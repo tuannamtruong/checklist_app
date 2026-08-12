@@ -21,19 +21,40 @@ just being a folder.
 
 ## Run it
 
-**Laptop (Windows or Linux, Chrome or Edge):**
+**Laptop — any browser:**
 
 ```bash
-npm run proto          # serves the app on 127.0.0.1:5175 — this device only
+npm run proto -- --folder ~/Dropbox/checklist
 ```
 
-Open <http://localhost:5175>, name the device, click **Choose folder…** and pick
-a folder inside your cloud drive, e.g. `C:\Users\you\Dropbox\checklist`. Type.
-Your text lands in `checklist.<device>.json`.
+Open <http://localhost:5175> and type. The local helper hands the folder to the
+page, so this works in Firefox, Safari, Chrome and Edge alike.
 
-`install/serve.mjs` binds to `127.0.0.1` and is not reachable from the network.
-It exists only because browsers refuse folder access over `file://`; it is the
-"install the app" step, and it is per-device forever.
+**Laptop — Chrome or Edge, picking the folder in the page:**
+
+```bash
+npm run proto          # no --folder
+```
+
+Then click **Choose folder…**. Same result; the folder is chosen in the browser
+instead of on the command line.
+
+`install/serve.py` binds to `127.0.0.1` and is not reachable from the network.
+It is not a sync server — it is one device's own file bridge, and the other
+device never touches it. Two devices can use different bridges, or none, and
+sync identically, because the only shared thing is the folder.
+
+**Python 3 stdlib only, no pip, ever.** That constraint is what lets the Windows
+launcher stage an embeddable Python and run the app with no installer — the
+approach `cooking_app` already proves. It also opens the browser for you, defers
+to an instance that is already running rather than failing to bind, and stops on
+`POST /api/quit`.
+
+Its folder API is deliberately `RemoteStore`-shaped (`src/sync/remote-store.ts`)
+— `list(prefix)` returning `FileMeta`, plus `read`/`write`/`remove` over nested
+paths and bytes — rather than the three flat methods the prototype needs today.
+`adapters/http-folder.mjs` shims between the two. Writing the helper to the
+smaller interface would have bought a rewrite the moment the op log arrives.
 
 **From a terminal, against a real folder** — the quickest way to convince
 yourself before trusting any UI:
@@ -47,7 +68,9 @@ node prototype/install/cli.mjs ~/Dropbox/checklist laptop --watch
 
 ```bash
 npm run proto:test     # two devices, a simulated cloud client, headless
-npm run proto:ui       # the browser shell (server must be running)
+npm run proto:ui       # the browser shell (helper must be running)
+npm run proto:bridge   # the any-browser path, against a real folder on disk
+npm run proto:android  # the Android code path, with the Java bridge stubbed
 ```
 
 ## 1. Testing on the phone today, without building anything
@@ -171,15 +194,39 @@ small file that changes often — some batch, some throttle background uploads.
 That sets how long "a few seconds" actually is, and it is the number worth
 measuring on your own accounts.
 
-## 4. Windows and Android are not symmetric
+## 4. Who can open a folder, and who cannot
 
 This is the real constraint the prototype turned up, and it decides how the app
 gets built.
 
-|                              | Laptop (Windows)                                | Phone (Android)                                           |
-| ---------------------------- | ----------------------------------------------- | --------------------------------------------------------- |
-| Folder access from a browser | **Yes** — File System Access API in Chrome/Edge | **No.** `showDirectoryPicker` is desktop-only             |
-| What it needs                | The static app + a localhost server             | An installed app using Android's Storage Access Framework |
+| Browser                | `showDirectoryPicker` | How it reaches the folder                     |
+| ---------------------- | --------------------- | --------------------------------------------- |
+| Chrome / Edge desktop  | Yes                   | Either: pick in the page, or the local helper |
+| **Firefox**            | **No, deliberately**  | The local helper (`--folder`)                 |
+| **Safari**             | **No**                | The local helper (`--folder`)                 |
+| Any browser on Android | No                    | Neither — and no local helper can run there   |
+
+Firefox has not merely "not got round to" the File System Access API — Mozilla
+objected to it, on the grounds that handing a web page a real folder on disk is
+a lot of authority to grant from a page. That position is unlikely to move, so
+depending on the API alone would have been a mistake regardless of Android.
+
+Hence the two ways in. The picker is a convenience where it exists; the helper
+is the portable path, and it is what an installed app would do anyway. Which one
+a device uses is local and invisible to sync — `test/bridge.mjs` runs a browser
+with `showDirectoryPicker` deleted, alongside a CLI device on the Node adapter,
+in one folder, and asserts they converge.
+
+Firefox does have OPFS (`navigator.storage.getDirectory()`), sometimes offered
+as the answer here. It is not: OPFS is an origin-private sandbox no cloud client
+can see, so nothing written there ever leaves the device.
+
+### The phone is still the hard part
+
+|                              | Laptop (Windows)                    | Phone (Android)                                               |
+| ---------------------------- | ----------------------------------- | ------------------------------------------------------------- |
+| Folder access from a browser | Yes — picker, or the local helper   | **No.** No File System Access API, and no local helper either |
+| What it needs                | The static app + a localhost helper | An installed app using Android's Storage Access Framework     |
 
 So the laptop half is a browser app and works today. The phone half **cannot be
 a plain web page** — a browser on Android cannot be granted a folder. It needs
@@ -189,16 +236,13 @@ core.
 That is exactly what you described, and it is the honest reading of the
 constraint rather than a preference.
 
-**What is built:** `core/` is pure and adapter-agnostic; `adapters/` has three
-implementations of the same three methods (Node fs, browser File System Access,
-in-memory). A WebView wrapper needs to supply a fourth — `list`, `read`, `write`
-over a SAF tree URI — and nothing else changes.
+`core/` is pure and adapter-agnostic; `adapters/` holds five implementations of
+the same three methods — Node fs, browser File System Access, the loopback
+bridge, in-memory, and Android SAF. The Android app is the fifth, and it is the
+only one that is a real application rather than a few lines of glue.
 
-**What is not built:** the APK. There is no Android SDK on this machine, and
-building one is a bigger piece of work than a prototype should smuggle in. The
-path is a Capacitor or TWA shell around `public/` plus a SAF folder plugin. Note
-this also contradicts _"PWA, not native"_ in `CLAUDE.md` — folder sync on
-Android is a genuine reason to revisit that decision, so it should be revisited
+Note this contradicts _"PWA, not native"_ in `CLAUDE.md`. Folder sync on Android
+is a genuine reason to revisit that decision — it should be revisited
 deliberately, not by accident.
 
 ## 5. What is proved, and what is assumed

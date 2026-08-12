@@ -9,9 +9,11 @@
 // show a device using a completely different adapter still converges.
 
 import { mkdtemp, rm, readdir } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
+import { request as httpRequest } from "node:http";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
@@ -46,12 +48,23 @@ async function expectEventually(name, fn, timeout = 10_000) {
 const folder = await mkdtemp(join(tmpdir(), "checklist-bridge-"));
 
 const helper = spawn(
-  process.execPath,
-  [join(HERE, "..", "install", "serve.mjs"), "--folder", folder],
-  { env: { ...process.env, PORT: String(PORT) }, stdio: "pipe" },
+  "python3",
+  [
+    join(HERE, "..", "install", "serve.py"),
+    "--folder",
+    folder,
+    "--port",
+    String(PORT),
+    "--no-browser",
+  ],
+  { stdio: "pipe" },
 );
 await new Promise((resolve, reject) => {
-  helper.stdout.on("data", (d) => String(d).includes("app on") && resolve());
+  helper.stdout.on(
+    "data",
+    (d) => String(d).includes("checklist helper:") && resolve(),
+  );
+  helper.stderr.on("data", (d) => reject(new Error(String(d))));
   helper.on("error", reject);
   setTimeout(() => reject(new Error("helper did not start")), 5000);
 });
@@ -147,23 +160,177 @@ await expectEventually("three files, one per device", async () => {
   );
 });
 
-console.log("\n5. the bridge refuses paths that are not ours");
+console.log("\n5. the bridge cannot be walked out of the folder");
+// The guarantee is confinement to the folder, not a filename pattern: the op
+// log needs `ops/<deviceId>/<seq>.jsonl`, so arbitrary nested paths are legal.
+// What must never work is escaping the root.
 for (const [label, name] of [
   ["traversal", "../../../etc/passwd"],
-  ["arbitrary file", "secrets.txt"],
+  ["absolute path", "/etc/passwd"],
+  ["parent segment", "ops/../../escape.json"],
+  ["backslash traversal", "..\\..\\windows\\system32"],
 ]) {
+  // Encoded whole, so the separators survive as %2F. Encoding per segment
+  // leaves literal dots and the *browser* collapses them before sending --
+  // which would prove nothing about the server.
   const status = await laptop.evaluate(
     (n) => fetch(`/folder/file/${encodeURIComponent(n)}`).then((r) => r.status),
     name,
   );
-  if (status === 400) ok(`rejects ${label} (400)`);
-  else fail(`rejects ${label}`, `got ${status}`);
+  if (status === 400) ok(`refuses ${label} (400)`);
+  else fail(`refuses ${label}`, `got ${status}`);
 }
+
+// A caller that is not a browser normalises nothing, which is the case that
+// actually matters. Raw request line, literal dots.
+const rawStatus = await new Promise((resolve, reject) => {
+  const req = httpRequest(
+    {
+      host: "127.0.0.1",
+      port: PORT,
+      path: "/folder/file/../../../../etc/passwd",
+    },
+    (res) => {
+      res.resume();
+      resolve(res.statusCode);
+    },
+  );
+  req.on("error", reject);
+  req.end();
+});
+if (rawStatus === 400)
+  ok("refuses an unnormalised traversal from a non-browser caller");
+else
+  fail(
+    "refuses an unnormalised traversal from a non-browser caller",
+    `got ${rawStatus}`,
+  );
+
+console.log("\n6. the RemoteStore shape the sync engine will use");
+const store = async (fn, arg) => laptop.evaluate(fn, arg);
+
+// Nested paths, which the flat prototype never exercises but the op log needs.
+const meta = await store(async () => {
+  const res = await fetch("/folder/file/ops/laptop/000001.jsonl", {
+    method: "PUT",
+    body: new TextEncoder().encode('{"op":1}\n'),
+  });
+  return res.json();
+});
+if (meta.path === "ops/laptop/000001.jsonl")
+  ok("writes a nested path, creating directories");
+else fail("writes a nested path", JSON.stringify(meta));
+
+await expectEventually("it is on disk where it says it is", async () =>
+  existsSync(join(folder, "ops", "laptop", "000001.jsonl")),
+);
+
+const listed = await store(() =>
+  fetch("/folder/list?prefix=ops/").then((r) => r.json()),
+);
+if (listed.length === 1 && listed[0].path === "ops/laptop/000001.jsonl")
+  ok("list(prefix) filters to that subtree");
+else fail("list(prefix) filters to that subtree", JSON.stringify(listed));
+
+const fields = Object.keys(listed[0] ?? {})
+  .sort()
+  .join();
+if (fields === "modified,path,rev,size")
+  ok("FileMeta carries path, size, rev, modified");
+else fail("FileMeta carries path, size, rev, modified", fields);
+
+// The rev is what the engine's cursors compare, so a changed file must change it.
+const revBefore = listed[0].rev;
+const revAfter = await store(async () => {
+  const res = await fetch("/folder/file/ops/laptop/000001.jsonl", {
+    method: "PUT",
+    body: new TextEncoder().encode('{"op":1}\n{"op":2}\n'),
+  });
+  return (await res.json()).rev;
+});
+if (revAfter !== revBefore) ok("rev changes when the file changes");
+else fail("rev changes when the file changes", `still ${revAfter}`);
+
+const gone = await store(async () => {
+  await fetch("/folder/file/ops/laptop/000001.jsonl", { method: "DELETE" });
+  return fetch("/folder/file/ops/laptop/000001.jsonl").then((r) => r.status);
+});
+if (gone === 404) ok("remove deletes it");
+else fail("remove deletes it", `got ${gone}`);
 
 if (errors.length) fail("no console/page errors", errors.join("\n       "));
 else ok("no console/page errors");
 
 await browser.close();
+
+console.log("\n7. the helper's own behaviour");
+
+/** Raw request, so headers can be set that a browser would not allow. */
+const raw = (options, body) =>
+  new Promise((resolve, reject) => {
+    const req = httpRequest(
+      { host: "127.0.0.1", port: PORT, ...options },
+      (res) => {
+        res.resume();
+        resolve(res.statusCode);
+      },
+    );
+    req.on("error", reject);
+    req.end(body);
+  });
+
+// Another page in the browser must not be able to reach the folder. PUT and
+// DELETE are already blocked by preflight; GET is not, so it is checked here.
+const foreign = await raw({
+  path: "/folder/list",
+  headers: { Origin: "http://evil.example" },
+});
+if (foreign === 403) ok("refuses a folder request from a foreign origin");
+else fail("refuses a folder request from a foreign origin", `got ${foreign}`);
+
+const own = await raw({
+  path: "/folder/list",
+  headers: { Origin: `http://127.0.0.1:${PORT}` },
+});
+if (own === 200) ok("allows its own origin");
+else fail("allows its own origin", `got ${own}`);
+
+// Double-clicking the launcher twice must reopen the app, not fail to bind.
+const second = await new Promise((resolve) => {
+  const proc = spawn(
+    "python3",
+    [
+      join(HERE, "..", "install", "serve.py"),
+      "--folder",
+      folder,
+      "--port",
+      String(PORT),
+      "--no-browser",
+    ],
+    { stdio: "pipe" },
+  );
+  let out = "";
+  proc.stdout.on("data", (d) => (out += d));
+  proc.on("exit", (code) => resolve({ code, out }));
+});
+if (second.code === 0 && second.out.includes("already running"))
+  ok("a second launch defers to the first");
+else
+  fail(
+    "a second launch defers to the first",
+    `exit ${second.code}: ${second.out.trim()}`,
+  );
+
+// Closing the tab does not stop the server, so there has to be a way out.
+const quit = await raw({ path: "/api/quit", method: "POST" });
+const stopped = await new Promise((resolve) => {
+  helper.on("exit", () => resolve(true));
+  setTimeout(() => resolve(false), 5000);
+});
+if (quit === 200 && stopped) ok("POST /api/quit stops the helper");
+else
+  fail("POST /api/quit stops the helper", `status ${quit}, exited ${stopped}`);
+
 helper.kill();
 await rm(folder, { recursive: true, force: true });
 console.log(`\n${failures ? `${failures} failure(s)` : "all checks passed"}`);
