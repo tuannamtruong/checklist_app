@@ -14,6 +14,12 @@ import {
 } from "../adapters/fsaa-folder.mjs";
 import { memoryFolder } from "../adapters/memory-folder.mjs";
 import { bridgeInfo, httpFolder } from "../adapters/http-folder.mjs";
+import {
+  androidFolder,
+  androidInfo,
+  available as androidAvailable,
+  pickAndroidFolder,
+} from "../adapters/android-folder.mjs";
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -163,6 +169,9 @@ $("device").addEventListener("change", (e) => {
 });
 
 $("pick").addEventListener("click", async () => {
+  // On Android the button is wired to the system picker instead; this
+  // listener stays attached, so it has to stand aside.
+  if (androidAvailable()) return;
   try {
     const handle = await pickFolder();
     await start(fsaaFolder(handle), handle.name);
@@ -202,16 +211,33 @@ $("device").value = deviceId;
 
 // How this device reaches the folder, best first.
 //
-// 1. The local helper was started with --folder. It already holds the folder,
-//    so every browser works — this is the only path Firefox and Safari have.
-// 2. Chrome/Edge with a handle we stored earlier: start straight up.
-// 3. Chrome/Edge with nothing stored: the user picks a folder.
+// 1. The Android shell handed us one through the Storage Access Framework.
+// 2. The local helper was started with --folder. It already holds the folder,
+//    so every desktop browser works — the only path Firefox and Safari have.
+// 3. Chrome/Edge with a handle we stored earlier: start straight up.
+// 4. Chrome/Edge with nothing stored: the user picks a folder.
 //
 // Which one a device uses is a local detail. Two devices can differ, and sync
 // is unaffected, because the folder is the only thing they share.
-const bridge = await bridgeInfo();
+const android = androidInfo();
+const bridge =
+  android.configured || androidAvailable()
+    ? { configured: false }
+    : await bridgeInfo();
 
-if (bridge.configured && !params.has("demo")) {
+if (androidAvailable() && !params.has("demo")) {
+  if (android.configured) {
+    $("pick").textContent = "Change folder…";
+    $("pick").onclick = pickAndroidFolder;
+    await start(androidFolder(), android.name);
+    log("folder granted through Android's file picker", "ok");
+  } else {
+    // No folder yet: the picker is the whole first-run experience.
+    $("unsupported").hidden = true;
+    $("pick").textContent = "Choose folder…";
+    $("pick").onclick = pickAndroidFolder;
+  }
+} else if (bridge.configured && !params.has("demo")) {
   $("pick").hidden = true;
   await start(httpFolder(), bridge.name);
   log(`folder supplied by the local helper: ${bridge.path}`, "ok");

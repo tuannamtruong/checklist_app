@@ -245,6 +245,110 @@ Note this contradicts _"PWA, not native"_ in `CLAUDE.md`. Folder sync on Android
 is a genuine reason to revisit that decision — it should be revisited
 deliberately, not by accident.
 
+## 5. The Android app
+
+`android/` is a real Android project producing a real APK. It is about 300 lines
+of Java around the same web app the laptop runs:
+
+| Piece                     | Job                                                                                                        |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `MainActivity`            | A WebView, loading the bundled page over `https://appassets.androidplatform.net`                           |
+| `MimeCorrectAssetHandler` | Serves `.mjs` as `text/javascript`. Without it every module is refused and the app boots to a blank screen |
+| `FolderStore`             | Keeps the SAF grant across restarts, so the folder is picked once                                          |
+| `FolderBridge`            | `list` / `read` / `write` exposed to the page as `window.AndroidFolder`                                    |
+
+The web app is **not** copied into the Android project. A Gradle task pulls
+`public/`, `core/` and `adapters/` from `prototype/` at build time, so there is
+one copy of the sync core and the phone cannot drift from the laptop.
+
+Two things worth noticing in the manifest:
+
+- **No `INTERNET` permission.** The app cannot reach the network even in
+  principle. It is not a sync client — it edits files in a folder you grant it.
+- **No storage permission either.** SAF grants access to one folder you chose;
+  there is no All Files Access and no permission prompt beyond the picker.
+
+### Building it
+
+```bash
+cd prototype/android
+./build.sh                 # -> out/checklist-sync.apk
+```
+
+Everything happens inside a container. The host needs Docker and nothing else —
+no JDK, no Android SDK, no Gradle. The first run builds the image (~2.4 GB,
+several minutes); after that only the APK is rebuilt. `./build.sh clean` removes
+the build output and the Gradle cache.
+
+Copy the APK to the phone and open it. Android will ask once for permission to
+install from that source.
+
+### On the phone
+
+Start the app, tap **Choose folder…**, and pick the folder your sync app keeps.
+That is the one real constraint: **Android needs an app that maintains a genuine
+local folder.** The Dropbox, Drive and OneDrive Android apps are on-demand
+browsers for cloud files — they do not mirror a folder onto the device the way
+their desktop clients do. What works:
+
+| Approach                      | Notes                                                                                                                                                                                       |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Syncthing**                 | Syncs a real folder, no cloud account, direct between devices. Best fit                                                                                                                     |
+| **FolderSync** / **Dropsync** | Mirrors a local folder to Dropbox/Drive/OneDrive on a schedule                                                                                                                              |
+| **Nextcloud**                 | Its Android app can auto-sync folders                                                                                                                                                       |
+| A provider's SAF location     | The picker shows any DocumentsProvider on the phone, so a cloud folder can be selected directly — but then reads and writes go over the network on demand, and behaviour varies by provider |
+
+This is the part of the design that is weakest on Android, and it is worth
+knowing before building anything larger on it.
+
+## 6. Jenkins later
+
+The image is the agent, and the build is one `docker run`. A pipeline step is
+the same command `build.sh` already issues:
+
+```groovy
+pipeline {
+    agent any
+    stages {
+        stage('APK') {
+            steps {
+                dir('prototype/android') {
+                    sh 'docker build -t checklist-android-builder .'
+                    sh '''docker run --rm \
+                        -u $(id -u):$(id -g) \
+                        -v $WORKSPACE/prototype:/workspace \
+                        -v $WORKSPACE/.gradle-cache:/gradle-home \
+                        -e GRADLE_USER_HOME=/gradle-home \
+                        -e ANDROID_USER_HOME=/gradle-home/.android \
+                        -e HOME=/gradle-home \
+                        -w /workspace/android \
+                        checklist-android-builder \
+                        gradle --no-daemon assembleDebug'''
+                }
+            }
+        }
+    }
+    post {
+        success {
+            archiveArtifacts 'prototype/android/app/build/outputs/apk/debug/*.apk'
+        }
+    }
+}
+```
+
+Four things were done with this in mind: the SDK licences are accepted in the
+`Dockerfile` rather than in someone's home directory, the daemon is off so no
+state survives between runs, `GRADLE_USER_HOME` is a mounted volume so a cache
+can be kept without baking it into the image, and the container runs as the
+invoking user so artifacts are not written to the workspace as root.
+
+`HOME` has to be set explicitly: running as a UID with no home directory in the
+image makes the Android Gradle plugin try to write `/.android` during
+configuration, and it fails the build rather than degrading.
+
+A release build would additionally need a signing key, which should come from
+Jenkins credentials and never from the repository.
+
 ## 5. What is proved, and what is assumed
 
 `npm run proto:test` runs the full story headlessly — two devices, each with its
@@ -261,6 +365,27 @@ convergence test that settles on every seed tried:
 - Resolving on the laptop propagates; the phone fast-forwards without a conflict
   of its own.
 - Every file in the cloud folder was written only by its owner.
+
+### The Android app specifically
+
+`npm run proto:android` drives the real `adapters/android-folder.mjs` and the
+real startup branch in `app.js`, with the Java bridge replaced by a synchronous
+in-page stub of the same shape. It asserts the app boots without a picker, never
+probes the loopback helper, writes valid snapshots through the bridge, picks up a
+laptop's file, raises a conflict on a concurrent one, writes nothing while it is
+open, and calls the _system_ picker on first run. 18 checks.
+
+The APK itself was verified by inspection, not by running it: package
+`dev.checklist.proto`, minSdk 24 / target 34, launcher activity present, all
+eleven web assets bundled, and `aapt2 dump permissions` returns **nothing at
+all** — the no-network claim is confirmed rather than asserted.
+
+**Not verified: every line of Java, and the MIME handling.** There is no
+accelerated emulator available here (`/dev/kvm` exists but the build user is not
+in the `kvm` group), so nothing has executed on an Android runtime. The most
+likely failure on first launch is a blank screen, which would mean
+`MimeCorrectAssetHandler` is not doing its job and the module scripts are being
+refused. `adb logcat | grep -i chromium` will say so plainly.
 
 Assumed, not proved, and worth testing on your own accounts:
 

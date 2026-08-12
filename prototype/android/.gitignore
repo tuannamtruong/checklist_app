@@ -1,0 +1,8 @@
+# Build output and caches. The image is reproducible from the Dockerfile, and
+# the APK is reproducible from build.sh, so neither belongs in git.
+out/
+build/
+app/build/
+.gradle/
+.gradle-cache/
+local.properties
