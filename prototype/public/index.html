@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="color-scheme" content="light dark" />
+    <title>Checklist sync prototype</title>
+    <link rel="stylesheet" href="/public/style.css" />
+  </head>
+  <body>
+    <header>
+      <div class="row">
+        <input id="device" class="device" aria-label="Device name" />
+        <span id="status" class="pill">starting</span>
+      </div>
+      <div class="row">
+        <span id="folder" class="folder">no folder</span>
+        <button id="pick">Choose folder…</button>
+      </div>
+    </header>
+
+    <main>
+      <section id="setup" class="setup">
+        <h2>Point this device at the shared folder</h2>
+        <p>
+          Pick a folder that your cloud client already syncs — for example
+          <code>Dropbox\checklist</code> or <code>OneDrive\checklist</code>.
+          This app never touches the network. It writes one file; your cloud
+          client carries it to the other device.
+        </p>
+        <p id="unsupported" class="warn-text" hidden>
+          This browser cannot open a folder itself — Firefox and Safari have no
+          File System Access API, by choice. Restart the local helper with the
+          folder and it will hand it over instead:
+        </p>
+        <pre id="unsupported-cmd" class="cmd" hidden>
+npm run proto -- --folder ~/Dropbox/checklist</pre>
+        <p><button id="demo">Run in demo mode instead</button></p>
+      </section>
+
+      <div id="work" hidden>
+        <label class="label" for="text">The sentence</label>
+        <textarea
+          id="text"
+          rows="3"
+          placeholder="Type here — it goes into your file in the folder"
+        ></textarea>
+
+        <section id="conflict" class="conflict" hidden>
+          <h2>Merge conflict</h2>
+          <p class="hint">
+            This device and another one both edited without seeing each other.
+            The conflict lives <strong>only on this device</strong> — nothing
+            about it was written to the folder.
+          </p>
+          <div id="sides" class="sides"></div>
+          <details>
+            <summary>Merge by hand</summary>
+            <textarea id="merged" rows="3"></textarea>
+            <button id="keep-merged">Save merged</button>
+          </details>
+        </section>
+
+        <dl class="meta">
+          <div>
+            <dt>My file</dt>
+            <dd id="m-file">—</dd>
+          </div>
+          <div>
+            <dt>Text last written by</dt>
+            <dd id="m-author">—</dd>
+          </div>
+          <div>
+            <dt>Version vector</dt>
+            <dd id="m-clock">—</dd>
+          </div>
+          <div>
+            <dt>Last checked</dt>
+            <dd id="m-sync">never</dd>
+          </div>
+        </dl>
+
+        <h2 class="label">Files in the folder</h2>
+        <ul id="files" class="files"></ul>
+
+        <h2 class="label">Log</h2>
+        <ol id="log" class="log"></ol>
+      </div>
+    </main>
+
+    <script type="module" src="/public/app.js"></script>
+  </body>
+</html>
