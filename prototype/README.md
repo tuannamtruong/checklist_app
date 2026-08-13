@@ -2,11 +2,11 @@
 
 Prototype for syncing one single text field in a web application across multiple devices.
 
-The prototype answering these questions:
+The goal of the prototype to solves these questions:
 
-1. Does folder-based sync between a windows 11 laptop and an android actually work?
-2. What storage does it need on these devices?
-3. How to handle race-condition when the devices makes Write op offline?
+1. How synchronisation between a windows 11 laptop and an android smartphone work?
+2. How to handle race-condition?
+3. What storage does it need on these devices?
 4. Which browser can host the app?
 
 The design contains **no**: database engine, API, OAuth, account, network code. The app reads and writes files in an
@@ -16,16 +16,8 @@ of multiple devices.
 Which cloud provider should makes no differences. The app needs three operations: `list`, `read`, `write`. Every
 provider grants those by just being a folder.
 
-## Glossary
 
-| Term           | Definition                                                                                                                                                                                                           |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Sync folder    | A specific shared folder in the cloud provider directory, which contains all items of the application.                                                                                                               |
-| Windows bundle | An official embeddable Python staged on the Windows side plus a desktop shortcut to `pythonw.exe`. No `.exe` is produced deliberately, as a shortcut to Microsoft's own signed binary raises no SmartScreen warning. |
-| Demo mode      | `?demo` in the URL, running the app against an in-memory folder with no disk and no network.                                                                                                                         |
-| Snapshot       | `checklist.<device-id>.json` files inside the sync folder. Each file is a device's replica of the shared state; every device holds a full replica, which enables the app to work offline.                            |
-
-## Validation Procedure
+## Setup
 
 ### Install
 
@@ -78,13 +70,23 @@ Picking the folder in the page (if not specified during install): click **Choose
 On Android there is no localhost and no picker in the page: the app boots straight to **Choose folder…**, which opens
 the _system_ picker (Storage Access Framework). The grant is kept across restarts, so the folder is picked once.
 
-## Logic
 
-Consider:
-`1111aaaa`: device-id of the laptop
-`2222bbbb`: device-id of the phone
+## Glossary
 
-### Snapshot
+| Term           | Definition                                                                                                                                                                                                           |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sync folder    | A specific shared folder in the cloud provider directory, which contains all items of the application.                                                                                                               |
+| Windows bundle | An official embeddable Python staged on the Windows side plus a desktop shortcut to `pythonw.exe`. No `.exe` is produced deliberately, as a shortcut to Microsoft's own signed binary raises no SmartScreen warning. |
+| Demo mode      | `?demo` in the URL, running the app against an in-memory folder with no disk and no network.                                                                                                                         |
+| Device-id       | A random generated on first run in a device and persisted in the meta table under key deviceId. Reset after "Clear site data" in DevTools.|
+| Snapshot       | `checklist.<device-id>.json` files inside the sync folder. Each file is a device's replica of the shared state; every device holds a full replica, which enables the app to work offline.                            |
+
+
+In this document:
+- 1111aaaa: device-id of a laptop
+- 2222bbbb: device-id of a phone
+
+## Snapshot
 
 The synced folder has no locking or conditional write. Each device writes a distinct snapshot `checklist.<device-id>.json`, that describes its state to the sync folder.
 
@@ -94,8 +96,7 @@ Sync-Folder/
   checklist.2222bbbb.json     <- only the phone ever writes this
 ```
 
-Each device **writes one Snapshot (specific for its device) and also reads all Snapshots (from its own and
-other device)**. No concurrent write of Snapshot can happens.
+Each device **writes one Snapshot** (specific for its own device) and reads all Snapshots in Sync Folder. No concurrent write of Snapshot can happens.
 
 Snapshot content
 
@@ -119,14 +120,19 @@ Snapshot content
 | text      | Value of the text field, specific for the prototype.                                                                                                                                                                                                                                                                                                                                                                        |
 | clock     | Version vector. It has 2 directions. <br> One counter for recording the version of its own device: `"1111aaaa": 3`.<br> Other counter(s) is a receipt for what this device `1111aaaa` have read from other device `2222bbbb`: `"2222bbbb": 1`.<br>A device that has never appeared in the folder is simply absent from the vector and counts as `0`, so a third device joins with no registration step and no coordination. |
 
-### Multi-device change synchronisation
 
-There are two level synchronisation:
+Change awareness is not received but derived. On every cycle a device reads the snapshots it finds and compares each
+snapshot's `clock` vector against its own.
 
-- File and folder in Sync Folder
-- Application content: Values shown in the app's presentation layer
+**Only a device may increment its own counter.** Folding in a peer's edit joins the two vectors.
 
-#### 1. File and folder in Sync Folder
+## Synchronisation Logic
+
+There are two parts of synchronisation:
+1. Files and directories in Sync Folder.
+2. Application Content: Values shown in the app's presentation layer for the end user.
+
+### 1. File and folder in Sync Folder
 
 Each device **writes only its own one Snapshot file** in the Sync Folder, as long the device-id is unique,
 it's impossible for race condition can happen for items inside Sync Folder.
@@ -135,14 +141,12 @@ The Sync Folder never tells a device that something happened. The files are quie
 not running. Sync of content inside the folder will be handled by the cloud provider. The application has no logic for
 this.
 
-#### 2. Application content
+Consider:
+`1111aaaa`: device-id of the laptop
+`2222bbbb`: device-id of the phone
 
-Change awareness is not received but derived. On every cycle a device reads the snapshots it finds and compares each
-snapshot's `clock` vector against its own.
-
-**Only a device may increment its own counter.** Folding in a peer's edit joins the two vectors.
-
-##### Comparision of 2 devices
+### 2. Application content synchronisation 
+#### 2.1. Application content synchronisation between a pair of devices
 
 Comparing two vectors solves:
 
@@ -204,8 +208,10 @@ thought of the wording. On the last row the phone's text is the only thing that 
 | Laptop reconnects and resolves | <code>"Buy milk, eggs<b>, bread and oat milk</b>"</code><br><code>{1111aaaa: <b>17</b>, 2222bbbb: <b>4</b>}</code><br>by `1111aaaa` at **`10:05Z`** | `"Buy oat milk"`<br>`{1111aaaa: 15, 2222bbbb: 4}`<br>by `2222bbbb` at `10:04Z`                                                     | laptop ahead |
 | Phone syncs and fast-forwards  | `"Buy milk, eggs, bread and oat milk"`<br>`{1111aaaa: 17, 2222bbbb: 4}`<br>by `1111aaaa` at `10:05Z`                                                | **`"Buy milk, eggs, bread and oat milk"`**<br><code>{1111aaaa: <b>17</b>, 2222bbbb: 4}</code><br>by **`1111aaaa`** at **`10:05Z`** | equal        |
 
+#### 2.2 Application content between more than 2 devices
 
-### The sync cycle
+
+### 3. The sync cycle
 
 `core/folder-sync.mjs` generic over the folder it is handed.
 
@@ -216,31 +222,26 @@ Every 3 s and on window focus, a full sync cycle starts:
 - `reconcile()` them against own snapshot (`core/merge.mjs`).
 - Write own file back, if something happend during merge.
 
-### Race conditions
+### 4. Race conditions
 
 Two of them, at different layers.
 
-**A half-written file.** The cloud client may be mid-download when we list the
-folder. A file that does not parse is skipped and picked up whole on the next
-cycle; our own writes go through write-then-rename
-(`adapters/node-folder.mjs`, `install/serve.py`) so no client ever observes a
-partial file of ours.
+**A half-written file.** The cloud client may be mid-download when we list the folder. A file that does not parse is
+skipped and picked up whole on the next cycle; our own writes go through write-then-rename (`adapters/node-folder.mjs`,
+`install/serve.py`) so no client ever observes a partial file of ours.
 
-**Two devices edited without seeing each other.** Detecting this is what the
-vector above is for; what follows is what the app does once it has.
+**Two devices edited without seeing each other.** Detecting this is what the vector above is for; what follows is what
+the app does once it has.
 
-On a concurrent pair the device holds its own text and shows both sides.
-**Nothing is written to the folder while a conflict is open**, so the other
-device never learns there was one — the conflict is local and stays local.
+On a concurrent pair the device holds its own text and shows both sides. **Nothing is written to the folder while a
+conflict is open**, so the other device never learns there was one — the conflict is local and stays local.
 
-Resolving joins every racing clock and then bumps our own, producing a version
-that strictly dominates all of them. The other device sees a snapshot newer than
-everything it knows and fast-forwards to it: no second conflict, no ping-pong.
+Resolving joins every racing clock and then bumps our own, producing a version that strictly dominates all of them. The
+other device sees a snapshot newer than everything it knows and fast-forwards to it: no second conflict, no ping-pong.
 
-**Only one device may resolve.** A resolution is itself an edit, so two devices
-resolving the same conflict independently are just two more concurrent edits,
-and they chase each other indefinitely. Fine for one person holding one device
-at a time; a real hazard if this ever became multi-user.
+**Only one device may resolve.** A resolution is itself an edit, so two devices resolving the same conflict
+independently are just two more concurrent edits, and they chase each other indefinitely. Fine for one person holding
+one device at a time; a real hazard if this ever became multi-user.
 
 ## Build pipeline
 
