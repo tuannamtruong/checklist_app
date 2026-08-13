@@ -7,7 +7,7 @@ The prototype answering these questions:
 1. Does folder-based sync between a windows 11 laptop and an android actually work?
 2. What storage does it need on these devices?
 3. How to handle race-condition when the devices makes Write op offline?
-4. Can it works in all browsers (Chromium, Firefox)?
+4. Which browser can host the app?
 
 The design contains **no**: database engine, API, OAuth, account, network code. The app reads and writes files in an
 folder, that resides in a Cloud Provider. The client of the Cloud Provider is needed to be installed for synchronisation
@@ -18,16 +18,12 @@ provider grants those by just being a folder.
 
 ## Glossary
 
-Sync folder: a specific shared folder in the cloud provider directory, which contains all items of the application.
-
-Replica Item: checklist.<device-id>.json files inside sync folder. It is device's replica of the shared state. Every
-device holds a full replica, which is what makes the app work offline .
-
-Windows bundle: an official embeddable Python staged on the Windows side plus a desktop shortcut to `pythonw.exe`. No
-`.exe` is produced deliberately, because a shortcut to Microsoft's own signed binary raises no SmartScreen warning.
-
-Demo mode: `?demo` in the URL, running the whole app against an in-memory folder with no disk and no network, with
-`window.__injectPeer(id, text, clock)` to fake a peer (`adapters/memory-folder.mjs`).
+| Term           | Definition                                                                                                                                                                                                           |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sync folder    | A specific shared folder in the cloud provider directory, which contains all items of the application.                                                                                                               |
+| Replica Item   | `checklist.<device-id>.json` files inside the sync folder. Each file is a device's replica of the shared state; every device holds a full replica, which enables the app to work offline.                            |
+| Windows bundle | An official embeddable Python staged on the Windows side plus a desktop shortcut to `pythonw.exe`. No `.exe` is produced deliberately, as a shortcut to Microsoft's own signed binary raises no SmartScreen warning. |
+| Demo mode      | `?demo` in the URL, running the app against an in-memory folder with no disk and no network. Use `window.__injectPeer(id, text, clock)` to fake a peer (`adapters/memory-folder.mjs`).                               |
 
 ## Validation Procedure
 
@@ -98,7 +94,8 @@ Sync-Folder/
   checklist.2222bbbb.json     <- only the phone ever writes this
 ```
 
-Each device **writes one Replica Item and reads all Replica Items**. No concurrent write of Replica Item will happens.
+Each device **writes one Replica Item (specific for this device) and also reads all Replica Items (from its own and
+other device)**. No concurrent write of Replica Item can happens.
 
 Replica Item's Content
 
@@ -122,11 +119,21 @@ Replica Item's Content
 | clock     | Version vector. One counter per device recording how many edits by that device. It is a receipt for what has been read, not a claim about time.                                                                     |
 | updatedAt | A wall-clock timestamp used only to pick the newest among snapshots that already agree on the text, and to show a human when something changed. It never decides what happened; clock skew makes it unfit for that. |
 
-### Multi-device change awareness
+### Multi-device change synchronisation
 
-A synced folder never tells a device that something happened.
-There is no notification, no callback, no server pushing an event — files just quietly appear and change under the folder while the app is not looking.
-Awareness is therefore not received but **derived**: on every cycle a device reads the Replica Items it finds and compares each one's `clock` against its own (`core/merge.mjs`).
+There are two level synchronisation:
+
+- File and folder in Sync Folder
+- Application content: Values shown in the app's presentation layer
+
+#### 1. File and folder in Sync Folder
+
+Each device **writes one Replica Item and reads all Replica Items** in the Sync Folder, as long the device-id is unique,
+it's impossible for race condition can happen for items inside Sync Folder.
+
+The Sync Folder never tells a device that something happened. The files are quietly synchronized also when the app is
+not running. Sync of content inside the folder will be handled by the cloud provider. The application has no logic for
+this.
 
 The rule that makes those counters comparable is a single one:
 

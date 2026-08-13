@@ -32,8 +32,8 @@ export function deviceIdFrom(fileName) {
 }
 
 /**
- * The user typed something. Only this device may increment its own slot, so a
- * local edit can never be confused with a peer's.
+ * The user typed something. Only this device may increment its own counter,
+ * so a local edit can never be confused with a peer's.
  * @returns {Snapshot}
  */
 export function localEdit(mine, deviceId, label, text, now) {

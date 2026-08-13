@@ -32,7 +32,7 @@ export function join(a, b) {
   return out;
 }
 
-/** One more edit by `device`. Only that device may ever increment its own slot. */
+/** One more edit by `device`. Only that device may ever increment its own counter. */
 export function bump(clock, device) {
   return { ...clock, [device]: at(clock, device) + 1 };
 }
