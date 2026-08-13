@@ -9,25 +9,25 @@ The prototype answering these questions:
 3. How to handle race-condition when the devices makes Write op offline?
 4. Can it works in all browsers (Chromium, Firefox)?
 
-The design contains **no**: database engine, API, OAuth, account, network code.
-The app reads and writes files in an folder, that resides in a Cloud Provider.
-The client of the Cloud Provider is needed to be installed for synchronisation
+The design contains **no**: database engine, API, OAuth, account, network code. The app reads and writes files in an
+folder, that resides in a Cloud Provider. The client of the Cloud Provider is needed to be installed for synchronisation
 of multiple devices.
 
-Which cloud provider should makes no differences. The app needs three operations:
-`list`, `read`, `write`. Every provider grants those by just being a folder.
+Which cloud provider should makes no differences. The app needs three operations: `list`, `read`, `write`. Every
+provider grants those by just being a folder.
 
 ## Glossary
 
 Sync folder: a specific shared folder in the cloud provider directory, which contains all items of the application.
 
-Replica Item: checklist.<device-id>.json files inside sync folder.
-It is device's replica of the shared state. Every device holds a full replica, which is what makes the app work offline .
+Replica Item: checklist.<device-id>.json files inside sync folder. It is device's replica of the shared state. Every
+device holds a full replica, which is what makes the app work offline .
 
-Windows bundle: an official embeddable Python staged on the Windows side plus a desktop shortcut to `pythonw.exe`.
-No `.exe` is produced deliberately, because a shortcut to Microsoft's own signed binary raises no SmartScreen warning.
+Windows bundle: an official embeddable Python staged on the Windows side plus a desktop shortcut to `pythonw.exe`. No
+`.exe` is produced deliberately, because a shortcut to Microsoft's own signed binary raises no SmartScreen warning.
 
-Demo mode: `?demo` in the URL, running the whole app against an in-memory folder with no disk and no network, with `window.__injectPeer(id, text, clock)` to fake a peer (`adapters/memory-folder.mjs`).
+Demo mode: `?demo` in the URL, running the whole app against an in-memory folder with no disk and no network, with
+`window.__injectPeer(id, text, clock)` to fake a peer (`adapters/memory-folder.mjs`).
 
 ## Validation Procedure
 
@@ -63,34 +63,34 @@ npm run proto -- --folder ~/Dropbox/checklist
 
 **Android - APK**
 
-All dependencies to build the APK are in Docker container: JDK, Android SDK, Gradle.
-The first run builds the image (~2.4 GB), after that only the APK is rebuilt.
+All dependencies to build the APK are in Docker container: JDK, Android SDK, Gradle. The first run builds the image
+(~2.4 GB), after that only the APK is rebuilt.
 
 ```bash
 make proto_android
 ```
 
-Gradle task pulls `public/`, `core/` and `adapters/` from `prototype/` at build time,
-so there is one copy of the sync core and the phone cannot drift from the laptop.
+Gradle task pulls `public/`, `core/` and `adapters/` from `prototype/` at build time, so there is one copy of the sync
+core and the phone cannot drift from the laptop.
 
 ### Running
 
 The webapp will be located in `http://localhost:38531/`
 
-Picking the folder in the page (if not specified during install)
-Click **Choose folder…** for choosing folder.
+Picking the folder in the page (if not specified during install): click **Choose folder…**.
 
-On Android there is no localhost and no picker in the page: the app boots
-straight to **Choose folder…**, which opens the _system_ picker (Storage Access
-Framework). The grant is kept across restarts, so the folder is picked once.
+On Android there is no localhost and no picker in the page: the app boots straight to **Choose folder…**, which opens
+the _system_ picker (Storage Access Framework). The grant is kept across restarts, so the folder is picked once.
 
 ## Logic
 
 ### Replica Item
 
-A synced folder gives no locking and no conditional write. Each device writes a distinct `checklist.<device-id>.json` file to the sync folder.
-1111aaaa: device-id of the laptop
-2222bbbb: device-id of the phone
+A synced folder gives no locking and no conditional write. Each device writes a distinct `checklist.<device-id>.json`
+file to the sync folder.
+
+- `1111aaaa`: device-id of the laptop
+- `2222bbbb`: device-id of the phone
 
 ```
 Sync-Folder/
@@ -100,7 +100,7 @@ Sync-Folder/
 
 Each device **writes one Replica Item and reads all Replica Items**. No concurrent write of Replica Item will happens.
 
-Fields in Replica Item
+Replica Item's Content
 
 ```json
 {
