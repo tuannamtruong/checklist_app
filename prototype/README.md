@@ -1,200 +1,277 @@
-# Sync prototype — one sentence, two devices, a shared cloud folder
+# Prototype
 
-Throwaway code answering three questions before the real app commits to
-anything:
+Prototype for syncing one single text field in a web application across multiple devices.
 
-1. Does folder-based sync between a laptop and a phone actually work?
-2. What storage does it need — on the device, and in the cloud?
-3. What does an offline edit that raced look like to the person holding the
-   phone?
+The prototype answering these questions:
 
-**There is no server anywhere in this design.** No API, no OAuth, no account,
-no network code in the app at all. The app reads and writes files in an
-ordinary folder. Whatever cloud client is already installed — Dropbox,
-OneDrive, Google Drive, Syncthing, iCloud — carries those files between
-devices, over each device's own internet connection. The two devices never
-address each other and never need to be on the same network.
+1. Does folder-based sync between a windows 11 laptop and an android actually work?
+2. What storage does it need on these devices?
+3. How to handle race-condition when the devices makes Write op offline?
+4. Can it works in all browsers (Chromium, Firefox)?
 
-That is also why the provider does not matter. The app needs three operations
-from a folder — `list`, `read`, `write` — and every provider gives you those by
-just being a folder.
+The design contains **no**: database engine, API, OAuth, account, network code.
+The app reads and writes files in an folder, that resides in a Cloud Provider.
+The client of the Cloud Provider is needed to be installed for synchronisation
+of multiple devices.
 
-## Run it
+Which cloud provider should makes no differences. The app needs three operations:
+`list`, `read`, `write`. Every provider grants those by just being a folder.
 
-**Laptop — any browser:**
+## Glossary
+
+Sync folder: a specific shared folder in the cloud provider directory, which contains all items of the application.
+
+Replica Item: checklist.<device-id>.json files inside sync folder.
+It is device's replica of the shared state. Every device holds a full replica, which is what makes the app work offline .
+
+Windows bundle: an official embeddable Python staged on the Windows side plus a desktop shortcut to `pythonw.exe`.
+No `.exe` is produced deliberately, because a shortcut to Microsoft's own signed binary raises no SmartScreen warning.
+
+Demo mode: `?demo` in the URL, running the whole app against an in-memory folder with no disk and no network, with `window.__injectPeer(id, text, clock)` to fake a peer (`adapters/memory-folder.mjs`).
+
+## Validation Procedure
+
+### Install
+
+**Laptop - Bundle for Windows**
+
+Creating and install the bundle
+
+```bash
+python3 install/make_windows_bundle.py
+```
+
+To also pass the sync folder while install
+
+```bash
+python3 install/make_windows_bundle.py --folder "C:\Dropbox\checklist"
+```
+
+**Laptop - running with CLI inside WSL**
+
+Picking folder in UI
+
+```bash
+npm run proto
+```
+
+Folder as parameter
 
 ```bash
 npm run proto -- --folder ~/Dropbox/checklist
 ```
 
-Open <http://localhost:5175> and type. The local helper hands the folder to the
-page, so this works in Firefox, Safari, Chrome and Edge alike.
+**Android - APK**
 
-**Laptop — Chrome or Edge, picking the folder in the page:**
-
-```bash
-npm run proto          # no --folder
-```
-
-Then click **Choose folder…**. Same result; the folder is chosen in the browser
-instead of on the command line.
-
-`install/serve.py` binds to `127.0.0.1` and is not reachable from the network.
-It is not a sync server — it is one device's own file bridge, and the other
-device never touches it. Two devices can use different bridges, or none, and
-sync identically, because the only shared thing is the folder.
-
-**Python 3 stdlib only, no pip, ever.** That constraint is what lets the Windows
-launcher stage an embeddable Python and run the app with no installer — the
-approach `cooking_app` already proves. It also opens the browser for you, defers
-to an instance that is already running rather than failing to bind, and stops on
-`POST /api/quit`.
-
-Its folder API is deliberately `RemoteStore`-shaped (`src/sync/remote-store.ts`)
-— `list(prefix)` returning `FileMeta`, plus `read`/`write`/`remove` over nested
-paths and bytes — rather than the three flat methods the prototype needs today.
-`adapters/http-folder.mjs` shims between the two. Writing the helper to the
-smaller interface would have bought a rewrite the moment the op log arrives.
-
-**From a terminal, against a real folder** — the quickest way to convince
-yourself before trusting any UI:
+All dependencies to build the APK are in Docker container: JDK, Android SDK, Gradle.
+The first run builds the image (~2.4 GB), after that only the APK is rebuilt.
 
 ```bash
-node prototype/install/cli.mjs ~/Dropbox/checklist laptop "Buy milk"
-node prototype/install/cli.mjs ~/Dropbox/checklist laptop --watch
+make proto_android
 ```
 
-**The tests:**
+Gradle task pulls `public/`, `core/` and `adapters/` from `prototype/` at build time,
+so there is one copy of the sync core and the phone cannot drift from the laptop.
 
-```bash
-npm run proto:test     # two devices, a simulated cloud client, headless
-npm run proto:ui       # the browser shell (helper must be running)
-npm run proto:bridge   # the any-browser path, against a real folder on disk
-npm run proto:android  # the Android code path, with the Java bridge stubbed
+### Running
+
+The webapp will be located in `http://localhost:38531/`
+
+Picking the folder in the page (if not specified during install)
+Click **Choose folder…** for choosing folder.
+
+On Android there is no localhost and no picker in the page: the app boots
+straight to **Choose folder…**, which opens the _system_ picker (Storage Access
+Framework). The grant is kept across restarts, so the folder is picked once.
+
+## Logic
+
+### Replica Item
+
+A synced folder gives no locking and no conditional write. Each device writes a distinct `checklist.<device-id>.json` file to the sync folder.
+1111aaaa: device-id of the laptop
+2222bbbb: device-id of the phone
+
+```
+Sync-Folder/
+  checklist.1111aaaa.json     <- only the laptop ever writes this
+  checklist.2222bbbb.json     <- only the phone ever writes this
 ```
 
-## 1. Testing on the phone today, without building anything
+Each device **writes one Replica Item and reads all Replica Items**. No concurrent write of Replica Item will happens.
 
-The file format is deliberately plain JSON, and that is not only for debugging:
+Fields in Replica Item
 
 ```json
 {
-  "device": "laptop",
-  "author": "laptop",
+  "device": "1111aaaa",
+  "label": "laptop",
+  "author": "1111aaaa",
   "text": "Buy milk",
-  "clock": { "laptop": 3, "phone": 1 },
+  "clock": { "1111aaaa": 3, "2222bbbb": 1 },
   "updatedAt": "2026-08-12T10:14:00Z"
 }
 ```
 
-So the phone half is testable **right now with no app at all**:
+| Field     | Description                                                                                                                                                                                                         |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| device    | A generated 8-hex-character id that names the replica file and never changes.                                                                                                                                       |
+| label     | The human name for a device, display only, carried inside the file and never in its name.                                                                                                                           |
+| author    | The device whose edit produced the current text, which is not always the device that owns the file. A device that adopts a peer's text keeps that peer as `author`.                                                 |
+| text      | Value of the text field, specific for the prototype.                                                                                                                                                                |
+| clock     | Version vector. One counter per device recording how many edits by that device. It is a receipt for what has been read, not a claim about time.                                                                     |
+| updatedAt | A wall-clock timestamp used only to pick the newest among snapshots that already agree on the text, and to show a human when something changed. It never decides what happened; clock skew makes it unfit for that. |
 
-1. On the laptop, write a sentence into a folder inside your cloud drive.
-2. On the phone, open the Dropbox/Drive/OneDrive app, find
-   `checklist.laptop.json`, and read it. The sentence is there — that is the
-   laptop → phone direction proven.
-3. Edit `checklist.phone.json` in any Android text editor, bumping
-   `clock.phone` by one and leaving the other numbers alone.
-4. On the laptop, `--watch` picks it up. That is the phone → laptop direction.
+### Multi-device change awareness
 
-Tedious by hand, obviously — bumping a counter is exactly the bookkeeping an app
-should do for you. But it proves the transport end to end before a single line
-of Android code exists, and if it fails, it fails somewhere you can see.
+A synced folder never tells a device that something happened.
+There is no notification, no callback, no server pushing an event — files just quietly appear and change under the folder while the app is not looking.
+Awareness is therefore not received but **derived**: on every cycle a device reads the Replica Items it finds and compares each one's `clock` against its own (`core/merge.mjs`).
 
-## 2. How it works
+The rule that makes those counters comparable is a single one:
 
-### One file per device — the whole safety argument
+**Only the owner of a slot ever increments it, and only when the user typed on that device.**
+Folding in a peer's edit joins the two vectors instead — pointwise max, no bump (`join`, `bump` in `core/merge.mjs`).
+So a vector reads in two directions at once: our own slot counts edits we made, every other slot is a receipt for what we have read from that device.
+A device that has never appeared in the folder is simply absent from the vector and counts as `0`, so a third device joins with no registration step and no coordination.
 
-A synced folder gives no locking and no conditional write. Two devices writing
-one file is how you get `checklist (nam's conflicted copy).json`, and it is the
-single biggest reason folder sync gets a bad reputation.
+Comparing two vectors answers the only question worth asking about a peer's file:
 
-So no two devices ever write the same path:
+| Relation to our clock | Meaning                                             | Consequence                                                |
+| --------------------- | --------------------------------------------------- | ---------------------------------------------------------- |
+| peer dominates ours   | The peer has seen everything we have, and then some | Its text is newer — adopt it                               |
+| ours dominates peer   | The peer is behind; it has not read our file yet    | Nothing to learn — our own file already carries the answer |
+| equal                 | Same knowledge on both sides                        | Nothing to do                                              |
+| neither dominates     | Both edited without seeing the other                | A genuine race — raise a conflict                          |
 
+With more than two devices the comparison is not pairwise.
+`reconcile()` takes every snapshot in the folder, ours included, and keeps the **maximal** ones — those nothing else strictly dominates.
+One surviving text means every other snapshot is an ancestor of it and there is nothing to ask anybody about; two surviving texts is the conflict case, and no merge rule can settle it alone.
+
+Worked through the scenario in `test/scenario.mjs`, with `1111aaaa` the laptop and `2222bbbb` the phone:
+
+| Step                                    | Laptop clock                 | Phone clock                  | Relation              |
+| --------------------------------------- | ---------------------------- | ---------------------------- | --------------------- |
+| Laptop types "Buy milk"                 | `{1111aaaa: 1}`              | —                            | laptop ahead          |
+| Phone syncs and adopts it               | `{1111aaaa: 1}`              | `{1111aaaa: 1}`              | equal                 |
+| Phone types "Buy milk and eggs"         | `{1111aaaa: 1}`              | `{1111aaaa: 1, 2222bbbb: 1}` | phone ahead           |
+| Laptop syncs and adopts it              | `{1111aaaa: 1, 2222bbbb: 1}` | `{1111aaaa: 1, 2222bbbb: 1}` | equal                 |
+| Laptop goes offline, types "…and bread" | `{1111aaaa: 2, 2222bbbb: 1}` | `{1111aaaa: 1, 2222bbbb: 1}` | laptop ahead          |
+| Phone types "Buy oat milk" meanwhile    | `{1111aaaa: 2, 2222bbbb: 1}` | `{1111aaaa: 1, 2222bbbb: 2}` | **concurrent**        |
+| Laptop reconnects and the user resolves | `{1111aaaa: 3, 2222bbbb: 2}` | `{1111aaaa: 1, 2222bbbb: 2}` | laptop dominates both |
+
+The last row is why resolving joins the racing clocks before bumping: the result strictly dominates every version that raced, so the phone reads it as plainly newer and fast-forwards instead of raising the same conflict again.
+
+Note what the wall clock does **not** do here.
+`updatedAt` never decides what happened — two devices with a few seconds of skew would silently hand every race to whichever one has the faster clock, and the loser's edit would disappear with no conflict raised.
+It is used only to pick among snapshots that already agree on the text, and to show a human when something changed.
+
+Adopting a peer's text obliges us to write our own file back, even though the user did nothing (`changed` in `applyPeers`).
+Taking the text without recording the clock would leave us looking, on our next local edit, as though we had edited concurrently — a conflict that never happened.
+Reading is part of the state, so it has to be published like any other change.
+
+What the user sees of all this: the current `author` resolved to a device label, our own clock, the file list with our file marked, and a log line for each incoming edit (`picked up "…" from laptop`).
+Labels are not copied around — each device declares its own inside its own file, so the folder as a whole is the lookup table and `labelFor()` reads it (`core/device.mjs`).
+A rename is display only: no clock bump, nothing to converge, and peers pick it up on their next read.
+
+### The sync cycle
+
+`core/folder-sync.mjs` generic over the folder it is handed.
+
+Every 3 s and on window focus, a full sync cycle starts:
+
+- `list()` the folder
+- `read()` every file (its own is skipped),
+- `reconcile()` them against own snapshot (`core/merge.mjs`).
+- Write own file back, if something happend during merge.
+
+### Race conditions
+
+Two of them, at different layers.
+
+**A half-written file.** The cloud client may be mid-download when we list the
+folder. A file that does not parse is skipped and picked up whole on the next
+cycle; our own writes go through write-then-rename
+(`adapters/node-folder.mjs`, `install/serve.py`) so no client ever observes a
+partial file of ours.
+
+**Two devices edited without seeing each other.** Detecting this is what the
+vector above is for; what follows is what the app does once it has.
+
+On a concurrent pair the device holds its own text and shows both sides.
+**Nothing is written to the folder while a conflict is open**, so the other
+device never learns there was one — the conflict is local and stays local.
+
+Resolving joins every racing clock and then bumps our own, producing a version
+that strictly dominates all of them. The other device sees a snapshot newer than
+everything it knows and fast-forwards to it: no second conflict, no ping-pong.
+
+**Only one device may resolve.** A resolution is itself an edit, so two devices
+resolving the same conflict independently are just two more concurrent edits,
+and they chase each other indefinitely. Fine for one person holding one device
+at a time; a real hazard if this ever became multi-user.
+
+## Build pipeline
+
+One command builds both bundles:
+
+```bash
+make proto_all
 ```
-Dropbox/checklist/
-  checklist.laptop.json     <- only the laptop ever writes this
-  checklist.phone.json      <- only the phone ever writes this
+
+Or either half on its own:
+
+```bash
+make proto_exe_win FOLDER='C:\Users\Nam\Dropbox\checklist'
+make proto_android
+make proto_clean
 ```
 
-Each device **writes one file and reads all of them**. The provider never sees a
-concurrent write, so its conflict-copy behaviour cannot trigger. Everything
-below is downstream of that one rule. (`test/scenario.mjs` §8 asserts it holds.)
+Neither installs a toolchain on this machine. The Windows target downloads an
+official embeddable Python and stages it on the Windows side — no installer, no
+pip, no admin rights — which is what the stdlib-only rule in `serve.py` buys.
+The Android target does everything inside Docker.
 
-### Version vectors — ordering without a server
+No `.exe` is produced, deliberately: a shortcut to Microsoft's own signed
+`pythonw.exe` raises no SmartScreen warning, an unsigned executable does. The
+prototype is not copied to the Windows side either — the shortcut points at
+`serve.py` where it already lives (over `\\wsl.localhost` under WSL), so there
+is one copy of the code and git keeps working.
 
-With no server and no ETag, ordering has to come from the data. Each snapshot
-carries a vector counting, per device, how many edits _by that device_ it has
-incorporated:
+`android/Dockerfile` doubles as a Jenkins agent: the SDK licences are accepted
+in the image rather than in someone's home directory, the Gradle daemon is off
+so no state survives a run, and the container runs as the invoking user so
+artifacts are not written to the workspace as root. A pipeline step is the same
+`docker run` that `build.sh` already issues.
 
-- `{laptop: 2, phone: 1}` vs `{laptop: 3, phone: 1}` — the second has seen
-  everything the first has, plus more. **Newer.** Take it silently.
-- `{laptop: 2, phone: 1}` vs `{laptop: 1, phone: 2}` — each knows something the
-  other does not. **Concurrent.** Nothing can order these, so ask the user.
-
-That distinction is the entire point. A timestamp cannot tell the difference
-between "later" and "at the same time on a device with a fast clock"; a vector
-can, and it needs no synchronised clocks between devices that may not have
-spoken in days.
-
-Adopting a peer's text also means adopting its clock — recording that we have
-_seen_ that edit. A device that took the text but not the clock would look, on
-its very next edit, like it had edited concurrently, and raise a conflict that
-never happened. `core/device.mjs` calls this out.
-
-### The conflict is local, and it stays local
-
-When two vectors are concurrent, the device holds its own text and shows both
-sides. Nothing is written to the folder while a conflict is open — so the other
-device learns nothing about it, which is precisely what "shown in the local
-device only" requires.
-
-Resolving joins both clocks and bumps our own, producing a version that strictly
-dominates both. The other device sees a snapshot newer than everything it knows
-and fast-forwards to it — no second conflict, no ping-pong.
-
-One finding from the property test worth stating plainly: **only one device may
-resolve.** A resolution is itself an edit, so two devices resolving the same
-conflict independently are just two more concurrent edits, and they chase each
-other indefinitely. Fine for one person holding one device at a time; a real
-hazard if this ever became multi-user.
-
-## 3. Storage
+## Storage
 
 ### On the device
 
-| Option                       | Verdict                                                                                                                                                              |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **The synced folder itself** | Where the shared state lives. Every device's copy is a full replica, so "local first" is automatic — the app reads its own folder whether or not the internet exists |
-| `localStorage`               | Only for device identity and UI preferences here. Synchronous, ~5 MB — wrong for list data                                                                           |
-| **IndexedDB**                | What the real app already uses via Dexie. For a prototype syncing one sentence it earns nothing, so this does not use it                                             |
+| Where          | Holds                                                                                                                                                  |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Sync folder    | The shared state. Every device's copy is a full replica, so local-first is automatic — the app reads its own folder whether or not the internet exists |
+| `localStorage` | The device id and label only (`proto.deviceId`, `proto.label`). Synchronous and ~5 MB — wrong for list data                                            |
+| IndexedDB      | What the real app already uses via Dexie. For a prototype syncing one sentence it earns nothing, so this does not use it                               |
 
-Note what the folder model removes: there is no separate "outbox" or pending
-queue. An offline edit is just a written file. The cloud client uploads it when
-it can, and its retry logic is code you do not write, test, or own.
+Note what the folder model removes: there is no outbox and no pending queue. An
+offline edit is just a written file. The cloud client uploads it when it can,
+and its retry logic is code you do not write, test or own.
 
 ### In the cloud
 
-The app needs `list`, `read`, `write` on a folder. That is all. Which means:
+`list`, `read`, `write` on a folder is the whole requirement, so the provider
+can be chosen on price or on which client is already installed. The one thing
+worth measuring per provider is how aggressively its client uploads a small file
+that changes often — that sets how long "a few seconds" actually is.
 
-| Provider         | Works  | Notes                                                                                               |
-| ---------------- | ------ | --------------------------------------------------------------------------------------------------- |
-| **Dropbox**      | Yes    | Best-behaved desktop client; conflicted copies are visible when they happen (they should not, here) |
-| **OneDrive**     | Yes    | Preinstalled on Windows — likely the least-friction option on your laptop                           |
-| **Google Drive** | Yes    | Desktop client mounts as a drive; Android side is a first-class app                                 |
-| **Syncthing**    | Yes    | No cloud account at all, device-to-device. Also proves the design needs nothing from a provider     |
-| **iCloud Drive** | Partly | Fine on Apple devices; poor Windows story                                                           |
+Android is the exception, and it is the weakest part of the design: it needs an
+app that maintains a **genuine local folder**. The Dropbox, Drive and OneDrive
+Android apps are on-demand browsers for cloud files and do not mirror a folder
+onto the device the way their desktop clients do. Syncthing, FolderSync/Dropsync
+and Nextcloud do.
 
-The single-writer rule is what makes this list boring, and boring is the result.
-Any of them works, so the choice can be made on price, on which client is
-already installed, or on which folder you would rather look at.
-
-**The one thing to check per provider** is how aggressively the client syncs a
-small file that changes often — some batch, some throttle background uploads.
-That sets how long "a few seconds" actually is, and it is the number worth
-measuring on your own accounts.
-
-## 4. Who can open a folder, and who cannot
+## Browser interaction
 
 This is the real constraint the prototype turned up, and it decides how the app
 gets built.
@@ -206,215 +283,4 @@ gets built.
 | **Safari**             | **No**                | The local helper (`--folder`)                 |
 | Any browser on Android | No                    | Neither — and no local helper can run there   |
 
-Firefox has not merely "not got round to" the File System Access API — Mozilla
-objected to it, on the grounds that handing a web page a real folder on disk is
-a lot of authority to grant from a page. That position is unlikely to move, so
-depending on the API alone would have been a mistake regardless of Android.
-
-Hence the two ways in. The picker is a convenience where it exists; the helper
-is the portable path, and it is what an installed app would do anyway. Which one
-a device uses is local and invisible to sync — `test/bridge.mjs` runs a browser
-with `showDirectoryPicker` deleted, alongside a CLI device on the Node adapter,
-in one folder, and asserts they converge.
-
-Firefox does have OPFS (`navigator.storage.getDirectory()`), sometimes offered
-as the answer here. It is not: OPFS is an origin-private sandbox no cloud client
-can see, so nothing written there ever leaves the device.
-
-### The phone is still the hard part
-
-|                              | Laptop (Windows)                    | Phone (Android)                                               |
-| ---------------------------- | ----------------------------------- | ------------------------------------------------------------- |
-| Folder access from a browser | Yes — picker, or the local helper   | **No.** No File System Access API, and no local helper either |
-| What it needs                | The static app + a localhost helper | An installed app using Android's Storage Access Framework     |
-
-So the laptop half is a browser app and works today. The phone half **cannot be
-a plain web page** — a browser on Android cannot be granted a folder. It needs
-an installed app that asks for the folder through SAF and hands it to the same
-core.
-
-That is exactly what you described, and it is the honest reading of the
-constraint rather than a preference.
-
-`core/` is pure and adapter-agnostic; `adapters/` holds five implementations of
-the same three methods — Node fs, browser File System Access, the loopback
-bridge, in-memory, and Android SAF. The Android app is the fifth, and it is the
-only one that is a real application rather than a few lines of glue.
-
-Note this contradicts _"PWA, not native"_ in `CLAUDE.md`. Folder sync on Android
-is a genuine reason to revisit that decision — it should be revisited
-deliberately, not by accident.
-
-## 5. The Android app
-
-`android/` is a real Android project producing a real APK. It is about 300 lines
-of Java around the same web app the laptop runs:
-
-| Piece                     | Job                                                                                                        |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `MainActivity`            | A WebView, loading the bundled page over `https://appassets.androidplatform.net`                           |
-| `MimeCorrectAssetHandler` | Serves `.mjs` as `text/javascript`. Without it every module is refused and the app boots to a blank screen |
-| `FolderStore`             | Keeps the SAF grant across restarts, so the folder is picked once                                          |
-| `FolderBridge`            | `list` / `read` / `write` exposed to the page as `window.AndroidFolder`                                    |
-
-The web app is **not** copied into the Android project. A Gradle task pulls
-`public/`, `core/` and `adapters/` from `prototype/` at build time, so there is
-one copy of the sync core and the phone cannot drift from the laptop.
-
-Two things worth noticing in the manifest:
-
-- **No `INTERNET` permission.** The app cannot reach the network even in
-  principle. It is not a sync client — it edits files in a folder you grant it.
-- **No storage permission either.** SAF grants access to one folder you chose;
-  there is no All Files Access and no permission prompt beyond the picker.
-
-### Building it
-
-```bash
-cd prototype/android
-./build.sh                 # -> out/checklist-sync.apk
-```
-
-Everything happens inside a container. The host needs Docker and nothing else —
-no JDK, no Android SDK, no Gradle. The first run builds the image (~2.4 GB,
-several minutes); after that only the APK is rebuilt. `./build.sh clean` removes
-the build output and the Gradle cache.
-
-Copy the APK to the phone and open it. Android will ask once for permission to
-install from that source.
-
-### On the phone
-
-Start the app, tap **Choose folder…**, and pick the folder your sync app keeps.
-That is the one real constraint: **Android needs an app that maintains a genuine
-local folder.** The Dropbox, Drive and OneDrive Android apps are on-demand
-browsers for cloud files — they do not mirror a folder onto the device the way
-their desktop clients do. What works:
-
-| Approach                      | Notes                                                                                                                                                                                       |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Syncthing**                 | Syncs a real folder, no cloud account, direct between devices. Best fit                                                                                                                     |
-| **FolderSync** / **Dropsync** | Mirrors a local folder to Dropbox/Drive/OneDrive on a schedule                                                                                                                              |
-| **Nextcloud**                 | Its Android app can auto-sync folders                                                                                                                                                       |
-| A provider's SAF location     | The picker shows any DocumentsProvider on the phone, so a cloud folder can be selected directly — but then reads and writes go over the network on demand, and behaviour varies by provider |
-
-This is the part of the design that is weakest on Android, and it is worth
-knowing before building anything larger on it.
-
-## 6. Jenkins later
-
-The image is the agent, and the build is one `docker run`. A pipeline step is
-the same command `build.sh` already issues:
-
-```groovy
-pipeline {
-    agent any
-    stages {
-        stage('APK') {
-            steps {
-                dir('prototype/android') {
-                    sh 'docker build -t checklist-android-builder .'
-                    sh '''docker run --rm \
-                        -u $(id -u):$(id -g) \
-                        -v $WORKSPACE/prototype:/workspace \
-                        -v $WORKSPACE/.gradle-cache:/gradle-home \
-                        -e GRADLE_USER_HOME=/gradle-home \
-                        -e ANDROID_USER_HOME=/gradle-home/.android \
-                        -e HOME=/gradle-home \
-                        -w /workspace/android \
-                        checklist-android-builder \
-                        gradle --no-daemon assembleDebug'''
-                }
-            }
-        }
-    }
-    post {
-        success {
-            archiveArtifacts 'prototype/android/app/build/outputs/apk/debug/*.apk'
-        }
-    }
-}
-```
-
-Four things were done with this in mind: the SDK licences are accepted in the
-`Dockerfile` rather than in someone's home directory, the daemon is off so no
-state survives between runs, `GRADLE_USER_HOME` is a mounted volume so a cache
-can be kept without baking it into the image, and the container runs as the
-invoking user so artifacts are not written to the workspace as root.
-
-`HOME` has to be set explicitly: running as a UID with no home directory in the
-image makes the Android Gradle plugin try to write `/.android` during
-configuration, and it fails the build rather than degrading.
-
-A release build would additionally need a signing key, which should come from
-Jenkins credentials and never from the repository.
-
-## 5. What is proved, and what is assumed
-
-`npm run proto:test` runs the full story headlessly — two devices, each with its
-own folder, and a `deliver()` step that models what a cloud client does in the
-background (upload mine, download theirs). Being offline is simply not calling
-it. Every assertion below passes, including a randomised 4-device, 300-step
-convergence test that settles on every seed tried:
-
-- Laptop edits → phone starts up and sees it.
-- Phone edits → laptop sees it, no conflict, because it was causally later.
-- Laptop offline: the edit is durable locally and the cloud is untouched.
-- Both edited blind → **the laptop raises a conflict, the phone knows nothing**,
-  and the laptop writes nothing while it is open.
-- Resolving on the laptop propagates; the phone fast-forwards without a conflict
-  of its own.
-- Every file in the cloud folder was written only by its owner.
-
-### The Android app specifically
-
-`npm run proto:android` drives the real `adapters/android-folder.mjs` and the
-real startup branch in `app.js`, with the Java bridge replaced by a synchronous
-in-page stub of the same shape. It asserts the app boots without a picker, never
-probes the loopback helper, writes valid snapshots through the bridge, picks up a
-laptop's file, raises a conflict on a concurrent one, writes nothing while it is
-open, and calls the _system_ picker on first run. 18 checks.
-
-The APK itself was verified by inspection, not by running it: package
-`dev.checklist.proto`, minSdk 24 / target 34, launcher activity present, all
-eleven web assets bundled, and `aapt2 dump permissions` returns **nothing at
-all** — the no-network claim is confirmed rather than asserted.
-
-**Not verified: every line of Java, and the MIME handling.** There is no
-accelerated emulator available here (`/dev/kvm` exists but the build user is not
-in the `kvm` group), so nothing has executed on an Android runtime. The most
-likely failure on first launch is a blank screen, which would mean
-`MimeCorrectAssetHandler` is not doing its job and the module scripts are being
-refused. `adb logcat | grep -i chromium` will say so plainly.
-
-Assumed, not proved, and worth testing on your own accounts:
-
-- **A real provider has not been in the loop.** Delivery is simulated by copying
-  files. What that skips is real-world timing, partial downloads, and each
-  client's own idea of when to upload. Write-then-rename in
-  `adapters/node-folder.mjs` guards against a client uploading a half-written
-  file, but that guard is untested against an actual client.
-- **One sentence, not a list.** Whole-file last-writer-wins is fine for one
-  field. For a real checklist it would mean editing item 3 on the phone
-  clobbering item 40 on the laptop — per-item granularity is not optional, and
-  that is what the op-log design in `docs/sync-flow.md` already provides.
-- **Polling.** A synced folder has no change notification, so the app re-lists
-  every 3 s. Fine on a desktop; on a phone that has to back off in the
-  background.
-
-## 6. What this suggests for the real app
-
-The folder model composes with `docs/sync-flow.md` rather than competing with
-it — both rest on the same single-writer rule, and that is the load-bearing
-idea in each. Two things transfer:
-
-1. **The conflict UI is probably not worth building.** Every conflict this
-   prototype raised was one field racing itself. At checklist granularity, the
-   op log's per-field LWW resolves the same situations silently and correctly,
-   and the surviving cases are rare enough for one user that `sync-flow.md` is
-   right to skip the dialog. Keep the _detection_ if you want a "this was
-   overwritten" affordance later; skip the modal.
-2. **Version vectors are the cheap way to know what a peer has seen.** The op
-   log currently tracks per-file cursors. A vector per device answers "has this
-   device seen my edit yet?" directly, which is what a sync-status UI actually
-   wants to display.
+Mozilla objected to the File System Access API. Hence the two ways for setting the sync folder in Laptop.
