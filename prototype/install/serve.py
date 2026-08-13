@@ -2,11 +2,11 @@
 """Serve the app to THIS device's own browser, and hand it the shared folder.
 
     python3 serve.py --folder ~/Dropbox/checklist
-    python3 serve.py --folder "C:\\Users\\Nam\\Dropbox\\checklist" --port 36637
+    python3 serve.py --folder "C:\\Users\\Nam\\Dropbox\\checklist"
 
 Python 3 stdlib only. No pip, ever -- that is what lets the Windows launcher
-stage an embeddable Python and run this with no installer (docs/platforms.md
-§3.1).
+stage an embeddable Python and run this with no installer, the way cooking_app
+already does.
 
 It binds 127.0.0.1 on purpose: no other device can reach it, and no device ever
 syncs *through* it. Two devices could run different helpers, or none, and still
@@ -43,7 +43,7 @@ from pathlib import Path
 from urllib.parse import unquote, urlparse, parse_qs
 
 APP_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_PORT = 5175
+DEFAULT_PORT = 38531
 
 MIME = {
     ".html": "text/html; charset=utf-8",

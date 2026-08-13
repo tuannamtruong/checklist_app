@@ -2,33 +2,55 @@
 // pointing at an actual Dropbox/OneDrive folder before trusting the browser
 // half, and for reading what the phone wrote.
 //
+//   node prototype/install/cli.mjs <folder> --new                      # mint an id
 //   node prototype/install/cli.mjs <folder> <deviceId>                 # show
 //   node prototype/install/cli.mjs <folder> <deviceId> "new text"      # edit
 //   node prototype/install/cli.mjs <folder> <deviceId> --resolve 1     # pick side 1
 //   node prototype/install/cli.mjs <folder> <deviceId> --watch         # poll
+//
+// The id is generated, not chosen: it names the file, and two devices sharing a
+// name would share a path. Pass --label to attach a human name to it.
 
 import { createDevice } from "../core/folder-sync.mjs";
 import { nodeFolder } from "../adapters/node-folder.mjs";
-import { fileNameFor } from "../core/device.mjs";
+import { fileNameFor, isDeviceId, labelFor, newDeviceId } from "../core/device.mjs";
 
 const [dir, deviceId, ...rest] = process.argv.slice(2);
 if (!dir || !deviceId) {
   console.error(
-    "usage: cli.mjs <folder> <deviceId> [text | --resolve <n> | --watch]",
+    "usage: cli.mjs <folder> <deviceId|--new> [text | --resolve <n> | --watch] [--label <name>]",
   );
   process.exit(2);
 }
 
-const device = createDevice({ deviceId, folder: nodeFolder(dir) });
+if (deviceId === "--new") {
+  console.log(newDeviceId());
+  process.exit(0);
+}
+
+if (!isDeviceId(deviceId)) {
+  console.error(`not a device id: ${deviceId}`);
+  console.error(`ids are 8 hex characters. mint one with:  cli.mjs ${dir} --new`);
+  console.error(`(here is one: ${newDeviceId()})`);
+  process.exit(2);
+}
+
+const labelAt = rest.indexOf("--label");
+const label = labelAt === -1 ? deviceId : rest[labelAt + 1];
+if (labelAt !== -1) rest.splice(labelAt, 2);
+
+const device = createDevice({ deviceId, label, folder: nodeFolder(dir) });
 await device.load();
 
 function report() {
   if (device.conflict) {
     console.log(
-      `\nCONFLICT — ${device.conflict.length} versions raced. This is local to ${deviceId}; nothing was written.`,
+      `\nCONFLICT — ${device.conflict.length} versions raced. This is local to ${label}; nothing was written.`,
     );
     device.conflict.forEach((s, i) =>
-      console.log(`  [${i}] ${s.author.padEnd(10)} ${JSON.stringify(s.text)}`),
+      console.log(
+        `  [${i}] ${labelFor(s.author, device.snapshots).padEnd(12)} ${JSON.stringify(s.text)}`,
+      ),
     );
     console.log(`\n  resolve with:  --resolve <n>\n`);
     return;
@@ -36,7 +58,7 @@ function report() {
   const s = device.state;
   console.log(
     s
-      ? `${JSON.stringify(s.text)}   (by ${s.author}, clock ${JSON.stringify(s.clock)})`
+      ? `${JSON.stringify(s.text)}   (by ${labelFor(s.author, device.snapshots)}, clock ${JSON.stringify(s.clock)})`
       : "(nothing yet)",
   );
 }

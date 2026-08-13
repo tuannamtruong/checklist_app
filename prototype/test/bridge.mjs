@@ -46,6 +46,8 @@ async function expectEventually(name, fn, timeout = 10_000) {
 }
 
 const folder = await mkdtemp(join(tmpdir(), "checklist-bridge-"));
+/** A fixed id for the CLI device — it has no localStorage to mint one into. */
+const TABLET = "33333333";
 
 const helper = spawn(
   "python3",
@@ -113,8 +115,10 @@ await expectEventually(
 
 console.log("\n2. an edit reaches the real folder on disk");
 await laptop.locator("#text").fill("Buy milk");
-await expectEventually("checklist.laptop.json exists on disk", async () =>
-  (await readdir(folder)).includes("checklist.laptop.json"),
+// The id is generated per browser context, so ask the page which one it minted.
+const laptopId = await laptop.evaluate(() => localStorage.getItem("proto.deviceId"));
+await expectEventually("our file exists on disk, named by device id", async () =>
+  (await readdir(folder)).includes(`checklist.${laptopId}.json`),
 );
 
 console.log("\n3. a second browser device in the same folder converges");
@@ -134,7 +138,7 @@ console.log("\n4. a device on a different adapter converges too");
 await new Promise((resolve, reject) => {
   const cli = spawn(
     process.execPath,
-    [join(HERE, "..", "install", "cli.mjs"), folder, "tablet", "Buy oat milk"],
+    [join(HERE, "..", "install", "cli.mjs"), folder, TABLET, "Buy oat milk", "--label", "tablet"],
     { stdio: "pipe" },
   );
   cli.on("exit", (code) =>
@@ -154,9 +158,12 @@ await expectEventually("three files, one per device", async () => {
   const names = (await readdir(folder))
     .filter((n) => n.startsWith("checklist."))
     .sort();
+  const phoneId = await phone.evaluate(() => localStorage.getItem("proto.deviceId"));
   return (
     names.join() ===
-    "checklist.laptop.json,checklist.phone.json,checklist.tablet.json"
+    [`checklist.${laptopId}.json`, `checklist.${phoneId}.json`, `checklist.${TABLET}.json`]
+      .sort()
+      .join()
   );
 });
 

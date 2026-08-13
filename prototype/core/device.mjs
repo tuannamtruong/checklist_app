@@ -5,20 +5,41 @@ import { bump, emptyClock, equal, join, reconcile } from "./merge.mjs";
 
 /** @typedef {import("./merge.mjs").Snapshot} Snapshot */
 
-/** One file per device is the whole safety argument — see README §2. */
+/**
+ * A device is identified by a generated id, never by the name the user typed.
+ *
+ * The id names the file, and one file per device is the entire safety argument.
+ * A human label is not safe to name a file with: two devices both called
+ * "phone" would write the same path, which is the one thing this design forbids
+ * and the one situation the merge cannot untangle. The label is display only,
+ * and it travels *inside* the file.
+ *
+ * Same shape as the real app's `db/device.ts`, so the two agree when the op log
+ * arrives.
+ */
+export function newDeviceId() {
+  return crypto.randomUUID().replace(/-/g, "").slice(0, 8);
+}
+
+/** Ids are hex, so this doubles as validation of anything found in the folder. */
+export const isDeviceId = (value) => /^[0-9a-f]{8}$/.test(value);
+
 export const fileNameFor = (deviceId) => `checklist.${deviceId}.json`;
 
-export const deviceIdFrom = (fileName) =>
-  fileName.match(/^checklist\.(.+)\.json$/)?.[1] ?? null;
+export function deviceIdFrom(fileName) {
+  const id = fileName.match(/^checklist\.([0-9a-f]{8})\.json$/)?.[1];
+  return id ?? null;
+}
 
 /**
  * The user typed something. Only this device may increment its own slot, so a
  * local edit can never be confused with a peer's.
  * @returns {Snapshot}
  */
-export function localEdit(mine, deviceId, text, now) {
+export function localEdit(mine, deviceId, label, text, now) {
   return {
     device: deviceId,
+    label,
     author: deviceId,
     text,
     clock: bump(mine?.clock ?? emptyClock(), deviceId),
@@ -48,9 +69,13 @@ export function applyPeers(mine, peers) {
 
   const changed =
     !mine || state.text !== mine.text || !equal(state.clock, mine.clock);
-  // The file keeps our name; the text keeps its author's.
+  // The file keeps our identity and our label; the text keeps its author's.
   const next = changed
-    ? { ...state, device: mine?.device ?? state.device }
+    ? {
+        ...state,
+        device: mine?.device ?? state.device,
+        label: mine?.label ?? state.label,
+      }
     : mine;
   return { state: next, conflict: null, changed };
 }
@@ -61,13 +86,26 @@ export function applyPeers(mine, peers) {
  * other device fast-forwards to it instead of re-raising the same conflict.
  * @returns {Snapshot}
  */
-export function resolveWith(conflict, deviceId, text, now) {
+export function resolveWith(conflict, deviceId, label, text, now) {
   const clock = conflict.reduce((c, s) => join(c, s.clock), emptyClock());
   return {
     device: deviceId,
+    label,
     author: deviceId,
     text,
     clock: bump(clock, deviceId),
     updatedAt: now,
   };
+}
+
+/**
+ * Which device wrote a given piece of text, in words.
+ *
+ * Labels are not duplicated into every snapshot — each device declares its own
+ * inside its own file, so the folder as a whole is the lookup table. One less
+ * thing that can disagree with itself.
+ */
+export function labelFor(deviceId, snapshots) {
+  const owner = snapshots.find((s) => s?.device === deviceId);
+  return owner?.label || deviceId;
 }

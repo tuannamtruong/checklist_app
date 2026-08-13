@@ -21,6 +21,7 @@ import {
 
 export function createDevice({
   deviceId,
+  label = deviceId,
   folder,
   now = () => new Date().toISOString(),
   onChange = () => {},
@@ -29,10 +30,12 @@ export function createDevice({
   let state = null;
   /** @type {Snapshot[] | null} */
   let conflict = null;
+  /** Kept from the last cycle so the UI can name a peer without re-reading. */
+  let peers = [];
   /** Our own file is the only path we ever write. */
   const myFile = fileNameFor(deviceId);
 
-  const notify = () => onChange({ state, conflict });
+  const notify = () => onChange({ state, conflict, peers });
 
   async function writeMine() {
     await folder.write(myFile, `${JSON.stringify(state, null, 2)}\n`);
@@ -62,6 +65,10 @@ export function createDevice({
     get conflict() {
       return conflict;
     },
+    /** Every snapshot in the folder, ours last, for naming a peer. */
+    get snapshots() {
+      return state ? [...peers, state] : peers;
+    },
 
     /** Read our own file back — this is what "start the app" does. */
     async load() {
@@ -73,7 +80,7 @@ export function createDevice({
 
     /** The user typed. Local first, always: the folder is not in this path. */
     async edit(text) {
-      state = localEdit(state, deviceId, text, now());
+      state = localEdit(state, deviceId, label, text, now());
       await writeMine();
       notify();
     },
@@ -83,7 +90,7 @@ export function createDevice({
      * if we learned something, our own file is updated to record it.
      */
     async sync() {
-      const peers = await readPeers();
+      peers = await readPeers();
       const result = applyPeers(state, peers);
       state = result.state;
       conflict = result.conflict;
@@ -95,8 +102,21 @@ export function createDevice({
     /** End a conflict by choosing a text. Writes only our own file. */
     async resolve(text) {
       if (!conflict) return;
-      state = resolveWith(conflict, deviceId, text, now());
+      state = resolveWith(conflict, deviceId, label, text, now());
       conflict = null;
+      await writeMine();
+      notify();
+    },
+
+    /**
+     * Rename this device. Display only — the id and the filename never change,
+     * so there is no clock bump and nothing to converge. Peers pick the new
+     * label up on their next read.
+     */
+    async rename(next) {
+      label = next;
+      if (!state) return;
+      state = { ...state, label };
       await writeMine();
       notify();
     },

@@ -17,7 +17,7 @@ import { createRequire } from "node:module";
 
 const { chromium } = createRequire(import.meta.url)("playwright");
 
-const BASE = process.env.BASE ?? "http://localhost:5175";
+const BASE = process.env.BASE ?? "http://localhost:38531";
 const SHOTS = process.env.SHOTS ?? "/tmp/checklist-proto";
 mkdirSync(SHOTS, { recursive: true });
 
@@ -52,11 +52,11 @@ const STUB = `
     folderName: () => "checklist",
     pickFolder: () => { window.__picked = true; },
     list: () => JSON.stringify(
-      Object.keys(window.__files).filter((n) => /^checklist\\.[A-Za-z0-9_-]{1,64}\\.json$/.test(n))
+      Object.keys(window.__files).filter((n) => /^checklist\\.[0-9a-f]{8}\\.json$/.test(n))
     ),
     read: (name) => (name in window.__files ? window.__files[name] : null),
     write: (name, content) => {
-      if (!/^checklist\\.[A-Za-z0-9_-]{1,64}\\.json$/.test(name)) return "refused: " + name;
+      if (!/^checklist\\.[0-9a-f]{8}\\.json$/.test(name)) return "refused: " + name;
       window.__files[name] = content;
       return null;
     },
@@ -97,19 +97,31 @@ if (helperRequests.length === 0) ok("the loopback helper was never consulted");
 else fail("the loopback helper was never consulted", helperRequests.join(", "));
 
 console.log("\n2. edits reach the folder through the bridge");
+// The device is identified by a generated id, not by the name in the header,
+// so the test has to ask the page which id it minted.
+const phoneId = await page.evaluate(() =>
+  localStorage.getItem("proto.deviceId"),
+);
+const myFile = `checklist.${phoneId}.json`;
+const LAPTOP = "77777777";
+if (/^[0-9a-f]{8}$/.test(phoneId)) ok(`minted a device id (${phoneId})`);
+else fail("minted a device id", String(phoneId));
+
 await page.locator("#text").fill("Buy milk");
 await expectEventually("the bridge received our file", async () => {
   const files = await page.evaluate(() => Object.keys(window.__files));
-  return files.join() === "checklist.phone.json";
+  return files.join() === myFile;
 });
 await expectEventually("the file holds a valid snapshot", async () => {
-  const snap = await page.evaluate(() =>
-    JSON.parse(window.__files["checklist.phone.json"]),
+  const snap = await page.evaluate(
+    (f) => JSON.parse(window.__files[f]),
+    myFile,
   );
   return (
     snap.text === "Buy milk" &&
-    snap.device === "phone" &&
-    snap.clock.phone === 1
+    snap.device === phoneId &&
+    snap.label === "phone" &&
+    snap.clock[phoneId] === 1
   );
 });
 await page.screenshot({
@@ -118,15 +130,19 @@ await page.screenshot({
 });
 
 console.log("\n3. a laptop's file appearing in the folder is picked up");
-await page.evaluate(() => {
-  window.__files["checklist.laptop.json"] = JSON.stringify({
-    device: "laptop",
-    author: "laptop",
-    text: "Buy milk and eggs",
-    clock: { phone: 1, laptop: 1 },
-    updatedAt: new Date().toISOString(),
-  });
-});
+await page.evaluate(
+  ([id, laptop]) => {
+    window.__files[`checklist.${laptop}.json`] = JSON.stringify({
+      device: laptop,
+      label: "laptop",
+      author: laptop,
+      text: "Buy milk and eggs",
+      clock: { [id]: 1, [laptop]: 1 },
+      updatedAt: new Date().toISOString(),
+    });
+  },
+  [phoneId, LAPTOP],
+);
 await expectEventually(
   "text arrives from the laptop",
   async () =>
@@ -142,20 +158,25 @@ console.log(
 );
 await page.locator("#text").fill("Buy oat milk");
 await expectEventually("our edit lands", async () => {
-  const snap = await page.evaluate(() =>
-    JSON.parse(window.__files["checklist.phone.json"]),
+  const snap = await page.evaluate(
+    (f) => JSON.parse(window.__files[f]),
+    myFile,
   );
   return snap.text === "Buy oat milk";
 });
-await page.evaluate(() => {
-  window.__files["checklist.laptop.json"] = JSON.stringify({
-    device: "laptop",
-    author: "laptop",
-    text: "Buy milk, eggs and bread",
-    clock: { phone: 1, laptop: 2 },
-    updatedAt: new Date().toISOString(),
-  });
-});
+await page.evaluate(
+  ([id, laptop]) => {
+    window.__files[`checklist.${laptop}.json`] = JSON.stringify({
+      device: laptop,
+      label: "laptop",
+      author: laptop,
+      text: "Buy milk, eggs and bread",
+      clock: { [id]: 1, [laptop]: 2 },
+      updatedAt: new Date().toISOString(),
+    });
+  },
+  [phoneId, LAPTOP],
+);
 await expectEventually(
   "conflict panel appears",
   async () => (await page.locator("#conflict").isVisible()) === true,
@@ -169,8 +190,9 @@ await expectEventually("both sides are offered", async () => {
   );
 });
 await expectEventually("nothing was written while conflicted", async () => {
-  const snap = await page.evaluate(() =>
-    JSON.parse(window.__files["checklist.phone.json"]),
+  const snap = await page.evaluate(
+    (f) => JSON.parse(window.__files[f]),
+    myFile,
   );
   return snap.text === "Buy oat milk"; // still ours, untouched
 });
@@ -186,10 +208,11 @@ await expectEventually(
   async () => (await page.locator("#conflict").isHidden()) === true,
 );
 await expectEventually("the written clock dominates the laptop's", async () => {
-  const snap = await page.evaluate(() =>
-    JSON.parse(window.__files["checklist.phone.json"]),
+  const snap = await page.evaluate(
+    (f) => JSON.parse(window.__files[f]),
+    myFile,
   );
-  return snap.clock.laptop >= 2 && snap.clock.phone >= 2;
+  return snap.clock[LAPTOP] >= 2 && snap.clock[phoneId] >= 2;
 });
 await page.screenshot({
   path: `${SHOTS}/android-3-resolved.png`,

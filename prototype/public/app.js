@@ -3,7 +3,12 @@
 // to a folder handle.
 
 import { createDevice } from "../core/folder-sync.mjs";
-import { fileNameFor } from "../core/device.mjs";
+import {
+  fileNameFor,
+  isDeviceId,
+  labelFor,
+  newDeviceId,
+} from "../core/device.mjs";
 import {
   ensurePermission,
   forgetHandle,
@@ -29,10 +34,18 @@ const DEBOUNCE_MS = 600;
 let device = null;
 /** True between a keystroke and the debounced write that commits it. */
 let pendingEdit = false;
-let deviceId =
+// Identity is a generated id that never changes and names our file. The name
+// the user types is a label, and it travels inside the file rather than on it —
+// two devices both called "phone" must not collide on one path.
+let deviceId = localStorage.getItem("proto.deviceId");
+if (!deviceId || !isDeviceId(deviceId)) {
+  deviceId = newDeviceId();
+  localStorage.setItem("proto.deviceId", deviceId);
+}
+let deviceLabel =
   params.get("device") ||
-  localStorage.getItem("proto.device") ||
-  `device-${Math.random().toString(36).slice(2, 6)}`;
+  localStorage.getItem("proto.label") ||
+  `device-${deviceId.slice(0, 4)}`;
 let polling = null;
 
 // ------------------------------------------------------------------- view
@@ -61,7 +74,10 @@ function renderConflict(conflict) {
     ...conflict.map((s) => {
       const box = document.createElement("div");
       const h = document.createElement("h3");
-      h.textContent = s.author === deviceId ? "Yours" : `From ${s.author}`;
+      h.textContent =
+        s.author === deviceId
+          ? "Yours"
+          : `From ${labelFor(s.author, device.snapshots)}`;
       const pre = document.createElement("pre");
       pre.textContent = s.text;
       const btn = document.createElement("button");
@@ -85,7 +101,9 @@ function render({ state, conflict }) {
   if (!pendingEdit) $("text").value = state?.text ?? "";
 
   $("m-file").textContent = fileNameFor(deviceId);
-  $("m-author").textContent = state?.author ?? "—";
+  $("m-author").textContent = state
+    ? labelFor(state.author, device.snapshots)
+    : "—";
   $("m-clock").textContent = state ? JSON.stringify(state.clock) : "—";
   $("m-sync").textContent = new Date().toLocaleTimeString();
   renderConflict(conflict);
@@ -108,14 +126,19 @@ async function renderFiles(folder) {
 // ------------------------------------------------------------------ actions
 
 async function start(folder, label) {
-  device = createDevice({ deviceId, folder, onChange: render });
+  device = createDevice({
+    deviceId,
+    label: deviceLabel,
+    folder,
+    onChange: render,
+  });
   await device.load();
   await cycle(folder);
 
   $("setup").hidden = true;
   $("work").hidden = false;
   $("folder").textContent = label;
-  log(`watching ${label} as ${deviceId}`, "ok");
+  log(`watching ${label} as ${deviceLabel} (${deviceId})`, "ok");
 
   clearInterval(polling);
   // Polling is the only option: a synced folder has no change notification, and
@@ -132,7 +155,7 @@ async function cycle(folder) {
       log(`conflict with ${result.conflict.length} versions`, "bad");
     else if (device.state?.text !== before)
       log(
-        `picked up "${device.state?.text}" from ${device.state?.author}`,
+        `picked up "${device.state?.text}" from ${labelFor(device.state?.author, device.snapshots)}`,
         "in",
       );
     await renderFiles(folder);
@@ -162,10 +185,13 @@ $("text").addEventListener("input", (e) => {
   }, DEBOUNCE_MS);
 });
 
-$("device").addEventListener("change", (e) => {
-  deviceId = e.target.value.trim().replace(/[^\w-]/g, "-") || "device";
-  localStorage.setItem("proto.device", deviceId);
-  location.reload(); // the device id names our file; simplest to restart clean
+$("device").addEventListener("change", async (e) => {
+  // Renaming is cosmetic now: the id names the file, so nothing moves and no
+  // reload is needed. Peers see the new label on their next read.
+  deviceLabel = e.target.value.trim() || `device-${deviceId.slice(0, 4)}`;
+  e.target.value = deviceLabel;
+  localStorage.setItem("proto.label", deviceLabel);
+  await device?.rename(deviceLabel);
 });
 
 $("pick").addEventListener("click", async () => {
@@ -188,11 +214,12 @@ $("demo").addEventListener("click", async () => {
   // exercised anywhere — including browsers with no folder access at all.
   const folder = memoryFolder();
   await start(folder, "demo (in memory)");
-  window.__injectPeer = async (peer, text, clock) => {
+  window.__injectPeer = async (peer, text, clock, peerLabel = peer) => {
     await folder.write(
       fileNameFor(peer),
       JSON.stringify({
         device: peer,
+        label: peerLabel,
         author: peer,
         text,
         clock,
@@ -207,7 +234,8 @@ $("demo").addEventListener("click", async () => {
   );
 });
 
-$("device").value = deviceId;
+$("device").value = deviceLabel;
+$("device").title = `device id ${deviceId}`;
 
 // How this device reaches the folder, best first.
 //

@@ -14,7 +14,7 @@ import { createRequire } from "node:module";
 // `import` ignores NODE_PATH; CommonJS resolution honours it.
 const { chromium } = createRequire(import.meta.url)("playwright");
 
-const BASE = process.env.BASE ?? "http://localhost:5175";
+const BASE = process.env.BASE ?? "http://localhost:38531";
 const SHOTS = process.env.SHOTS ?? "/tmp/checklist-proto";
 mkdirSync(SHOTS, { recursive: true });
 
@@ -58,23 +58,32 @@ await expectEventually(
 );
 
 console.log("\n2. a local edit writes exactly one file — ours");
+// The device is identified by a generated id, not by the name in the header,
+// so the test has to ask the page which id it minted.
+const laptopId = await page.evaluate(() => localStorage.getItem("proto.deviceId"));
+if (/^[0-9a-f]{8}$/.test(laptopId)) ok(`minted a device id (${laptopId})`);
+else fail("minted a device id", String(laptopId));
+
 await page.locator("#text").fill("Buy milk");
 await expectEventually(
   "our file appears in the folder",
   async () =>
     (await page.locator("#files li").allTextContents()).join() ===
-    "checklist.laptop.json",
+    `checklist.${laptopId}.json`,
 );
 await expectEventually(
   "the version vector counts our edit",
-  async () => (await page.locator("#m-clock").textContent()) === '{"laptop":1}',
+  async () =>
+    (await page.locator("#m-clock").textContent()) ===
+    JSON.stringify({ [laptopId]: 1 }),
 );
 await page.screenshot({ path: `${SHOTS}/1-edited.png`, fullPage: true });
 
 console.log("\n3. a peer file that is causally newer is adopted silently");
 // The phone saw our edit (laptop:1) and then made its own.
-await page.evaluate(() =>
-  window.__injectPeer("phone", "Buy milk and eggs", { laptop: 1, phone: 1 }),
+await page.evaluate(
+  (id) => window.__injectPeer("99999999", "Buy milk and eggs", { [id]: 1, 99999999: 1 }, "phone"),
+  laptopId,
 );
 await expectEventually(
   "text updates from the peer",
@@ -86,7 +95,8 @@ await expectEventually(
   async () => (await page.locator("#conflict").isHidden()) === true,
 );
 await expectEventually(
-  "author is attributed to the phone",
+  // The peer's label comes from inside its own file, not from its id.
+  "the peer is named by its label, not its id",
   async () => (await page.locator("#m-author").textContent()) === "phone",
 );
 
@@ -95,12 +105,13 @@ await page.locator("#text").fill("Buy milk, eggs and bread");
 await expectEventually(
   "our edit lands",
   async () =>
-    (await page.locator("#m-clock").textContent())?.includes('"laptop":2') ===
+    (await page.locator("#m-clock").textContent())?.includes(`"${laptopId}":2`) ===
     true,
 );
 // The phone edited from the state before ours — neither vector dominates.
-await page.evaluate(() =>
-  window.__injectPeer("phone", "Buy oat milk", { laptop: 1, phone: 2 }),
+await page.evaluate(
+  (id) => window.__injectPeer("99999999", "Buy oat milk", { [id]: 1, 99999999: 2 }, "phone"),
+  laptopId,
 );
 await expectEventually(
   "conflict panel appears",
@@ -136,7 +147,7 @@ await expectEventually(
 );
 await expectEventually("the resolution dominates both", async () => {
   const clock = JSON.parse(await page.locator("#m-clock").textContent());
-  return clock.laptop >= 3 && clock.phone >= 2;
+  return clock[laptopId] >= 3 && clock["99999999"] >= 2;
 });
 await page.screenshot({ path: `${SHOTS}/3-resolved.png`, fullPage: true });
 

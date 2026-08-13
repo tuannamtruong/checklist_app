@@ -24,8 +24,13 @@ import java.nio.charset.StandardCharsets;
  */
 public class FolderBridge {
 
-    /** Only the app's own files are ever touched, whatever else is in the folder. */
-    private static final String NAME_PATTERN = "checklist\\.[A-Za-z0-9_-]{1,64}\\.json";
+    /**
+     * Only the app's own files are ever touched, whatever else is in the folder.
+     * The id is generated and always 8 hex characters -- a device is never
+     * identified by the name its owner typed, because two devices called
+     * "phone" would then share one path.
+     */
+    private static final String NAME_PATTERN = "checklist\\.[0-9a-f]{8}\\.json";
 
     private final Context context;
     private final FolderStore store;

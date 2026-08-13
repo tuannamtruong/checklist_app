@@ -45,9 +45,18 @@ const dirFor = (id) => join(root, id);
 let tick = 0;
 const now = () => new Date(Date.UTC(2026, 7, 12, 0, 0, ++tick)).toISOString();
 
-async function device(id) {
+// Fixed ids rather than generated ones: a device is identified by an id, never
+// by its label, and pinning them keeps the assertions below readable.
+const ID = { laptop: "1111aaaa", phone: "2222bbbb" };
+
+async function device(id, label) {
   await mkdir(dirFor(id), { recursive: true });
-  const d = createDevice({ deviceId: id, folder: nodeFolder(dirFor(id)), now });
+  const d = createDevice({
+    deviceId: id,
+    label,
+    folder: nodeFolder(dirFor(id)),
+    now,
+  });
   await d.load();
   return d;
 }
@@ -70,21 +79,21 @@ async function deliver(id) {
 const textOf = (d) => d.state?.text ?? null;
 
 console.log("\n1. laptop edits; phone starts up and sees it");
-const laptop = await device("laptop");
-const phone = await device("phone");
+const laptop = await device(ID.laptop, "laptop");
+const phone = await device(ID.phone, "phone");
 
 await laptop.edit("Buy milk");
-await deliver("laptop");
+await deliver(ID.laptop);
 is("cloud has one file", (await readdir(CLOUD)).length, 1);
 
-await deliver("phone");
+await deliver(ID.phone);
 await phone.sync();
 is("phone sees the laptop's text", textOf(phone), "Buy milk");
 
 console.log("\n2. phone edits; laptop sees it");
 await phone.edit("Buy milk and eggs");
-await deliver("phone");
-await deliver("laptop");
+await deliver(ID.phone);
+await deliver(ID.laptop);
 await laptop.sync();
 is("laptop sees the phone's edit", textOf(laptop), "Buy milk and eggs");
 is("no conflict — the edit was causally after", laptop.conflict, null);
@@ -92,7 +101,7 @@ is("no conflict — the edit was causally after", laptop.conflict, null);
 console.log("\n3. laptop goes offline and edits");
 await laptop.edit("Buy milk, eggs and bread");
 is("the edit is durable locally", textOf(laptop), "Buy milk, eggs and bread");
-await deliver("phone");
+await deliver(ID.phone);
 await phone.sync();
 is(
   "the cloud is untouched — phone still on its own text",
@@ -104,12 +113,12 @@ console.log(
   "\n4. phone edits meanwhile, over the revision the laptop never saw",
 );
 await phone.edit("Buy oat milk");
-await deliver("phone");
+await deliver(ID.phone);
 
 console.log(
   "\n5. laptop reconnects — concurrent edits, conflict raised locally",
 );
-await deliver("laptop");
+await deliver(ID.laptop);
 const merged = await laptop.sync();
 is("laptop raises a conflict", merged.conflict?.length, 2);
 const sides = new Set(merged.conflict?.map((s) => s.text));
@@ -126,8 +135,8 @@ is("the phone kept its own text", textOf(phone), "Buy oat milk");
 console.log("\n6. the user resolves, on the laptop, and it propagates");
 await laptop.resolve("Buy oat milk, eggs and bread");
 is("laptop conflict cleared", laptop.conflict, null);
-await deliver("laptop");
-await deliver("phone");
+await deliver(ID.laptop);
+await deliver(ID.phone);
 await phone.sync();
 is(
   "phone fast-forwards to the resolution",
@@ -157,7 +166,7 @@ is("every file in the cloud was written only by its owner", violations, 0);
 is(
   "one file per device, no conflicted copies",
   (await readdir(CLOUD)).sort().join(),
-  "checklist.laptop.json,checklist.phone.json",
+  [fileNameFor(ID.laptop), fileNameFor(ID.phone)].sort().join(),
 );
 
 // ---------------------------------------------------------------------------
@@ -165,9 +174,9 @@ is(
 // must not depend on who syncs when. Same bar as merge.test.ts in the real app.
 console.log("\n9. randomised convergence (4 devices, 300 steps)");
 {
-  const ids = ["a", "b", "c", "d"];
+  const ids = ["aaaa0001", "bbbb0002", "cccc0003", "dddd0004"];
   const devs = {};
-  for (const id of ids) devs[id] = await device(`p-${id}`);
+  for (const id of ids) devs[id] = await device(id, `dev-${id.slice(0, 4)}`);
 
   // Deterministic PRNG so a failure is reproducible from the seed alone.
   let seed = Number(process.env.SEED ?? 42);
@@ -185,7 +194,7 @@ console.log("\n9. randomised convergence (4 devices, 300 steps)");
     } else if (roll < 0.4) {
       await d.edit(`edit-${i}`);
     } else if (roll < 0.7) {
-      await deliver(`p-${id}`);
+      await deliver(id);
     } else {
       await d.sync();
     }
@@ -199,7 +208,7 @@ console.log("\n9. randomised convergence (4 devices, 300 steps)");
   // person holds one device at a time, which is what makes this terminate.
   let rounds = 0;
   for (; rounds < 30; rounds++) {
-    for (const id of ids) await deliver(`p-${id}`);
+    for (const id of ids) await deliver(id);
     const results = [];
     for (const id of ids) results.push(await devs[id].sync());
     const resolver = devs[ids[0]];
