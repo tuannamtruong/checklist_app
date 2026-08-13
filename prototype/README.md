@@ -18,12 +18,12 @@ provider grants those by just being a folder.
 
 ## Glossary
 
-| Term           | Definition                                                                                                                                                                                                                                                                 |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Sync folder    | A specific shared folder in the cloud provider directory, which contains all items of the application.                                                                                                                                                                     |
-| Windows bundle | An official embeddable Python staged on the Windows side plus a desktop shortcut to `pythonw.exe`. No `.exe` is produced deliberately, as a shortcut to Microsoft's own signed binary raises no SmartScreen warning.                                                       |
-| Demo mode      | `?demo` in the URL, running the app against an in-memory folder with no disk and no network.                                                                                      |
-| Snapshot      | `checklist.<device-id>.json` files inside the sync folder. Each file is a device's replica of the shared state; every device holds a full replica, which enables the app to work offline.                            |
+| Term           | Definition                                                                                                                                                                                                           |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sync folder    | A specific shared folder in the cloud provider directory, which contains all items of the application.                                                                                                               |
+| Windows bundle | An official embeddable Python staged on the Windows side plus a desktop shortcut to `pythonw.exe`. No `.exe` is produced deliberately, as a shortcut to Microsoft's own signed binary raises no SmartScreen warning. |
+| Demo mode      | `?demo` in the URL, running the app against an in-memory folder with no disk and no network.                                                                                                                         |
+| Snapshot       | `checklist.<device-id>.json` files inside the sync folder. Each file is a device's replica of the shared state; every device holds a full replica, which enables the app to work offline.                            |
 
 ## Validation Procedure
 
@@ -114,10 +114,10 @@ Snapshot content
 | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | device    | A generated 8-hex-character id that names the replica file and never changes.                                                                                                                                                                                                                                                                                                                                               |
 | label     | The human name for a device, display only, carried inside the file and never in its name.                                                                                                                                                                                                                                                                                                                                   |
-| author    | The device that produced the current text, which is not always the device that owns the file. A device that adopts a peer's text keeps that peer as `author`.                                                                                                                                                                                                                                                         |
+| author    | The device that produced the current text, which is not always the device that owns the file. A device that adopts a peer's text keeps that peer as `author`.                                                                                                                                                                                                                                                               |
+| updatedAt | A timestamp for when the text was last authored. `author` and `updatedAt` are one pair. <br> It is stamped by the author's device, not by the device that owns the file. <br>It does not effect the sync process.                                                                                                                                                                                                           |
 | text      | Value of the text field, specific for the prototype.                                                                                                                                                                                                                                                                                                                                                                        |
 | clock     | Version vector. It has 2 directions. <br> One counter for recording the version of its own device: `"1111aaaa": 3`.<br> Other counter(s) is a receipt for what this device `1111aaaa` have read from other device `2222bbbb`: `"2222bbbb": 1`.<br>A device that has never appeared in the folder is simply absent from the vector and counts as `0`, so a third device joins with no registration step and no coordination. |
-| updatedAt | A timestamp for getting the newest snapshot that already agree on the text, and to show a human when something changed. It does not effect the sync process.                                                                                                                                                                                                         |
 
 ### Multi-device change synchronisation
 
@@ -155,38 +155,54 @@ Comparing two vectors solves:
 
 Consider this race condition scenario in `test/scenario.mjs`:
 
-| Step                              | Laptop                                                        | Phone                                                  | Relation       |
-| --------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------ | -------------- |
-| Start state   |`"Water the plants"`<br>`{1111aaaa: 14, 2222bbbb: 2}` | `"Water the plants"`<br>`{1111aaaa: 14, 2222bbbb: 2}`| equal|
-| Laptop writes a new text       | `"Buy milk"`<br>`{1111aaaa: 15, 2222bbbb: 2}`                 | `"Water the plants"`<br>`{1111aaaa: 14, 2222bbbb: 2}`  | laptop ahead   |
-| Phone syncs and adopts it         | `"Buy milk"`<br>`{1111aaaa: 15, 2222bbbb: 2}`                 | `"Buy milk"`<br>`{1111aaaa: 15, 2222bbbb: 2}`          | equal          |
-| Phone adds `" and eggs"`          | `"Buy milk"`<br>`{1111aaaa: 15, 2222bbbb: 2}`                 | `"Buy milk and eggs"`<br>`{1111aaaa: 15, 2222bbbb: 3}` | phone ahead    |
-| Laptop syncs and adopts it        | `"Buy milk and eggs"`<br>`{1111aaaa: 15, 2222bbbb: 3}`        | `"Buy milk and eggs"`<br>`{1111aaaa: 15, 2222bbbb: 3}` | equal          |
-| Laptop goes offline and update text   | `"Buy milk, eggs and bread"`<br>`{1111aaaa: 16, 2222bbbb: 3}` | `"Buy milk and eggs"`<br>`{1111aaaa: 15, 2222bbbb: 3}` | laptop ahead   |
-| Phone rewrites the line meanwhile | `"Buy milk, eggs and bread"`<br>`{1111aaaa: 16, 2222bbbb: 3}` | `"Buy oat milk"`<br>`{1111aaaa: 15, 2222bbbb: 4}`      | **concurrent** |
+Each cell is one device's whole snapshot: the text, the clock, then `author` and `updatedAt` (abbreviated to the time of
+day). **Bold** marks what changed for that device since the row above — and in A, B and C, since the last row of this
+table. Note that `author` and `updatedAt` travel **with the text**, not with the file — a device that adopts a peer's
+text copies both unchanged, so they record when the text was authored and by whom, never when this device last wrote its
+own file.
+
+| Step                                | Laptop                                                                                                                          | Phone                                                                                                                           | Relation       |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | -------------- |
+| Start state                         | `"Water the plants"`<br>`{1111aaaa: 14, 2222bbbb: 2}`<br>by `1111aaaa` at `10:00Z`                                              | `"Water the plants"`<br>`{1111aaaa: 14, 2222bbbb: 2}`<br>by `1111aaaa` at `10:00Z`                                              | equal          |
+| Laptop writes a new text            | **`"Buy milk"`**<br><code>{1111aaaa: <b>15</b>, 2222bbbb: 2}</code><br>by `1111aaaa` at **`10:01Z`**                            | `"Water the plants"`<br>`{1111aaaa: 14, 2222bbbb: 2}`<br>by `1111aaaa` at `10:00Z`                                              | laptop ahead   |
+| Phone syncs and adopts it           | `"Buy milk"`<br>`{1111aaaa: 15, 2222bbbb: 2}`<br>by `1111aaaa` at `10:01Z`                                                      | **`"Buy milk"`**<br><code>{1111aaaa: <b>15</b>, 2222bbbb: 2}</code><br>by `1111aaaa` at **`10:01Z`**                            | equal          |
+| Phone adds `" and eggs"`            | `"Buy milk"`<br>`{1111aaaa: 15, 2222bbbb: 2}`<br>by `1111aaaa` at `10:01Z`                                                      | <code>"Buy milk <b>and eggs</b>"</code><br><code>{1111aaaa: 15, 2222bbbb: <b>3</b>}</code><br>by **`2222bbbb`** at **`10:02Z`** | phone ahead    |
+| Laptop syncs and adopts it          | <code>"Buy milk <b>and eggs</b>"</code><br><code>{1111aaaa: 15, 2222bbbb: <b>3</b>}</code><br>by **`2222bbbb`** at **`10:02Z`** | `"Buy milk and eggs"`<br>`{1111aaaa: 15, 2222bbbb: 3}`<br>by `2222bbbb` at `10:02Z`                                             | equal          |
+| Laptop goes offline and update text | **`"Buy milk, eggs and bread"`**<br><code>{1111aaaa: <b>16</b>, 2222bbbb: 3}</code><br>by **`1111aaaa`** at **`10:03Z`**        | `"Buy milk and eggs"`<br>`{1111aaaa: 15, 2222bbbb: 3}`<br>by `2222bbbb` at `10:02Z`                                             | laptop ahead   |
+| Phone rewrites the line meanwhile   | `"Buy milk, eggs and bread"`<br>`{1111aaaa: 16, 2222bbbb: 3}`<br>by `1111aaaa` at `10:03Z`                                      | **`"Buy oat milk"`**<br><code>{1111aaaa: 15, 2222bbbb: <b>4</b>}</code><br>by `2222bbbb` at **`10:04Z`**                        | **concurrent** |
+
+Rows 3 and 5 are the ones to read twice: the adopting device rewrites its own file, yet keeps the peer's `author` and
+`updatedAt`. The clock is what moves.
 
 The race condition happens in Laptop, and the resolution needs to be handled by Laptop side.
 
 **A: the user keeps the laptop's text.**
 
-| Step                           | Laptop                                                        | Phone                                                         | Relation     |
-| ------------------------------ | ------------------------------------------------------------- | ------------------------------------------------------------- | ------------ |
-| Laptop reconnects and resolves | `"Buy milk, eggs and bread"`<br>`{1111aaaa: 17, 2222bbbb: 4}` | `"Buy oat milk"`<br>`{1111aaaa: 15, 2222bbbb: 4}`             | laptop ahead |
-| Phone syncs and fast-forwards  | `"Buy milk, eggs and bread"`<br>`{1111aaaa: 17, 2222bbbb: 4}` | `"Buy milk, eggs and bread"`<br>`{1111aaaa: 17, 2222bbbb: 4}` | equal        |
+| Step                           | Laptop                                                                                                                  | Phone                                                                                                                    | Relation     |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------ |
+| Laptop reconnects and resolves | `"Buy milk, eggs and bread"`<br><code>{1111aaaa: <b>17</b>, 2222bbbb: <b>4</b>}</code><br>by `1111aaaa` at **`10:05Z`** | `"Buy oat milk"`<br>`{1111aaaa: 15, 2222bbbb: 4}`<br>by `2222bbbb` at `10:04Z`                                           | laptop ahead |
+| Phone syncs and fast-forwards  | `"Buy milk, eggs and bread"`<br>`{1111aaaa: 17, 2222bbbb: 4}`<br>by `1111aaaa` at `10:05Z`                              | **`"Buy milk, eggs and bread"`**<br><code>{1111aaaa: <b>17</b>, 2222bbbb: 4}</code><br>by **`1111aaaa`** at **`10:05Z`** | equal        |
+
+The laptop's text did not change — it resolved onto what it already had. Only the clock moved, and that is what
+makes the phone fast-forward.
 
 **B: the user keeps the phone's text.**
 
-| Step                           | Laptop                                            | Phone                                             | Relation     |
-| ------------------------------ | ------------------------------------------------- | ------------------------------------------------- | ------------ |
-| Laptop reconnects and resolves | `"Buy oat milk"`<br>`{1111aaaa: 17, 2222bbbb: 4}` | `"Buy oat milk"`<br>`{1111aaaa: 15, 2222bbbb: 4}` | laptop ahead |
-| Phone syncs and fast-forwards  | `"Buy oat milk"`<br>`{1111aaaa: 17, 2222bbbb: 4}` | `"Buy oat milk"`<br>`{1111aaaa: 17, 2222bbbb: 4}` | equal        |
+| Step                           | Laptop                                                                                                          | Phone                                                                                                    | Relation     |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ------------ |
+| Laptop reconnects and resolves | **`"Buy oat milk"`**<br><code>{1111aaaa: <b>17</b>, 2222bbbb: <b>4</b>}</code><br>by `1111aaaa` at **`10:05Z`** | `"Buy oat milk"`<br>`{1111aaaa: 15, 2222bbbb: 4}`<br>by `2222bbbb` at `10:04Z`                           | laptop ahead |
+| Phone syncs and fast-forwards  | `"Buy oat milk"`<br>`{1111aaaa: 17, 2222bbbb: 4}`<br>by `1111aaaa` at `10:05Z`                                  | `"Buy oat milk"`<br><code>{1111aaaa: <b>17</b>, 2222bbbb: 4}</code><br>by **`1111aaaa`** at **`10:05Z`** | equal        |
+
+Case B is the one that surprises: the phone's _text_ wins, but the laptop is the `author` — resolving is itself an edit,
+and the laptop is the device that made it. `author` names who produced the snapshot's current text, not who first
+thought of the wording. On the last row the phone's text is the only thing that does _not_ change.
 
 **C: the user combines them by hand.**
 
-| Step                           | Laptop                                            | Phone                                             | Relation     |
-| ------------------------------ | ------------------------------------------------- | ------------------------------------------------- | ------------ |
-| Laptop reconnects and resolves | `"Buy milk, eggs, bread and oat milk"`<br>`{1111aaaa: 17, 2222bbbb: 4}` | `"Buy oat milk"`<br>`{1111aaaa: 15, 2222bbbb: 4}` | laptop ahead |
-| Phone syncs and fast-forwards  | `"Buy milk, eggs, bread and oat milk"`<br>`{1111aaaa: 17, 2222bbbb: 4}` | `"Buy milk, eggs, bread and oat milk"`<br>`{1111aaaa: 17, 2222bbbb: 4}` | equal        |
+| Step                           | Laptop                                                                                                                                              | Phone                                                                                                                              | Relation     |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| Laptop reconnects and resolves | <code>"Buy milk, eggs<b>, bread and oat milk</b>"</code><br><code>{1111aaaa: <b>17</b>, 2222bbbb: <b>4</b>}</code><br>by `1111aaaa` at **`10:05Z`** | `"Buy oat milk"`<br>`{1111aaaa: 15, 2222bbbb: 4}`<br>by `2222bbbb` at `10:04Z`                                                     | laptop ahead |
+| Phone syncs and fast-forwards  | `"Buy milk, eggs, bread and oat milk"`<br>`{1111aaaa: 17, 2222bbbb: 4}`<br>by `1111aaaa` at `10:05Z`                                                | **`"Buy milk, eggs, bread and oat milk"`**<br><code>{1111aaaa: <b>17</b>, 2222bbbb: 4}</code><br>by **`1111aaaa`** at **`10:05Z`** | equal        |
 
 
 ### The sync cycle
