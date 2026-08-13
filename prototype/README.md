@@ -18,12 +18,12 @@ provider grants those by just being a folder.
 
 ## Glossary
 
-| Term           | Definition                                                                                                                                                                                                           |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Sync folder    | A specific shared folder in the cloud provider directory, which contains all items of the application.                                                                                                               |
-| Replica Item   | `checklist.<device-id>.json` files inside the sync folder. Each file is a device's replica of the shared state; every device holds a full replica, which enables the app to work offline.                            |
-| Windows bundle | An official embeddable Python staged on the Windows side plus a desktop shortcut to `pythonw.exe`. No `.exe` is produced deliberately, as a shortcut to Microsoft's own signed binary raises no SmartScreen warning. |
-| Demo mode      | `?demo` in the URL, running the app against an in-memory folder with no disk and no network. Use `window.__injectPeer(id, text, clock)` to fake a peer (`adapters/memory-folder.mjs`).                               |
+| Term           | Definition                                                                                                                                                                                                                                                                 |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sync folder    | A specific shared folder in the cloud provider directory, which contains all items of the application.                                                                                                                                                                     |
+| Windows bundle | An official embeddable Python staged on the Windows side plus a desktop shortcut to `pythonw.exe`. No `.exe` is produced deliberately, as a shortcut to Microsoft's own signed binary raises no SmartScreen warning.                                                       |
+| Demo mode      | `?demo` in the URL, running the app against an in-memory folder with no disk and no network.                                                                                      |
+| Snapshot      | `checklist.<device-id>.json` files inside the sync folder. Each file is a device's replica of the shared state; every device holds a full replica, which enables the app to work offline.                            |
 
 ## Validation Procedure
 
@@ -80,13 +80,13 @@ the _system_ picker (Storage Access Framework). The grant is kept across restart
 
 ## Logic
 
-### Replica Item
+Consider:
+`1111aaaa`: device-id of the laptop
+`2222bbbb`: device-id of the phone
 
-A synced folder gives no locking and no conditional write. Each device writes a distinct `checklist.<device-id>.json`
-file to the sync folder.
+### Snapshot
 
-- `1111aaaa`: device-id of the laptop
-- `2222bbbb`: device-id of the phone
+The synced folder has no locking or conditional write. Each device writes a distinct snapshot `checklist.<device-id>.json`, that describes its state to the sync folder.
 
 ```
 Sync-Folder/
@@ -94,10 +94,10 @@ Sync-Folder/
   checklist.2222bbbb.json     <- only the phone ever writes this
 ```
 
-Each device **writes one Replica Item (specific for this device) and also reads all Replica Items (from its own and
-other device)**. No concurrent write of Replica Item can happens.
+Each device **writes one Snapshot (specific for its device) and also reads all Snapshots (from its own and
+other device)**. No concurrent write of Snapshot can happens.
 
-Replica Item's Content
+Snapshot content
 
 ```json
 {
@@ -110,14 +110,14 @@ Replica Item's Content
 }
 ```
 
-| Field     | Description                                                                                                                                                                                                         |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| device    | A generated 8-hex-character id that names the replica file and never changes.                                                                                                                                       |
-| label     | The human name for a device, display only, carried inside the file and never in its name.                                                                                                                           |
-| author    | The device whose edit produced the current text, which is not always the device that owns the file. A device that adopts a peer's text keeps that peer as `author`.                                                 |
-| text      | Value of the text field, specific for the prototype.                                                                                                                                                                |
-| clock     | Version vector. One counter per device recording how many edits by that device. It is a receipt for what has been read, not a claim about time.                                                                     |
-| updatedAt | A wall-clock timestamp used only to pick the newest among snapshots that already agree on the text, and to show a human when something changed. It never decides what happened; clock skew makes it unfit for that. |
+| Field     | Description                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| device    | A generated 8-hex-character id that names the replica file and never changes.                                                                                                                                                                                                                                                                                                                                               |
+| label     | The human name for a device, display only, carried inside the file and never in its name.                                                                                                                                                                                                                                                                                                                                   |
+| author    | The device that produced the current text, which is not always the device that owns the file. A device that adopts a peer's text keeps that peer as `author`.                                                                                                                                                                                                                                                         |
+| text      | Value of the text field, specific for the prototype.                                                                                                                                                                                                                                                                                                                                                                        |
+| clock     | Version vector. It has 2 directions. <br> One counter for recording the version of its own device: `"1111aaaa": 3`.<br> Other counter(s) is a receipt for what this device `1111aaaa` have read from other device `2222bbbb`: `"2222bbbb": 1`.<br>A device that has never appeared in the folder is simply absent from the vector and counts as `0`, so a third device joins with no registration step and no coordination. |
+| updatedAt | A timestamp for getting the newest snapshot that already agree on the text, and to show a human when something changed. It does not effect the sync process.                                                                                                                                                                                                         |
 
 ### Multi-device change synchronisation
 
@@ -128,58 +128,66 @@ There are two level synchronisation:
 
 #### 1. File and folder in Sync Folder
 
-Each device **writes one Replica Item and reads all Replica Items** in the Sync Folder, as long the device-id is unique,
+Each device **writes only its own one Snapshot file** in the Sync Folder, as long the device-id is unique,
 it's impossible for race condition can happen for items inside Sync Folder.
 
 The Sync Folder never tells a device that something happened. The files are quietly synchronized also when the app is
 not running. Sync of content inside the folder will be handled by the cloud provider. The application has no logic for
 this.
 
-The rule that makes those counters comparable is a single one:
+#### 2. Application content
 
-**Only the owner of a slot ever increments it, and only when the user typed on that device.**
-Folding in a peer's edit joins the two vectors instead — pointwise max, no bump (`join`, `bump` in `core/merge.mjs`).
-So a vector reads in two directions at once: our own slot counts edits we made, every other slot is a receipt for what we have read from that device.
-A device that has never appeared in the folder is simply absent from the vector and counts as `0`, so a third device joins with no registration step and no coordination.
+Change awareness is not received but derived. On every cycle a device reads the snapshots it finds and compares each
+snapshot's `clock` vector against its own.
 
-Comparing two vectors answers the only question worth asking about a peer's file:
+**Only a device may increment its own counter.** Folding in a peer's edit joins the two vectors.
 
-| Relation to our clock | Meaning                                             | Consequence                                                |
-| --------------------- | --------------------------------------------------- | ---------------------------------------------------------- |
-| peer dominates ours   | The peer has seen everything we have, and then some | Its text is newer — adopt it                               |
-| ours dominates peer   | The peer is behind; it has not read our file yet    | Nothing to learn — our own file already carries the answer |
-| equal                 | Same knowledge on both sides                        | Nothing to do                                              |
-| neither dominates     | Both edited without seeing the other                | A genuine race — raise a conflict                          |
+##### Comparision of 2 devices
 
-With more than two devices the comparison is not pairwise.
-`reconcile()` takes every snapshot in the folder, ours included, and keeps the **maximal** ones — those nothing else strictly dominates.
-One surviving text means every other snapshot is an ancestor of it and there is nothing to ask anybody about; two surviving texts is the conflict case, and no merge rule can settle it alone.
+Comparing two vectors solves:
 
-Worked through the scenario in `test/scenario.mjs`, with `1111aaaa` the laptop and `2222bbbb` the phone:
+| Relation to our clock | `dominates(peer, ours)` | `dominates(ours, peer)` | Consequence                                   |
+| --------------------- | ----------------------- | ----------------------- | --------------------------------------------- |
+| peer ahead            | true                    | false                   | Adopt peer's text                             |
+| peer behind           | false                   | true                    | Nothing to do                                 |
+| equal                 | true                    | true                    | Nothing to do                                 |
+| concurrent            | false                   | false                   | Race condition, raise conflict inside the app |
 
-| Step                                    | Laptop clock                 | Phone clock                  | Relation              |
-| --------------------------------------- | ---------------------------- | ---------------------------- | --------------------- |
-| Laptop types "Buy milk"                 | `{1111aaaa: 1}`              | —                            | laptop ahead          |
-| Phone syncs and adopts it               | `{1111aaaa: 1}`              | `{1111aaaa: 1}`              | equal                 |
-| Phone types "Buy milk and eggs"         | `{1111aaaa: 1}`              | `{1111aaaa: 1, 2222bbbb: 1}` | phone ahead           |
-| Laptop syncs and adopts it              | `{1111aaaa: 1, 2222bbbb: 1}` | `{1111aaaa: 1, 2222bbbb: 1}` | equal                 |
-| Laptop goes offline, types "…and bread" | `{1111aaaa: 2, 2222bbbb: 1}` | `{1111aaaa: 1, 2222bbbb: 1}` | laptop ahead          |
-| Phone types "Buy oat milk" meanwhile    | `{1111aaaa: 2, 2222bbbb: 1}` | `{1111aaaa: 1, 2222bbbb: 2}` | **concurrent**        |
-| Laptop reconnects and the user resolves | `{1111aaaa: 3, 2222bbbb: 2}` | `{1111aaaa: 1, 2222bbbb: 2}` | laptop dominates both |
+Consider this race condition scenario in `test/scenario.mjs`:
 
-The last row is why resolving joins the racing clocks before bumping: the result strictly dominates every version that raced, so the phone reads it as plainly newer and fast-forwards instead of raising the same conflict again.
+| Step                              | Laptop                                                        | Phone                                                  | Relation       |
+| --------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------ | -------------- |
+| Start state   |`"Water the plants"`<br>`{1111aaaa: 14, 2222bbbb: 2}` | `"Water the plants"`<br>`{1111aaaa: 14, 2222bbbb: 2}`| equal|
+| Laptop writes a new text       | `"Buy milk"`<br>`{1111aaaa: 15, 2222bbbb: 2}`                 | `"Water the plants"`<br>`{1111aaaa: 14, 2222bbbb: 2}`  | laptop ahead   |
+| Phone syncs and adopts it         | `"Buy milk"`<br>`{1111aaaa: 15, 2222bbbb: 2}`                 | `"Buy milk"`<br>`{1111aaaa: 15, 2222bbbb: 2}`          | equal          |
+| Phone adds `" and eggs"`          | `"Buy milk"`<br>`{1111aaaa: 15, 2222bbbb: 2}`                 | `"Buy milk and eggs"`<br>`{1111aaaa: 15, 2222bbbb: 3}` | phone ahead    |
+| Laptop syncs and adopts it        | `"Buy milk and eggs"`<br>`{1111aaaa: 15, 2222bbbb: 3}`        | `"Buy milk and eggs"`<br>`{1111aaaa: 15, 2222bbbb: 3}` | equal          |
+| Laptop goes offline and update text   | `"Buy milk, eggs and bread"`<br>`{1111aaaa: 16, 2222bbbb: 3}` | `"Buy milk and eggs"`<br>`{1111aaaa: 15, 2222bbbb: 3}` | laptop ahead   |
+| Phone rewrites the line meanwhile | `"Buy milk, eggs and bread"`<br>`{1111aaaa: 16, 2222bbbb: 3}` | `"Buy oat milk"`<br>`{1111aaaa: 15, 2222bbbb: 4}`      | **concurrent** |
 
-Note what the wall clock does **not** do here.
-`updatedAt` never decides what happened — two devices with a few seconds of skew would silently hand every race to whichever one has the faster clock, and the loser's edit would disappear with no conflict raised.
-It is used only to pick among snapshots that already agree on the text, and to show a human when something changed.
+The race condition happens in Laptop, and the resolution needs to be handled by Laptop side.
 
-Adopting a peer's text obliges us to write our own file back, even though the user did nothing (`changed` in `applyPeers`).
-Taking the text without recording the clock would leave us looking, on our next local edit, as though we had edited concurrently — a conflict that never happened.
-Reading is part of the state, so it has to be published like any other change.
+**A: the user keeps the laptop's text.**
 
-What the user sees of all this: the current `author` resolved to a device label, our own clock, the file list with our file marked, and a log line for each incoming edit (`picked up "…" from laptop`).
-Labels are not copied around — each device declares its own inside its own file, so the folder as a whole is the lookup table and `labelFor()` reads it (`core/device.mjs`).
-A rename is display only: no clock bump, nothing to converge, and peers pick it up on their next read.
+| Step                           | Laptop                                                        | Phone                                                         | Relation     |
+| ------------------------------ | ------------------------------------------------------------- | ------------------------------------------------------------- | ------------ |
+| Laptop reconnects and resolves | `"Buy milk, eggs and bread"`<br>`{1111aaaa: 17, 2222bbbb: 4}` | `"Buy oat milk"`<br>`{1111aaaa: 15, 2222bbbb: 4}`             | laptop ahead |
+| Phone syncs and fast-forwards  | `"Buy milk, eggs and bread"`<br>`{1111aaaa: 17, 2222bbbb: 4}` | `"Buy milk, eggs and bread"`<br>`{1111aaaa: 17, 2222bbbb: 4}` | equal        |
+
+**B: the user keeps the phone's text.**
+
+| Step                           | Laptop                                            | Phone                                             | Relation     |
+| ------------------------------ | ------------------------------------------------- | ------------------------------------------------- | ------------ |
+| Laptop reconnects and resolves | `"Buy oat milk"`<br>`{1111aaaa: 17, 2222bbbb: 4}` | `"Buy oat milk"`<br>`{1111aaaa: 15, 2222bbbb: 4}` | laptop ahead |
+| Phone syncs and fast-forwards  | `"Buy oat milk"`<br>`{1111aaaa: 17, 2222bbbb: 4}` | `"Buy oat milk"`<br>`{1111aaaa: 17, 2222bbbb: 4}` | equal        |
+
+**C: the user combines them by hand.**
+
+| Step                           | Laptop                                            | Phone                                             | Relation     |
+| ------------------------------ | ------------------------------------------------- | ------------------------------------------------- | ------------ |
+| Laptop reconnects and resolves | `"Buy milk, eggs, bread and oat milk"`<br>`{1111aaaa: 17, 2222bbbb: 4}` | `"Buy oat milk"`<br>`{1111aaaa: 15, 2222bbbb: 4}` | laptop ahead |
+| Phone syncs and fast-forwards  | `"Buy milk, eggs, bread and oat milk"`<br>`{1111aaaa: 17, 2222bbbb: 4}` | `"Buy milk, eggs, bread and oat milk"`<br>`{1111aaaa: 17, 2222bbbb: 4}` | equal        |
+
 
 ### The sync cycle
 

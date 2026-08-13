@@ -13,6 +13,7 @@ import {
   rm,
   readdir,
   readFile,
+  writeFile,
   copyFile,
   mkdir,
 } from "node:fs/promises";
@@ -49,8 +50,37 @@ const now = () => new Date(Date.UTC(2026, 7, 12, 0, 0, ++tick)).toISOString();
 // by its label, and pinning them keeps the assertions below readable.
 const ID = { laptop: "1111aaaa", phone: "2222bbbb" };
 
-async function device(id, label) {
+// The pair has been syncing for a while before the scenario opens: 14 edits
+// authored on the laptop, 2 on the phone, converged. Starting mid-history
+// rather than from an empty folder keeps the counters from lining up, which is
+// the ordinary case — a counter is only ever compared with the *same device's*
+// counter in another vector, never with a different device's.
+const SEED = {
+  text: "Water the plants",
+  clock: { [ID.laptop]: 14, [ID.phone]: 2 },
+};
+
+async function seed(id, label) {
   await mkdir(dirFor(id), { recursive: true });
+  await mkdir(CLOUD, { recursive: true });
+  const body = `${JSON.stringify(
+    {
+      device: id,
+      label,
+      author: ID.laptop, // the last edit before the scenario was the laptop's
+      text: SEED.text,
+      clock: SEED.clock,
+      updatedAt: now(),
+    },
+    null,
+    2,
+  )}\n`;
+  await writeFile(join(dirFor(id), fileNameFor(id)), body);
+  await writeFile(join(CLOUD, fileNameFor(id)), body);
+}
+
+async function device(id, label) {
+  await seed(id, label);
   const d = createDevice({
     deviceId: id,
     label,
@@ -77,14 +107,20 @@ async function deliver(id) {
 }
 
 const textOf = (d) => d.state?.text ?? null;
+const clockOf = (d) => JSON.stringify(d.state?.clock);
 
 console.log("\n1. laptop edits; phone starts up and sees it");
 const laptop = await device(ID.laptop, "laptop");
 const phone = await device(ID.phone, "phone");
 
 await laptop.edit("Buy milk");
+is(
+  "only the laptop's own counter moved",
+  clockOf(laptop),
+  '{"1111aaaa":15,"2222bbbb":2}',
+);
 await deliver(ID.laptop);
-is("cloud has one file", (await readdir(CLOUD)).length, 1);
+is("cloud still has one file per device", (await readdir(CLOUD)).length, 2);
 
 await deliver(ID.phone);
 await phone.sync();
@@ -135,6 +171,13 @@ is("the phone kept its own text", textOf(phone), "Buy oat milk");
 console.log("\n6. the user resolves, on the laptop, and it propagates");
 await laptop.resolve("Buy oat milk, eggs and bread");
 is("laptop conflict cleared", laptop.conflict, null);
+// The join of both racing clocks, then one bump of the resolver's own counter.
+// Which text was chosen does not enter into it.
+is(
+  "the resolution dominates both racing versions",
+  clockOf(laptop),
+  '{"1111aaaa":17,"2222bbbb":4}',
+);
 await deliver(ID.laptop);
 await deliver(ID.phone);
 await phone.sync();
@@ -144,6 +187,7 @@ is(
   "Buy oat milk, eggs and bread",
 );
 is("phone raises no conflict of its own", phone.conflict, null);
+is("phone adopts the clock too", clockOf(phone), clockOf(laptop));
 
 console.log("\n7. converged, and quiet");
 await laptop.sync();
