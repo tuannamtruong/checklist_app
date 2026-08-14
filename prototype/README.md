@@ -16,7 +16,6 @@ of multiple devices.
 Which cloud provider should makes no differences. The app needs three operations: `list`, `read`, `write`. Every
 provider grants those by just being a folder.
 
-
 ## Setup
 
 ### Install
@@ -70,7 +69,6 @@ Picking the folder in the page (if not specified during install): click **Choose
 On Android there is no localhost and no picker in the page: the app boots straight to **Choose folder…**, which opens
 the _system_ picker (Storage Access Framework). The grant is kept across restarts, so the folder is picked once.
 
-
 ## Glossary
 
 | Term           | Definition                                                                                                                                                                                                           |
@@ -78,13 +76,14 @@ the _system_ picker (Storage Access Framework). The grant is kept across restart
 | Sync folder    | A specific shared folder in the cloud provider directory, which contains all items of the application.                                                                                                               |
 | Windows bundle | An official embeddable Python staged on the Windows side plus a desktop shortcut to `pythonw.exe`. No `.exe` is produced deliberately, as a shortcut to Microsoft's own signed binary raises no SmartScreen warning. |
 | Demo mode      | `?demo` in the URL, running the app against an in-memory folder with no disk and no network.                                                                                                                         |
-| Device-id       | A random generated on first run in a device and persisted in the meta table under key deviceId. Reset after "Clear site data" in DevTools.|
+| Device-id      | A random generated on first run in a device and persisted in the meta table under key deviceId. Reset after "Clear site data" in DevTools.                                                                           |
 | Snapshot       | `checklist.<device-id>.json` files inside the sync folder. Each file is a device's replica of the shared state; every device holds a full replica, which enables the app to work offline.                            |
 
-
 In this document:
+
 - 1111aaaa: device-id of a laptop
 - 2222bbbb: device-id of a phone
+- 3333cccc: device-id of a tablet
 
 ## Snapshot
 
@@ -120,7 +119,6 @@ Snapshot content
 | text      | Value of the text field, specific for the prototype.                                                                                                                                                                                                                                                                                                                                                                        |
 | clock     | Version vector. It has 2 directions. <br> One counter for recording the version of its own device: `"1111aaaa": 3`.<br> Other counter(s) is a receipt for what this device `1111aaaa` have read from other device `2222bbbb`: `"2222bbbb": 1`.<br>A device that has never appeared in the folder is simply absent from the vector and counts as `0`, so a third device joins with no registration step and no coordination. |
 
-
 Change awareness is not received but derived. On every cycle a device reads the snapshots it finds and compares each
 snapshot's `clock` vector against its own.
 
@@ -129,6 +127,7 @@ snapshot's `clock` vector against its own.
 ## Synchronisation Logic
 
 There are two parts of synchronisation:
+
 1. Files and directories in Sync Folder.
 2. Application Content: Values shown in the app's presentation layer for the end user.
 
@@ -145,27 +144,26 @@ Consider:
 `1111aaaa`: device-id of the laptop
 `2222bbbb`: device-id of the phone
 
-### 2. Application content synchronisation 
-#### 2.1. Application content synchronisation between a pair of devices
+### 2. Application content synchronisation
 
-Comparing two vectors solves:
+Sync works by comparing two `sClock` against each other: `ours`, from this device's snapshot, and `peer`, from the
+peer's snapshot. 
 
-| Relation to our clock | `dominates(peer, ours)` | `dominates(ours, peer)` | Consequence                                   |
+`dominates(a, b)` answers if `a`'s counter is at least `b`'s. By calling it twice in both directions, the Relation between the two can be determinded.
+
+|  `dominates(peer, ours)` | `dominates(ours, peer)` | Relation |Consequence                                   |
 | --------------------- | ----------------------- | ----------------------- | --------------------------------------------- |
-| peer ahead            | true                    | false                   | Adopt peer's text                             |
-| peer behind           | false                   | true                    | Nothing to do                                 |
-| equal                 | true                    | true                    | Nothing to do                                 |
-| concurrent            | false                   | false                   | Race condition, raise conflict inside the app |
+| true                    | false                   |peer ahead            |  Adopt peer's text                             |
+| false                   | true                    | peer behind           | Nothing |
+| true                    | true                    | equal                 | Nothing                                  |
+| false                   | false                   | concurrent            | Race condition|
 
 Consider this race condition scenario in `test/scenario.mjs`:
 
-Each cell is one device's whole snapshot: the text, the clock, then `author` and `updatedAt` (abbreviated to the time of
-day). **Bold** marks what changed for that device since the row above — and in A, B and C, since the last row of this
-table. Note that `author` and `updatedAt` travel **with the text**, not with the file — a device that adopts a peer's
-text copies both unchanged, so they record when the text was authored and by whom, never when this device last wrote its
-own file.
+Each cell contains one device's partial snapshot: application content, vector, author and updatedAt.
+**Bold** marks what changed for that device since the last event.
 
-| Step                                | Laptop                                                                                                                          | Phone                                                                                                                           | Relation       |
+| Event                               | Laptop                                                                                                                          | Phone                                                                                                                           | Relation       |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | -------------- |
 | Start state                         | `"Water the plants"`<br>`{1111aaaa: 14, 2222bbbb: 2}`<br>by `1111aaaa` at `10:00Z`                                              | `"Water the plants"`<br>`{1111aaaa: 14, 2222bbbb: 2}`<br>by `1111aaaa` at `10:00Z`                                              | equal          |
 | Laptop writes a new text            | **`"Buy milk"`**<br><code>{1111aaaa: <b>15</b>, 2222bbbb: 2}</code><br>by `1111aaaa` at **`10:01Z`**                            | `"Water the plants"`<br>`{1111aaaa: 14, 2222bbbb: 2}`<br>by `1111aaaa` at `10:00Z`                                              | laptop ahead   |
@@ -175,14 +173,11 @@ own file.
 | Laptop goes offline and update text | **`"Buy milk, eggs and bread"`**<br><code>{1111aaaa: <b>16</b>, 2222bbbb: 3}</code><br>by **`1111aaaa`** at **`10:03Z`**        | `"Buy milk and eggs"`<br>`{1111aaaa: 15, 2222bbbb: 3}`<br>by `2222bbbb` at `10:02Z`                                             | laptop ahead   |
 | Phone rewrites the line meanwhile   | `"Buy milk, eggs and bread"`<br>`{1111aaaa: 16, 2222bbbb: 3}`<br>by `1111aaaa` at `10:03Z`                                      | **`"Buy oat milk"`**<br><code>{1111aaaa: 15, 2222bbbb: <b>4</b>}</code><br>by `2222bbbb` at **`10:04Z`**                        | **concurrent** |
 
-Rows 3 and 5 are the ones to read twice: the adopting device rewrites its own file, yet keeps the peer's `author` and
-`updatedAt`. The clock is what moves.
-
 The race condition happens in Laptop, and the resolution needs to be handled by Laptop side.
 
 **A: the user keeps the laptop's text.**
 
-| Step                           | Laptop                                                                                                                  | Phone                                                                                                                    | Relation     |
+| Event                          | Laptop                                                                                                                  | Phone                                                                                                                    | Relation     |
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------ |
 | Laptop reconnects and resolves | `"Buy milk, eggs and bread"`<br><code>{1111aaaa: <b>17</b>, 2222bbbb: <b>4</b>}</code><br>by `1111aaaa` at **`10:05Z`** | `"Buy oat milk"`<br>`{1111aaaa: 15, 2222bbbb: 4}`<br>by `2222bbbb` at `10:04Z`                                           | laptop ahead |
 | Phone syncs and fast-forwards  | `"Buy milk, eggs and bread"`<br>`{1111aaaa: 17, 2222bbbb: 4}`<br>by `1111aaaa` at `10:05Z`                              | **`"Buy milk, eggs and bread"`**<br><code>{1111aaaa: <b>17</b>, 2222bbbb: 4}</code><br>by **`1111aaaa`** at **`10:05Z`** | equal        |
@@ -192,7 +187,7 @@ makes the phone fast-forward.
 
 **B: the user keeps the phone's text.**
 
-| Step                           | Laptop                                                                                                          | Phone                                                                                                    | Relation     |
+| Event                          | Laptop                                                                                                          | Phone                                                                                                    | Relation     |
 | ------------------------------ | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ------------ |
 | Laptop reconnects and resolves | **`"Buy oat milk"`**<br><code>{1111aaaa: <b>17</b>, 2222bbbb: <b>4</b>}</code><br>by `1111aaaa` at **`10:05Z`** | `"Buy oat milk"`<br>`{1111aaaa: 15, 2222bbbb: 4}`<br>by `2222bbbb` at `10:04Z`                           | laptop ahead |
 | Phone syncs and fast-forwards  | `"Buy oat milk"`<br>`{1111aaaa: 17, 2222bbbb: 4}`<br>by `1111aaaa` at `10:05Z`                                  | `"Buy oat milk"`<br><code>{1111aaaa: <b>17</b>, 2222bbbb: 4}</code><br>by **`1111aaaa`** at **`10:05Z`** | equal        |
@@ -203,13 +198,14 @@ thought of the wording. On the last row the phone's text is the only thing that 
 
 **C: the user combines them by hand.**
 
-| Step                           | Laptop                                                                                                                                              | Phone                                                                                                                              | Relation     |
+| Event                          | Laptop                                                                                                                                              | Phone                                                                                                                              | Relation     |
 | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------ |
 | Laptop reconnects and resolves | <code>"Buy milk, eggs<b>, bread and oat milk</b>"</code><br><code>{1111aaaa: <b>17</b>, 2222bbbb: <b>4</b>}</code><br>by `1111aaaa` at **`10:05Z`** | `"Buy oat milk"`<br>`{1111aaaa: 15, 2222bbbb: 4}`<br>by `2222bbbb` at `10:04Z`                                                     | laptop ahead |
 | Phone syncs and fast-forwards  | `"Buy milk, eggs, bread and oat milk"`<br>`{1111aaaa: 17, 2222bbbb: 4}`<br>by `1111aaaa` at `10:05Z`                                                | **`"Buy milk, eggs, bread and oat milk"`**<br><code>{1111aaaa: <b>17</b>, 2222bbbb: 4}</code><br>by **`1111aaaa`** at **`10:05Z`** | equal        |
 
-#### 2.2 Application content between more than 2 devices
+#### 2.2. Synchronisation with more than 2 devices
 
+There is no different in code path, that differentiates with the sync of 2 devices.
 
 ### 3. The sync cycle
 
@@ -259,22 +255,18 @@ make proto_android
 make proto_clean
 ```
 
-Neither installs a toolchain on this machine. The Windows target downloads an
-official embeddable Python and stages it on the Windows side — no installer, no
-pip, no admin rights — which is what the stdlib-only rule in `serve.py` buys.
-The Android target does everything inside Docker.
+Neither installs a toolchain on this machine. The Windows target downloads an official embeddable Python and stages it
+on the Windows side — no installer, no pip, no admin rights — which is what the stdlib-only rule in `serve.py` buys. The
+Android target does everything inside Docker.
 
-No `.exe` is produced, deliberately: a shortcut to Microsoft's own signed
-`pythonw.exe` raises no SmartScreen warning, an unsigned executable does. The
-prototype is not copied to the Windows side either — the shortcut points at
-`serve.py` where it already lives (over `\\wsl.localhost` under WSL), so there
-is one copy of the code and git keeps working.
+No `.exe` is produced, deliberately: a shortcut to Microsoft's own signed `pythonw.exe` raises no SmartScreen warning,
+an unsigned executable does. The prototype is not copied to the Windows side either — the shortcut points at `serve.py`
+where it already lives (over `\\wsl.localhost` under WSL), so there is one copy of the code and git keeps working.
 
-`android/Dockerfile` doubles as a Jenkins agent: the SDK licences are accepted
-in the image rather than in someone's home directory, the Gradle daemon is off
-so no state survives a run, and the container runs as the invoking user so
-artifacts are not written to the workspace as root. A pipeline step is the same
-`docker run` that `build.sh` already issues.
+`android/Dockerfile` doubles as a Jenkins agent: the SDK licences are accepted in the image rather than in someone's
+home directory, the Gradle daemon is off so no state survives a run, and the container runs as the invoking user so
+artifacts are not written to the workspace as root. A pipeline step is the same `docker run` that `build.sh` already
+issues.
 
 ## Storage
 
@@ -286,27 +278,22 @@ artifacts are not written to the workspace as root. A pipeline step is the same
 | `localStorage` | The device id and label only (`proto.deviceId`, `proto.label`). Synchronous and ~5 MB — wrong for list data                                            |
 | IndexedDB      | What the real app already uses via Dexie. For a prototype syncing one sentence it earns nothing, so this does not use it                               |
 
-Note what the folder model removes: there is no outbox and no pending queue. An
-offline edit is just a written file. The cloud client uploads it when it can,
-and its retry logic is code you do not write, test or own.
+Note what the folder model removes: there is no outbox and no pending queue. An offline edit is just a written file. The
+cloud client uploads it when it can, and its retry logic is code you do not write, test or own.
 
 ### In the cloud
 
-`list`, `read`, `write` on a folder is the whole requirement, so the provider
-can be chosen on price or on which client is already installed. The one thing
-worth measuring per provider is how aggressively its client uploads a small file
+`list`, `read`, `write` on a folder is the whole requirement, so the provider can be chosen on price or on which client
+is already installed. The one thing worth measuring per provider is how aggressively its client uploads a small file
 that changes often — that sets how long "a few seconds" actually is.
 
-Android is the exception, and it is the weakest part of the design: it needs an
-app that maintains a **genuine local folder**. The Dropbox, Drive and OneDrive
-Android apps are on-demand browsers for cloud files and do not mirror a folder
-onto the device the way their desktop clients do. Syncthing, FolderSync/Dropsync
-and Nextcloud do.
+Android is the exception, and it is the weakest part of the design: it needs an app that maintains a **genuine local
+folder**. The Dropbox, Drive and OneDrive Android apps are on-demand browsers for cloud files and do not mirror a folder
+onto the device the way their desktop clients do. Syncthing, FolderSync/Dropsync and Nextcloud do.
 
 ## Browser interaction
 
-This is the real constraint the prototype turned up, and it decides how the app
-gets built.
+This is the real constraint the prototype turned up, and it decides how the app gets built.
 
 | Browser                | `showDirectoryPicker` | How it reaches the folder                     |
 | ---------------------- | --------------------- | --------------------------------------------- |
