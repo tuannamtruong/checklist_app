@@ -4,17 +4,31 @@ Prototype for syncing one single text field in a web application across multiple
 
 The goal of the prototype to solves these questions:
 
-1. How synchronisation between a windows 11 laptop and an android smartphone work?
-2. How to handle race-condition?
+1. How does synchronisation between a Windows 11 laptop and an Android smartphone work?
+2. How is a race condition handled?
 3. What storage does it need on these devices?
 4. Which browser can host the app?
 
-The design contains **no**: database engine, API, OAuth, account, network code. The app reads and writes files in an
-folder, that resides in a Cloud Provider. The client of the Cloud Provider is needed to be installed for synchronisation
-of multiple devices.
+The design contains **no**: database engine, API, OAuth, account, network code. The app reads and writes files in a
+folder that resides in a cloud provider's directory. The provider's client has to be installed for multiple devices to
+synchronise.
 
-Which cloud provider should makes no differences. The app needs three operations: `list`, `read`, `write`. Every
+Which cloud provider is used makes no difference. The app needs three operations: `list`, `read`, `write`. Every
 provider grants those by just being a folder.
+
+## Answers
+
+The four questions, answered. Each one is proven in the section it points at.
+
+1. **Laptop and phone synchronise through a Sync Folder, never with each other.** Every device writes exactly one snapshot
+   `checklist.<device-id>.json` and reads all of them. The cloud provider's client syncs the files between
+   devices. → §2
+2. **Race conditions are not prevented, they are detected.** Comparing version vectors derives whether race condition happens. 
+One user with one edit will create new maximal set, all devices can fast-forward this version to solve the concurrent.
+ → §2.3, §4.
+3. **The Sync Folder is the whole database.** Each device's copy is a full replica, so the app works offline by default. The
+   only other storage is `localStorage`, holding the device id and label. No database engine, no IndexedDB. → Storage
+4. Chrome, Edge and Firefox can host the app. → Browser interaction
 
 ## Setup
 
@@ -76,8 +90,9 @@ the _system_ picker (Storage Access Framework). The grant is kept across restart
 | Sync folder    | A specific shared folder in the cloud provider directory, which contains all items of the application.                                                                                                               |
 | Windows bundle | An official embeddable Python staged on the Windows side plus a desktop shortcut to `pythonw.exe`. No `.exe` is produced deliberately, as a shortcut to Microsoft's own signed binary raises no SmartScreen warning. |
 | Demo mode      | `?demo` in the URL, running the app against an in-memory folder with no disk and no network.                                                                                                                         |
-| Device-id      | A random generated on first run in a device and persisted in the meta table under key deviceId. Reset after "Clear site data" in DevTools.                                                                           |
+| Device-id      | Eight hex characters, generated on a device's first run and kept in `localStorage` under `proto.deviceId`. Reset by "Clear site data" in DevTools.                                                                   |
 | Snapshot       | `checklist.<device-id>.json` files inside the sync folder. Each file is a device's replica of the shared state; every device holds a full replica, which enables the app to work offline.                            |
+| Maximal set        | Highest value of a version vector across all devices. Between `{1111aaaa: 17, 2222bbbb: 4}`, `{1111aaaa: 16, 2222bbbb: 5, 3333cccc: 1}` and `{1111aaaa: 17, 2222bbbb: 5, 3333cccc: 1}`, the last one is the maximal set.  |
 
 ## Synchronisation Logic
 
@@ -88,8 +103,8 @@ There are two parts to synchronize:
 
 ### 1. File and folder in Sync Folder
 
-Each device **writes only its own one Snapshot file** in the Sync Folder, as long the device-id is unique,
-it's impossible for race condition can happen for items inside Sync Folder.
+Each device **writes only its own single Snapshot file** in the Sync Folder. As long as the device-id is unique, no two
+devices write to the same file, so no race condition is possible for the items inside the Sync Folder.
 
 The Sync Folder never tells a device that something happened. The files are quietly synchronized also when the app is
 not running. Sync of content inside the folder will be handled by the cloud provider. The application has no logic for
@@ -99,7 +114,8 @@ this.
 
 #### 2.1. Snapshot
 
-The synced folder has no locking or conditional write. Each device writes a distinct snapshot `checklist.<device-id>.json`, that describes its state to the sync folder.
+The synced folder has no locking or conditional write. Each device writes a distinct snapshot
+`checklist.<device-id>.json`, that describes its state to the sync folder.
 
 ```
 Sync-Folder/
@@ -107,7 +123,8 @@ Sync-Folder/
   checklist.2222bbbb.json     <- only the phone ever writes this
 ```
 
-Each device **writes one Snapshot** (specific for its own device) and reads all Snapshots in Sync Folder. No concurrent write of Snapshot can happens.
+Each device **writes one Snapshot** (its own) and reads every Snapshot in the Sync Folder. No concurrent write of a
+Snapshot can happen.
 
 Snapshot content
 
@@ -122,14 +139,14 @@ Snapshot content
 }
 ```
 
-| Field     | Description                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| device    | A generated 8-hex-character id that names the replica file and never changes.                                                                                                                                                                                                                                                                                                                                                   |
-| label     | The human name for a device, display only, carried inside the file and never in its name.                                                                                                                                                                                                                                                                                                                                       |
-| author    | The device that produced the current text, which is not always the device that owns the file. A device that adopts a peer's text keeps that peer as `author`.                                                                                                                                                                                                                                                                   |
-| updatedAt | A timestamp for when the text was last authored. `author` and `updatedAt` are one pair. <br> It is stamped by the author's device, not by the device that owns the file. <br>It does not effect the sync process.                                                                                                                                                                                                               |
-| text      | Value of the text field, specific for the prototype.                                                                                                                                                                                                                                                                                                                                                                            |
-| sClock    | **Version vector**. It has 2 directions. <br> One counter for recording the version of its own device: `"1111aaaa": 3`.<br> Other counter(s) is a receipt for what this device `1111aaaa` have read from other device `2222bbbb`: `"2222bbbb": 1`.<br>A device that has never appeared in the folder is simply absent from the vector and counts as `0`, so a third device joins with no registration step and no coordination. |
+| Field     | Description                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| device    | A generated 8-hex-character id that names the replica file and never changes.                                                                                                                                                                                                                                                                                                                                                 |
+| label     | The human name for a device, display only, carried inside the file and never in its name.                                                                                                                                                                                                                                                                                                                                     |
+| author    | The device that produced the current text, which is not always the device that owns the file. A device that adopts a peer's text keeps that peer as `author`.                                                                                                                                                                                                                                                                 |
+| updatedAt | A timestamp for when the text was last authored. `author` and `updatedAt` are one pair. <br> It is stamped by the author's device, not by the device that owns the file. <br>It does not affect the sync process.                                                                                                                                                                                                             |
+| text      | Value of the text field, specific for the prototype.                                                                                                                                                                                                                                                                                                                                                                          |
+| sClock    | **Version vector**. It has 2 directions. <br> One counter records the version of its own device: `"1111aaaa": 3`.<br> The other counters are a receipt for what this device `1111aaaa` has read from another device `2222bbbb`: `"2222bbbb": 1`.<br>A device that has never appeared in the folder is simply absent from the vector and counts as `0`, so a third device joins with no registration step and no coordination. |
 
 Change awareness is not received but derived. On every cycle a device reads the snapshots it finds and compares each
 snapshot's `sClock` vector against its own.
@@ -141,7 +158,8 @@ snapshot's `sClock` vector against its own.
 Sync works by comparing two `sClock` against each other: `ours`, from this device's snapshot, and `peer`, from the
 peer's snapshot.
 
-`dominates(a, b)` answers if `a`'s counter is at least `b`'s. By calling it twice in both directions, the Relation between the two can be determinded.
+`dominates(a, b)` answers whether every one of `a`'s counters is at least `b`'s. Calling it twice in different direction,
+ determines the relation between the two.
 
 | `dominates(peer, ours)` | `dominates(ours, peer)` | Relation    | Consequence       |
 | ----------------------- | ----------------------- | ----------- | ----------------- |
@@ -152,14 +170,15 @@ peer's snapshot.
 
 #### 2.3. Race condition handle
 
-When race condition happens, any device awares of it can resolve by creating the most up-to-date application content. In turn, a **maximal set** is created
-with dominating `sClock` values, that aheads all its `peer`.
+When a race condition happens, any device aware of it can resolve it by writing the up-to-date application content. That
+resolution carries an `sClock` that dominates every racing one, which makes it the new **maximal set**.
 
-The app doesn't prevent races, but detect them afterwards. The detection works by deriving the relation between version vectors of multiple snapshots.
+The app does not prevent races, it detects them afterwards. The detection is derived from the relation between the
+version vectors of the snapshots in the folder.
 
 #### 2.4. Maximal set
 
-Every snapshot in the Sync Folder are handled all at once. In each sync cycle a device does two steps:
+Every snapshot in the Sync Folder is handled at once. In each sync cycle a device does two steps:
 
 1. **Drop every ancestor.** A snapshot that another snapshot strictly dominates has already been folded into that other
    one, so it carries nothing new. What survives is the maximal set.
@@ -173,7 +192,8 @@ Every snapshot in the Sync Folder are handled all at once. In each sync cycle a 
 
 #### 2.5. Sync between two devices
 
-The `test/scenario.mjs` demonstrates all relation between two devices, which is shown in the next table.
+`test/scenario.mjs` demonstrates every relation between two devices. The next table walks the same sequence, with the
+same numbers the test asserts.
 
 Each cell contains one device's partial snapshot: application content, vector, author and updatedAt.
 **Bold** marks what changed for that device since the last event.
@@ -190,8 +210,11 @@ Each cell contains one device's partial snapshot: application content, vector, a
 | Laptop goes offline and update text | **`"Buy milk, eggs and bread"`**<br><code>{1111aaaa: <b>16</b>, 2222bbbb: 3}</code><br>by **`1111aaaa`** at **`10:03Z`**        | `"Buy milk and eggs"`<br>`{1111aaaa: 15, 2222bbbb: 3}`<br>by `2222bbbb` at `10:02Z`                                             | laptop ahead   |
 | Phone rewrites the line meanwhile   | `"Buy milk, eggs and bread"`<br>`{1111aaaa: 16, 2222bbbb: 3}`<br>by `1111aaaa` at `10:03Z`                                      | **`"Buy oat milk"`**<br><code>{1111aaaa: 15, 2222bbbb: <b>4</b>}</code><br>by `2222bbbb` at **`10:04Z`**                        | **concurrent** |
 
-Any device can resolve the race condition, for this example, it's the laptop.
-In all 3 following cases, the laptop set the lastest version of the text, which increases the version vector. A maximal set is then created. The phone can now fast-forward for equal relation.
+Any device can resolve the race condition; in this example it is the laptop. 
+
+In all 3 following cases the laptop writes the resolved text, which joins both racing vectors and then bumps its own 
+counter. The result is a new maximal set, and the phone can fast-forward to it. The maximal set is always `{17, 4}` 
+at the end in all cases, because the arithmetic is identical.
 
 **A: the user keeps the laptop's text.**
 
@@ -207,23 +230,24 @@ In all 3 following cases, the laptop set the lastest version of the text, which 
 | Laptop reconnects and resolves | **`"Buy oat milk"`**<br><code>{1111aaaa: <b>17</b>, 2222bbbb: <b>4</b>}</code><br>by `1111aaaa` at **`10:05Z`** | `"Buy oat milk"`<br>`{1111aaaa: 15, 2222bbbb: 4}`<br>by `2222bbbb` at `10:04Z`                           | laptop ahead |
 | Phone syncs and fast-forwards  | `"Buy oat milk"`<br>`{1111aaaa: 17, 2222bbbb: 4}`<br>by `1111aaaa` at `10:05Z`                                  | `"Buy oat milk"`<br><code>{1111aaaa: <b>17</b>, 2222bbbb: 4}</code><br>by **`1111aaaa`** at **`10:05Z`** | equal        |
 
-**C: the user combines them by hand.**
 
-| Event                          | Laptop                                                                                                                                              | Phone                                                                                                                              | Relation     |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------ |
-| Laptop reconnects and resolves | <code>"Buy milk, eggs<b>, bread and oat milk</b>"</code><br><code>{1111aaaa: <b>17</b>, 2222bbbb: <b>4</b>}</code><br>by `1111aaaa` at **`10:05Z`** | `"Buy oat milk"`<br>`{1111aaaa: 15, 2222bbbb: 4}`<br>by `2222bbbb` at `10:04Z`                                                     | laptop ahead |
-| Phone syncs and fast-forwards  | `"Buy milk, eggs, bread and oat milk"`<br>`{1111aaaa: 17, 2222bbbb: 4}`<br>by `1111aaaa` at `10:05Z`                                                | **`"Buy milk, eggs, bread and oat milk"`**<br><code>{1111aaaa: <b>17</b>, 2222bbbb: 4}</code><br>by **`1111aaaa`** at **`10:05Z`** | equal        |
+**C: the user combines them by hand.** (The taken path in `test/scenario.mjs`)
+
+| Event                          | Laptop                                                                                                                          | Phone                                                                                                                        | Relation     |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| Laptop reconnects and resolves | **`"Buy oat milk, eggs and bread"`**<br><code>{1111aaaa: <b>17</b>, 2222bbbb: <b>4</b>}</code><br>by `1111aaaa` at **`10:05Z`** | `"Buy oat milk"`<br>`{1111aaaa: 15, 2222bbbb: 4}`<br>by `2222bbbb` at `10:04Z`                                               | laptop ahead |
+| Phone syncs and fast-forwards  | `"Buy oat milk, eggs and bread"`<br>`{1111aaaa: 17, 2222bbbb: 4}`<br>by `1111aaaa` at `10:05Z`                                  | **`"Buy oat milk, eggs and bread"`**<br><code>{1111aaaa: <b>17</b>, 2222bbbb: 4}</code><br>by **`1111aaaa`** at **`10:05Z`** | equal        |
 
 #### 2.6. Sync with more than 2 devices
 
 There is **no**:
 
-- different in code path compare to the sync of 2 devices
-- count of total existing snapshots/devices
+- difference in code path compared to the sync of 2 devices
+- count of the total existing snapshots or devices
 - leader, quorum, membership, vote
 
-It's the same, any device may resolve a given conflict (§4). If there are `n` amount of devices with `n` race conditions happening.
-It stills means, that with `1` edit will create a dominating `sClock`, the new maximal set solves the race condition in all devices.
+It is the same code, and any device may resolve a given conflict (§4). If there are `n` amount of devices with `n` race conditions happening.
+It stills means, that `1` edit will produces a dominating `sClock`, the new maximal set solves the race condition in all devices.
 
 ##### Sync when a third device joins
 
@@ -242,25 +266,26 @@ It stills means, that with `1` edit will create a dominating `sClock`, the new m
 
 The phone has been offline since `10:05Z` and never saw the `jam` from the tablet.
 
-| State                                                | Laptop                                                                                                                                             | Phone                                                                                                        | Tablet                                                                                                       | Relation                                                                  |
-| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------- |
-| Phone rewrites the <br>line while offline            | `"Buy milk, eggs, bread and jam"`<br>`{1111aaaa: 17, 2222bbbb: 4, 3333cccc: 1}`<br>by `3333cccc` at `10:10Z`                                       | **`"Buy oat milk"`**<br><code>{1111aaaa: 17, 2222bbbb: <b>5</b>}</code><br>by **`2222bbbb`** at **`10:12Z`** | `"Buy milk, eggs, bread and jam"`<br>`{1111aaaa: 17, 2222bbbb: 4, 3333cccc: 1}`<br>by `3333cccc` at `10:10Z` | phone **concurrent** with both                                            |
-| Laptop adds `coffee`                                 | **`"Buy milk, eggs, bread, jam and coffee"`**<br><code>{1111aaaa: <b>18</b>, 2222bbbb: 4, 3333cccc: 1}</code><br>by **`1111aaaa`** at **`10:13Z`** | `"Buy oat milk"`<br>`{1111aaaa: 17, 2222bbbb: 5}`<br>by `2222bbbb` at `10:12Z`                               | `"Buy milk, eggs, bread and jam"`<br>`{1111aaaa: 17, 2222bbbb: 4, 3333cccc: 1}`<br>by `3333cccc` at `10:10Z` | laptop ahead of tablet, **concurrent** with phone                         |
-| All devices upload their <br>snapshot to Sync Folder | `"Buy milk, eggs, bread, jam and coffee"`<br>`{1111aaaa: 18, 2222bbbb: 4, 3333cccc: 1}`<br>by `1111aaaa` at `10:13Z`                               | `"Buy oat milk"`<br>`{1111aaaa: 17, 2222bbbb: 5}`<br>by `2222bbbb` at `10:12Z`                               | `"Buy milk, eggs, bread and jam"`<br>`{1111aaaa: 17, 2222bbbb: 4, 3333cccc: 1}`<br>by `3333cccc` at `10:10Z` | Race condition in Laptop and Tablet. <br> All devices are awared of this. |
+| State                                                | Laptop                                                                                                                                             | Phone                                                                                                        | Tablet                                                                                                       | Relation                                                               |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- |
+| Phone rewrites the <br>line while offline            | `"Buy milk, eggs, bread and jam"`<br>`{1111aaaa: 17, 2222bbbb: 4, 3333cccc: 1}`<br>by `3333cccc` at `10:10Z`                                       | **`"Buy oat milk"`**<br><code>{1111aaaa: 17, 2222bbbb: <b>5</b>}</code><br>by **`2222bbbb`** at **`10:12Z`** | `"Buy milk, eggs, bread and jam"`<br>`{1111aaaa: 17, 2222bbbb: 4, 3333cccc: 1}`<br>by `3333cccc` at `10:10Z` | phone **concurrent** with both                                         |
+| Laptop adds `coffee`                                 | **`"Buy milk, eggs, bread, jam and coffee"`**<br><code>{1111aaaa: <b>18</b>, 2222bbbb: 4, 3333cccc: 1}</code><br>by **`1111aaaa`** at **`10:13Z`** | `"Buy oat milk"`<br>`{1111aaaa: 17, 2222bbbb: 5}`<br>by `2222bbbb` at `10:12Z`                               | `"Buy milk, eggs, bread and jam"`<br>`{1111aaaa: 17, 2222bbbb: 4, 3333cccc: 1}`<br>by `3333cccc` at `10:10Z` | laptop ahead of tablet, **concurrent** with phone                      |
+| All devices upload their <br>snapshot to Sync Folder | `"Buy milk, eggs, bread, jam and coffee"`<br>`{1111aaaa: 18, 2222bbbb: 4, 3333cccc: 1}`<br>by `1111aaaa` at `10:13Z`                               | `"Buy oat milk"`<br>`{1111aaaa: 17, 2222bbbb: 5}`<br>by `2222bbbb` at `10:12Z`                               | `"Buy milk, eggs, bread and jam"`<br>`{1111aaaa: 17, 2222bbbb: 4, 3333cccc: 1}`<br>by `3333cccc` at `10:10Z` | Race condition between Laptop and Phone. <br> Every device can see it. |
 
 Three snapshots in Sync Folder and two of them race.
 
-The same as 2 races in 2 devices: Any of the three devices can solve the concurrent for all devices by creating new maximal set.
+The same as a race between 2 devices: any of the three can settle it for all of them by writing a new maximal set.
 
-Difference: **Only the text from a device that is in the race are compared.** Not every entry from all devices will be in merge resolution.
-The conflict set is only between laptop and phone. The tablet's vector `{17, 4, 1}` is overtaken by the vector in Laptop `{18, 4, 1}`, so its text won't be a part of the merge resolution.
+The one difference: **only the texts of the devices actually in the race are offered.** The conflict set here is the
+laptop and the phone. The tablet's vector `{17, 4, 1}` is dominated by the laptop's `{18, 4, 1}`, so the tablet is an
+ancestor and its text is not part of the resolution.
 
-Besides this example, a third device can add a third side. If there are three devices race, then all three texts will be in the conflict resolution.
+Three devices can of course produce a three-sided race, and then all three texts are offered.
 
-Similar logic to solving race condition in 2.5. Any device can pick a version of any device or making a combination of them all, which introduce a dominated version vector i.e. maximal set.
-All devices can fast-forward then.
+The resolution works exactly as in §2.5. Any device can pick one side, or write a combination of them all. The result dominates 
+every racing vector and becomes the new maximal set that the others fast-forward to.
 
-If the tablet takes both the content from laptop and phone.
+Here the tablet resolves, keeping content from both the laptop and the phone.
 
 | State                                  | Laptop                                                                                                                                                | Phone                                                                                                                                                 | Tablet                                                                                                                                                       | Relation         |
 | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------- |
@@ -269,27 +294,27 @@ If the tablet takes both the content from laptop and phone.
 
 ### 3. The sync cycle
 
-`core/folder-sync.mjs` generic over the folder it is handed.
+`core/folder-sync.mjs` is generic over the folder it is handed.
 
 Every 3 s and on window focus, a full sync cycle starts:
 
-- `list()` the folder
-- `read()` every file (its own is skipped),
-- `reconcile()` them against own snapshot (`core/merge.mjs`).
-- Write own file back, if something happend during merge.
+- `list()` the folder,
+- `read()` every file, skipping its own,
+- `applyPeers()` them against its own snapshot (`core/device.mjs`, which reconciles in `core/merge.mjs`),
+- write its own file back, but only if the merge changed something.
 
 ### 4. Race conditions
 
-1. File and folder in Sync Folder
-   There can be no race condition when writing file into the sync folder.
-   If the snapshot file is synching by the cloud provider client, it won't be read.
+1. **File and folder in Sync Folder.** There can be no race condition when writing a file into the sync folder, because
+   a device only ever writes its own. A snapshot the cloud provider's client is still syncing fails to parse and is
+   skipped until the next cycle.
 
-2. Application content
-   Only one device needs to resolve the conflict of application's data.
-   When the race condition happens between 2 or more device, no quorum is needed to resolve.
-   The version vector only detetects that a race condition has happened. There is no preventation method in the app.
+2. **Application content.** Only one device needs to resolve a conflict, however many devices are racing, and no quorum
+   is involved. The version vector only detects that a race condition has happened. There is no preventation method in 
+   the app by design.
 
-When merge conflict, only content from concurrent devices are choosen. If the tablet's vector is `{17, 4, 1}` and the laptop's vector is `{18, 4, 1}`, then tablet's text won't be a part of the merge resolution.
+When merge conflict, only content from concurrent devices are choosen. If the tablet's vector is `{17, 4, 1}` and 
+the laptop's vector is `{18, 4, 1}`, then tablet's text won't be a part of the merge resolution.
 
 Resolving conflict create a maximal set, so every devices can fast-forward to.
 
