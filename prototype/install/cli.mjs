@@ -13,7 +13,12 @@
 
 import { createDevice } from "../core/folder-sync.mjs";
 import { nodeFolder } from "../adapters/node-folder.mjs";
-import { fileNameFor, isDeviceId, labelFor, newDeviceId } from "../core/device.mjs";
+import {
+  fileNameFor,
+  isDeviceId,
+  labelFor,
+  newDeviceId,
+} from "../core/device.mjs";
 
 const [dir, deviceId, ...rest] = process.argv.slice(2);
 if (!dir || !deviceId) {
@@ -30,7 +35,9 @@ if (deviceId === "--new") {
 
 if (!isDeviceId(deviceId)) {
   console.error(`not a device id: ${deviceId}`);
-  console.error(`ids are 8 hex characters. mint one with:  cli.mjs ${dir} --new`);
+  console.error(
+    `ids are 8 hex characters. mint one with:  cli.mjs ${dir} --new`,
+  );
   console.error(`(here is one: ${newDeviceId()})`);
   process.exit(2);
 }
@@ -58,7 +65,7 @@ function report() {
   const s = device.state;
   console.log(
     s
-      ? `${JSON.stringify(s.text)}   (by ${labelFor(s.author, device.snapshots)}, clock ${JSON.stringify(s.clock)})`
+      ? `${JSON.stringify(s.text)}   (by ${labelFor(s.author, device.snapshots)}, sClock ${JSON.stringify(s.sClock)})`
       : "(nothing yet)",
   );
 }

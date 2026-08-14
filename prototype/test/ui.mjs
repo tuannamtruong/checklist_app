@@ -60,7 +60,9 @@ await expectEventually(
 console.log("\n2. a local edit writes exactly one file — ours");
 // The device is identified by a generated id, not by the name in the header,
 // so the test has to ask the page which id it minted.
-const laptopId = await page.evaluate(() => localStorage.getItem("proto.deviceId"));
+const laptopId = await page.evaluate(() =>
+  localStorage.getItem("proto.deviceId"),
+);
 if (/^[0-9a-f]{8}$/.test(laptopId)) ok(`minted a device id (${laptopId})`);
 else fail("minted a device id", String(laptopId));
 
@@ -74,7 +76,7 @@ await expectEventually(
 await expectEventually(
   "the version vector counts our edit",
   async () =>
-    (await page.locator("#m-clock").textContent()) ===
+    (await page.locator("#m-sclock").textContent()) ===
     JSON.stringify({ [laptopId]: 1 }),
 );
 await page.screenshot({ path: `${SHOTS}/1-edited.png`, fullPage: true });
@@ -82,7 +84,13 @@ await page.screenshot({ path: `${SHOTS}/1-edited.png`, fullPage: true });
 console.log("\n3. a peer file that is causally newer is adopted silently");
 // The phone saw our edit (laptop:1) and then made its own.
 await page.evaluate(
-  (id) => window.__injectPeer("99999999", "Buy milk and eggs", { [id]: 1, 99999999: 1 }, "phone"),
+  (id) =>
+    window.__injectPeer(
+      "99999999",
+      "Buy milk and eggs",
+      { [id]: 1, 99999999: 1 },
+      "phone",
+    ),
   laptopId,
 );
 await expectEventually(
@@ -105,12 +113,19 @@ await page.locator("#text").fill("Buy milk, eggs and bread");
 await expectEventually(
   "our edit lands",
   async () =>
-    (await page.locator("#m-clock").textContent())?.includes(`"${laptopId}":2`) ===
-    true,
+    (await page.locator("#m-sclock").textContent())?.includes(
+      `"${laptopId}":2`,
+    ) === true,
 );
 // The phone edited from the state before ours — neither vector dominates.
 await page.evaluate(
-  (id) => window.__injectPeer("99999999", "Buy oat milk", { [id]: 1, 99999999: 2 }, "phone"),
+  (id) =>
+    window.__injectPeer(
+      "99999999",
+      "Buy oat milk",
+      { [id]: 1, 99999999: 2 },
+      "phone",
+    ),
   laptopId,
 );
 await expectEventually(
@@ -146,8 +161,8 @@ await expectEventually(
     "Buy oat milk, eggs and bread",
 );
 await expectEventually("the resolution dominates both", async () => {
-  const clock = JSON.parse(await page.locator("#m-clock").textContent());
-  return clock[laptopId] >= 3 && clock["99999999"] >= 2;
+  const sClock = JSON.parse(await page.locator("#m-sclock").textContent());
+  return sClock[laptopId] >= 3 && sClock["99999999"] >= 2;
 });
 await page.screenshot({ path: `${SHOTS}/3-resolved.png`, fullPage: true });
 

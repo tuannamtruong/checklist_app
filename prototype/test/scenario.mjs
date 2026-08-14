@@ -57,7 +57,7 @@ const ID = { laptop: "1111aaaa", phone: "2222bbbb" };
 // counter in another vector, never with a different device's.
 const SEED = {
   text: "Water the plants",
-  clock: { [ID.laptop]: 14, [ID.phone]: 2 },
+  sClock: { [ID.laptop]: 14, [ID.phone]: 2 },
 };
 
 async function seed(id, label) {
@@ -69,7 +69,7 @@ async function seed(id, label) {
       label,
       author: ID.laptop, // the last edit before the scenario was the laptop's
       text: SEED.text,
-      clock: SEED.clock,
+      sClock: SEED.sClock,
       updatedAt: now(),
     },
     null,
@@ -107,7 +107,7 @@ async function deliver(id) {
 }
 
 const textOf = (d) => d.state?.text ?? null;
-const clockOf = (d) => JSON.stringify(d.state?.clock);
+const sClockOf = (d) => JSON.stringify(d.state?.sClock);
 
 console.log("\n1. laptop edits; phone starts up and sees it");
 const laptop = await device(ID.laptop, "laptop");
@@ -116,7 +116,7 @@ const phone = await device(ID.phone, "phone");
 await laptop.edit("Buy milk");
 is(
   "only the laptop's own counter moved",
-  clockOf(laptop),
+  sClockOf(laptop),
   '{"1111aaaa":15,"2222bbbb":2}',
 );
 await deliver(ID.laptop);
@@ -171,11 +171,11 @@ is("the phone kept its own text", textOf(phone), "Buy oat milk");
 console.log("\n6. the user resolves, on the laptop, and it propagates");
 await laptop.resolve("Buy oat milk, eggs and bread");
 is("laptop conflict cleared", laptop.conflict, null);
-// The join of both racing clocks, then one bump of the resolver's own counter.
+// The join of both racing sClocks, then one bump of the resolver's own counter.
 // Which text was chosen does not enter into it.
 is(
   "the resolution dominates both racing versions",
-  clockOf(laptop),
+  sClockOf(laptop),
   '{"1111aaaa":17,"2222bbbb":4}',
 );
 await deliver(ID.laptop);
@@ -187,7 +187,7 @@ is(
   "Buy oat milk, eggs and bread",
 );
 is("phone raises no conflict of its own", phone.conflict, null);
-is("phone adopts the clock too", clockOf(phone), clockOf(laptop));
+is("phone adopts the sClock too", sClockOf(phone), sClockOf(laptop));
 
 console.log("\n7. converged, and quiet");
 await laptop.sync();
@@ -267,9 +267,11 @@ console.log("\n9. randomised convergence (4 devices, 300 steps)");
   is("settles without needing every round", rounds < 30, true);
 
   const texts = new Set(ids.map((id) => textOf(devs[id])));
-  const clocks = new Set(ids.map((id) => JSON.stringify(devs[id].state.clock)));
+  const sClocks = new Set(
+    ids.map((id) => JSON.stringify(devs[id].state.sClock)),
+  );
   is("all 4 devices agree on the text", texts.size, 1);
-  is("all 4 devices agree on the clock", clocks.size, 1);
+  is("all 4 devices agree on the sClock", sClocks.size, 1);
   is(
     "nobody is left conflicted",
     ids.filter((id) => devs[id].conflict).length,

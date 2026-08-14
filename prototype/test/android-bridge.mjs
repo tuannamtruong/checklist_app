@@ -121,7 +121,7 @@ await expectEventually("the file holds a valid snapshot", async () => {
     snap.text === "Buy milk" &&
     snap.device === phoneId &&
     snap.label === "phone" &&
-    snap.clock[phoneId] === 1
+    snap.sClock[phoneId] === 1
   );
 });
 await page.screenshot({
@@ -137,7 +137,7 @@ await page.evaluate(
       label: "laptop",
       author: laptop,
       text: "Buy milk and eggs",
-      clock: { [id]: 1, [laptop]: 1 },
+      sClock: { [id]: 1, [laptop]: 1 },
       updatedAt: new Date().toISOString(),
     });
   },
@@ -171,7 +171,7 @@ await page.evaluate(
       label: "laptop",
       author: laptop,
       text: "Buy milk, eggs and bread",
-      clock: { [id]: 1, [laptop]: 2 },
+      sClock: { [id]: 1, [laptop]: 2 },
       updatedAt: new Date().toISOString(),
     });
   },
@@ -207,13 +207,16 @@ await expectEventually(
   "conflict clears",
   async () => (await page.locator("#conflict").isHidden()) === true,
 );
-await expectEventually("the written clock dominates the laptop's", async () => {
-  const snap = await page.evaluate(
-    (f) => JSON.parse(window.__files[f]),
-    myFile,
-  );
-  return snap.clock[LAPTOP] >= 2 && snap.clock[phoneId] >= 2;
-});
+await expectEventually(
+  "the written sClock dominates the laptop's",
+  async () => {
+    const snap = await page.evaluate(
+      (f) => JSON.parse(window.__files[f]),
+      myFile,
+    );
+    return snap.sClock[LAPTOP] >= 2 && snap.sClock[phoneId] >= 2;
+  },
+);
 await page.screenshot({
   path: `${SHOTS}/android-3-resolved.png`,
   fullPage: true,

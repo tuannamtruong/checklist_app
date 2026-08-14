@@ -1,7 +1,7 @@
 // What one device does with what it finds in the folder. Pure, and `now` is a
 // parameter — same rule as `core/` in the real app, so the tests can be exact.
 
-import { bump, emptyClock, equal, join, reconcile } from "./merge.mjs";
+import { bump, emptySClock, equal, join, reconcile } from "./merge.mjs";
 
 /** @typedef {import("./merge.mjs").Snapshot} Snapshot */
 
@@ -42,7 +42,7 @@ export function localEdit(mine, deviceId, label, text, now) {
     label,
     author: deviceId,
     text,
-    clock: bump(mine?.clock ?? emptyClock(), deviceId),
+    sClock: bump(mine?.sClock ?? emptySClock(), deviceId),
     updatedAt: now,
   };
 }
@@ -52,7 +52,7 @@ export function localEdit(mine, deviceId, label, text, now) {
  *
  * `changed` is what the caller writes on. Writing our own file after adopting a
  * peer's text is not busywork: it records that we have *seen* that edit. A
- * device that adopted the text but not the clock would look, on its next edit,
+ * device that adopted the text but not the sClock would look, on its next edit,
  * like it had edited concurrently — and raise a conflict that never happened.
  *
  * @param {Snapshot | null} mine
@@ -68,7 +68,7 @@ export function applyPeers(mine, peers) {
   if (!state) return { state: mine, conflict: null, changed: false };
 
   const changed =
-    !mine || state.text !== mine.text || !equal(state.clock, mine.clock);
+    !mine || state.text !== mine.text || !equal(state.sClock, mine.sClock);
   // The file keeps our identity and our label; the text keeps its author's.
   const next = changed
     ? {
@@ -81,19 +81,19 @@ export function applyPeers(mine, peers) {
 }
 
 /**
- * The user picked a text to end the conflict. Joining every racing clock and
+ * The user picked a text to end the conflict. Joining every racing sClock and
  * then bumping ours makes the result strictly dominate all of them, so every
  * other device fast-forwards to it instead of re-raising the same conflict.
  * @returns {Snapshot}
  */
 export function resolveWith(conflict, deviceId, label, text, now) {
-  const clock = conflict.reduce((c, s) => join(c, s.clock), emptyClock());
+  const sClock = conflict.reduce((c, s) => join(c, s.sClock), emptySClock());
   return {
     device: deviceId,
     label,
     author: deviceId,
     text,
-    clock: bump(clock, deviceId),
+    sClock: bump(sClock, deviceId),
     updatedAt: now,
   };
 }

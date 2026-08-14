@@ -104,7 +104,7 @@ function render({ state, conflict }) {
   $("m-author").textContent = state
     ? labelFor(state.author, device.snapshots)
     : "—";
-  $("m-clock").textContent = state ? JSON.stringify(state.clock) : "—";
+  $("m-sclock").textContent = state ? JSON.stringify(state.sClock) : "—";
   $("m-sync").textContent = new Date().toLocaleTimeString();
   renderConflict(conflict);
 }
@@ -214,7 +214,7 @@ $("demo").addEventListener("click", async () => {
   // exercised anywhere — including browsers with no folder access at all.
   const folder = memoryFolder();
   await start(folder, "demo (in memory)");
-  window.__injectPeer = async (peer, text, clock, peerLabel = peer) => {
+  window.__injectPeer = async (peer, text, sClock, peerLabel = peer) => {
     await folder.write(
       fileNameFor(peer),
       JSON.stringify({
@@ -222,14 +222,14 @@ $("demo").addEventListener("click", async () => {
         label: peerLabel,
         author: peer,
         text,
-        clock,
+        sClock,
         updatedAt: new Date().toISOString(),
       }),
     );
     await cycle(folder);
   };
   log(
-    "demo mode: no folder, no network. window.__injectPeer(id, text, clock)",
+    "demo mode: no folder, no network. window.__injectPeer(id, text, sClock)",
     "warn",
   );
 });

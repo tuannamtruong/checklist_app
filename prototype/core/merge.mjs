@@ -10,18 +10,18 @@
 // happen without knowing about each other?
 
 /**
- * @typedef {Record<string, number>} Clock
+ * @typedef {Record<string, number>} SClock
  * @typedef {object} Snapshot
  * @property {string} device   owner of the file this came from — never changes
  * @property {string} author   who last changed the text (may be a peer)
  * @property {string} text
- * @property {Clock} clock
+ * @property {SClock} sClock
  * @property {string} updatedAt
  */
 
-export const emptyClock = () => ({});
+export const emptySClock = () => ({});
 
-const at = (clock, device) => clock[device] ?? 0;
+const at = (sClock, device) => sClock[device] ?? 0;
 
 const devices = (a, b) => new Set([...Object.keys(a), ...Object.keys(b)]);
 
@@ -33,8 +33,8 @@ export function join(a, b) {
 }
 
 /** One more edit by `device`. Only that device may ever increment its own counter. */
-export function bump(clock, device) {
-  return { ...clock, [device]: at(clock, device) + 1 };
+export function bump(sClock, device) {
+  return { ...sClock, [device]: at(sClock, device) + 1 };
 }
 
 /** True when a has seen everything b has seen. */
@@ -73,16 +73,18 @@ export function reconcile(snapshots) {
     (s) =>
       !live.some(
         (o) =>
-          o !== s && dominates(o.clock, s.clock) && !equal(o.clock, s.clock),
+          o !== s &&
+          dominates(o.sClock, s.sClock) &&
+          !equal(o.sClock, s.sClock),
       ),
   );
 
   const texts = [...new Set(maximal.map((s) => s.text))];
   if (texts.length > 1) return { state: null, conflict: maximal };
 
-  // One text. Its clock is the join of every snapshot that agrees on it, so
+  // One text. Its sClock is the join of every snapshot that agrees on it, so
   // the result records everything the folder collectively knows.
-  const clock = maximal.reduce((c, s) => join(c, s.clock), emptyClock());
+  const sClock = maximal.reduce((c, s) => join(c, s.sClock), emptySClock());
   const newest = maximal.reduce((a, b) => (a.updatedAt >= b.updatedAt ? a : b));
-  return { state: { ...newest, clock }, conflict: null };
+  return { state: { ...newest, sClock }, conflict: null };
 }

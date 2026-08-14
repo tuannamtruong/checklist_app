@@ -110,7 +110,7 @@ export function createDevice({
 
     /**
      * Rename this device. Display only — the id and the filename never change,
-     * so there is no clock bump and nothing to converge. Peers pick the new
+     * so there is no sClock bump and nothing to converge. Peers pick the new
      * label up on their next read.
      */
     async rename(next) {

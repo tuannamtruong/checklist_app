@@ -117,42 +117,42 @@ Snapshot content
   "label": "laptop",
   "author": "1111aaaa",
   "text": "Buy milk",
-  "clock": { "1111aaaa": 3, "2222bbbb": 1 },
+  "sClock": { "1111aaaa": 3, "2222bbbb": 1 },
   "updatedAt": "2026-08-12T10:14:00Z"
 }
 ```
 
-| Field     | Description                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| device    | A generated 8-hex-character id that names the replica file and never changes.                                                                                                                                                                                                                                                                                                                                               |
-| label     | The human name for a device, display only, carried inside the file and never in its name.                                                                                                                                                                                                                                                                                                                                   |
-| author    | The device that produced the current text, which is not always the device that owns the file. A device that adopts a peer's text keeps that peer as `author`.                                                                                                                                                                                                                                                               |
-| updatedAt | A timestamp for when the text was last authored. `author` and `updatedAt` are one pair. <br> It is stamped by the author's device, not by the device that owns the file. <br>It does not effect the sync process.                                                                                                                                                                                                           |
-| text      | Value of the text field, specific for the prototype.                                                                                                                                                                                                                                                                                                                                                                        |
-| clock     | **Version vector**. It has 2 directions. <br> One counter for recording the version of its own device: `"1111aaaa": 3`.<br> Other counter(s) is a receipt for what this device `1111aaaa` have read from other device `2222bbbb`: `"2222bbbb": 1`.<br>A device that has never appeared in the folder is simply absent from the vector and counts as `0`, so a third device joins with no registration step and no coordination. |
+| Field     | Description                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| device    | A generated 8-hex-character id that names the replica file and never changes.                                                                                                                                                                                                                                                                                                                                                   |
+| label     | The human name for a device, display only, carried inside the file and never in its name.                                                                                                                                                                                                                                                                                                                                       |
+| author    | The device that produced the current text, which is not always the device that owns the file. A device that adopts a peer's text keeps that peer as `author`.                                                                                                                                                                                                                                                                   |
+| updatedAt | A timestamp for when the text was last authored. `author` and `updatedAt` are one pair. <br> It is stamped by the author's device, not by the device that owns the file. <br>It does not effect the sync process.                                                                                                                                                                                                               |
+| text      | Value of the text field, specific for the prototype.                                                                                                                                                                                                                                                                                                                                                                            |
+| sClock    | **Version vector**. It has 2 directions. <br> One counter for recording the version of its own device: `"1111aaaa": 3`.<br> Other counter(s) is a receipt for what this device `1111aaaa` have read from other device `2222bbbb`: `"2222bbbb": 1`.<br>A device that has never appeared in the folder is simply absent from the vector and counts as `0`, so a third device joins with no registration step and no coordination. |
 
 Change awareness is not received but derived. On every cycle a device reads the snapshots it finds and compares each
-snapshot's `clock` vector against its own.
+snapshot's `sClock` vector against its own.
 
 **Only a device may increment its own counter.** Folding in a peer's edit joins the two vectors.
 
 #### 2.2. Relation determination
 
 Sync works by comparing two `sClock` against each other: `ours`, from this device's snapshot, and `peer`, from the
-peer's snapshot. 
+peer's snapshot.
 
 `dominates(a, b)` answers if `a`'s counter is at least `b`'s. By calling it twice in both directions, the Relation between the two can be determinded.
 
-|  `dominates(peer, ours)` | `dominates(ours, peer)` | Relation |Consequence                                   |
-| --------------------- | ----------------------- | ----------------------- | --------------------------------------------- |
-| true                    | false                   |peer ahead            |  Adopt peer's text                             |
-| false                   | true                    | peer behind           | Nothing |
-| true                    | true                    | equal                 | Nothing                                  |
-| false                   | false                   | concurrent            | Race condition|
+| `dominates(peer, ours)` | `dominates(ours, peer)` | Relation    | Consequence       |
+| ----------------------- | ----------------------- | ----------- | ----------------- |
+| true                    | false                   | peer ahead  | Adopt peer's text |
+| false                   | true                    | peer behind | Nothing           |
+| true                    | true                    | equal       | Nothing           |
+| false                   | false                   | concurrent  | Race condition    |
 
 #### 2.3. Race condition handle
 
-When race condition happens, any device awares of it can resolve by creating the most up-to-date application content. In turn, a  **maximal set** is created
+When race condition happens, any device awares of it can resolve by creating the most up-to-date application content. In turn, a **maximal set** is created
 with dominating `sClock` values, that aheads all its `peer`.
 
 The app doesn't prevent races, but detect them afterwards. The detection works by deriving the relation between version vectors of multiple snapshots.
@@ -168,9 +168,8 @@ Every snapshot in the Sync Folder are handled all at once. In each sync cycle a 
 | Maximal set after step 1   | Consequence                                                                   |
 | -------------------------- | ----------------------------------------------------------------------------- |
 | one snapshot               | Adopt its text                                                                |
-| several, all the same text | Adopt it; the clock is the join of all of them                                |
+| several, all the same text | Adopt it; the sClock is the join of all of them                               |
 | several, different texts   | Race condition between exactly those snapshots, raise conflict inside the app |
-
 
 #### 2.5. Sync between two devices
 
@@ -180,7 +179,6 @@ Each cell contains one device's partial snapshot: application content, vector, a
 **Bold** marks what changed for that device since the last event.
 `1111aaaa`: device-id of the laptop
 `2222bbbb`: device-id of the phone
-
 
 | Event                               | Laptop                                                                                                                          | Phone                                                                                                                           | Relation       |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | -------------- |
@@ -219,13 +217,13 @@ In all 3 following cases, the laptop set the lastest version of the text, which 
 #### 2.6. Sync with more than 2 devices
 
 There is **no**:
+
 - different in code path compare to the sync of 2 devices
 - count of total existing snapshots/devices
 - leader, quorum, membership, vote
 
-It's the same, any device may resolve a given conflict (§4). If there are `n` amount of devices with `n` race conditions happening. 
+It's the same, any device may resolve a given conflict (§4). If there are `n` amount of devices with `n` race conditions happening.
 It stills means, that with `1` edit will create a dominating `sClock`, the new maximal set solves the race condition in all devices.
-
 
 ##### Sync when a third device joins
 
@@ -233,24 +231,24 @@ It stills means, that with `1` edit will create a dominating `sClock`, the new m
 - 2222bbbb: device-id of a phone
 - 3333cccc: device-id of a tablet
 
-| State                       | Laptop                                                                                                                                     | Phone                                                                                      | Tablet                                                                                                                                     | Relation                           |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------- |
-| Start state                | `"Buy milk, eggs and bread"`<br>`{1111aaaa: 17, 2222bbbb: 4}`<br>by `1111aaaa` at `10:05Z`                                                 | `"Buy milk, eggs and bread"`<br>`{1111aaaa: 17, 2222bbbb: 4}`<br>by `1111aaaa` at `10:05Z` | _no file yet_                                                                                                                              | all equal |
-| Tablet's first sync        | `"Buy milk, eggs and bread"`<br>`{1111aaaa: 17, 2222bbbb: 4}`<br>by `1111aaaa` at `10:05Z`                                                 | `"Buy milk, eggs and bread"`<br>`{1111aaaa: 17, 2222bbbb: 4}`<br>by `1111aaaa` at `10:05Z` | **`"Buy milk, eggs and bread"`**<br>**`{1111aaaa: 17, 2222bbbb: 4}`**<br>by **`1111aaaa`** at **`10:05Z`**                                 | all equal                    |
-| Tablet adds `jam`   | `"Buy milk, eggs and bread"`<br>`{1111aaaa: 17, 2222bbbb: 4}`<br>by `1111aaaa` at `10:05Z`                                                 | `"Buy milk, eggs and bread"`<br>`{1111aaaa: 17, 2222bbbb: 4}`<br>by `1111aaaa` at `10:05Z` | **`"Buy milk, eggs, bread and jam"`**<br><code>{1111aaaa: 17, 2222bbbb: 4, <b>3333cccc: 1</b>}</code><br>by **`3333cccc`** at **`10:10Z`** | tablet ahead all               |
-| Laptop syncs | **`"Buy milk, eggs, bread and jam"`**<br><code>{1111aaaa: 17, 2222bbbb: 4, <b>3333cccc: 1</b>}</code><br>by **`3333cccc`** at **`10:10Z`** | `"Buy milk, eggs and bread"`<br>`{1111aaaa: 17, 2222bbbb: 4}`<br>by `1111aaaa` at `10:05Z` | `"Buy milk, eggs, bread and jam"`<br>`{1111aaaa: 17, 2222bbbb: 4, 3333cccc: 1}`<br>by `3333cccc` at `10:10Z`                               | phone behind all         |
+| State               | Laptop                                                                                                                                     | Phone                                                                                      | Tablet                                                                                                                                     | Relation         |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ | ---------------- |
+| Start state         | `"Buy milk, eggs and bread"`<br>`{1111aaaa: 17, 2222bbbb: 4}`<br>by `1111aaaa` at `10:05Z`                                                 | `"Buy milk, eggs and bread"`<br>`{1111aaaa: 17, 2222bbbb: 4}`<br>by `1111aaaa` at `10:05Z` | _no file yet_                                                                                                                              | all equal        |
+| Tablet's first sync | `"Buy milk, eggs and bread"`<br>`{1111aaaa: 17, 2222bbbb: 4}`<br>by `1111aaaa` at `10:05Z`                                                 | `"Buy milk, eggs and bread"`<br>`{1111aaaa: 17, 2222bbbb: 4}`<br>by `1111aaaa` at `10:05Z` | **`"Buy milk, eggs and bread"`**<br>**`{1111aaaa: 17, 2222bbbb: 4}`**<br>by **`1111aaaa`** at **`10:05Z`**                                 | all equal        |
+| Tablet adds `jam`   | `"Buy milk, eggs and bread"`<br>`{1111aaaa: 17, 2222bbbb: 4}`<br>by `1111aaaa` at `10:05Z`                                                 | `"Buy milk, eggs and bread"`<br>`{1111aaaa: 17, 2222bbbb: 4}`<br>by `1111aaaa` at `10:05Z` | **`"Buy milk, eggs, bread and jam"`**<br><code>{1111aaaa: 17, 2222bbbb: 4, <b>3333cccc: 1</b>}</code><br>by **`3333cccc`** at **`10:10Z`** | tablet ahead all |
+| Laptop syncs        | **`"Buy milk, eggs, bread and jam"`**<br><code>{1111aaaa: 17, 2222bbbb: 4, <b>3333cccc: 1</b>}</code><br>by **`3333cccc`** at **`10:10Z`** | `"Buy milk, eggs and bread"`<br>`{1111aaaa: 17, 2222bbbb: 4}`<br>by `1111aaaa` at `10:05Z` | `"Buy milk, eggs, bread and jam"`<br>`{1111aaaa: 17, 2222bbbb: 4, 3333cccc: 1}`<br>by `3333cccc` at `10:10Z`                               | phone behind all |
 
-##### Three devices, two racing 
+##### Three devices, two racing
 
 The phone has been offline since `10:05Z` and never saw the `jam` from the tablet.
 
-| State                                    | Laptop                                                                                                                                             | Phone                                                                                                        | Tablet                                                                                                       | Relation                                          |
-| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------- |
-| Phone rewrites the <br>line while offline       | `"Buy milk, eggs, bread and jam"`<br>`{1111aaaa: 17, 2222bbbb: 4, 3333cccc: 1}`<br>by `3333cccc` at `10:10Z`                                       | **`"Buy oat milk"`**<br><code>{1111aaaa: 17, 2222bbbb: <b>5</b>}</code><br>by **`2222bbbb`** at **`10:12Z`** | `"Buy milk, eggs, bread and jam"`<br>`{1111aaaa: 17, 2222bbbb: 4, 3333cccc: 1}`<br>by `3333cccc` at `10:10Z` | phone **concurrent** with both                    |
-| Laptop adds `coffee`          | **`"Buy milk, eggs, bread, jam and coffee"`**<br><code>{1111aaaa: <b>18</b>, 2222bbbb: 4, 3333cccc: 1}</code><br>by **`1111aaaa`** at **`10:13Z`** | `"Buy oat milk"`<br>`{1111aaaa: 17, 2222bbbb: 5}`<br>by `2222bbbb` at `10:12Z`                               | `"Buy milk, eggs, bread and jam"`<br>`{1111aaaa: 17, 2222bbbb: 4, 3333cccc: 1}`<br>by `3333cccc` at `10:10Z` | laptop ahead of tablet, **concurrent** with phone |
-| All devices upload their <br>snapshot to Sync Folder | `"Buy milk, eggs, bread, jam and coffee"`<br>`{1111aaaa: 18, 2222bbbb: 4, 3333cccc: 1}`<br>by `1111aaaa` at `10:13Z`                               | `"Buy oat milk"`<br>`{1111aaaa: 17, 2222bbbb: 5}`<br>by `2222bbbb` at `10:12Z`                               | `"Buy milk, eggs, bread and jam"`<br>`{1111aaaa: 17, 2222bbbb: 4, 3333cccc: 1}`<br>by `3333cccc` at `10:10Z`                                           | Race condition in Laptop and Tablet. <br> All devices are awared of this.                       |
+| State                                                | Laptop                                                                                                                                             | Phone                                                                                                        | Tablet                                                                                                       | Relation                                                                  |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------- |
+| Phone rewrites the <br>line while offline            | `"Buy milk, eggs, bread and jam"`<br>`{1111aaaa: 17, 2222bbbb: 4, 3333cccc: 1}`<br>by `3333cccc` at `10:10Z`                                       | **`"Buy oat milk"`**<br><code>{1111aaaa: 17, 2222bbbb: <b>5</b>}</code><br>by **`2222bbbb`** at **`10:12Z`** | `"Buy milk, eggs, bread and jam"`<br>`{1111aaaa: 17, 2222bbbb: 4, 3333cccc: 1}`<br>by `3333cccc` at `10:10Z` | phone **concurrent** with both                                            |
+| Laptop adds `coffee`                                 | **`"Buy milk, eggs, bread, jam and coffee"`**<br><code>{1111aaaa: <b>18</b>, 2222bbbb: 4, 3333cccc: 1}</code><br>by **`1111aaaa`** at **`10:13Z`** | `"Buy oat milk"`<br>`{1111aaaa: 17, 2222bbbb: 5}`<br>by `2222bbbb` at `10:12Z`                               | `"Buy milk, eggs, bread and jam"`<br>`{1111aaaa: 17, 2222bbbb: 4, 3333cccc: 1}`<br>by `3333cccc` at `10:10Z` | laptop ahead of tablet, **concurrent** with phone                         |
+| All devices upload their <br>snapshot to Sync Folder | `"Buy milk, eggs, bread, jam and coffee"`<br>`{1111aaaa: 18, 2222bbbb: 4, 3333cccc: 1}`<br>by `1111aaaa` at `10:13Z`                               | `"Buy oat milk"`<br>`{1111aaaa: 17, 2222bbbb: 5}`<br>by `2222bbbb` at `10:12Z`                               | `"Buy milk, eggs, bread and jam"`<br>`{1111aaaa: 17, 2222bbbb: 4, 3333cccc: 1}`<br>by `3333cccc` at `10:10Z` | Race condition in Laptop and Tablet. <br> All devices are awared of this. |
 
-Three snapshots in Sync Folder and two of them race. 
+Three snapshots in Sync Folder and two of them race.
 
 The same as 2 races in 2 devices: Any of the three devices can solve the concurrent for all devices by creating new maximal set.
 
@@ -264,10 +262,10 @@ All devices can fast-forward then.
 
 If the tablet takes both the content from laptop and phone.
 
-| State                                   | Laptop                                                                                                                                                | Phone                                                                                                                                                 | Tablet                                                                                                                                                       | Relation             |
-| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------- |
+| State                                  | Laptop                                                                                                                                                | Phone                                                                                                                                                 | Tablet                                                                                                                                                       | Relation         |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------- |
 | Tablet resolves                        | `"Buy milk, eggs, bread, jam and coffee"`<br>`{1111aaaa: 18, 2222bbbb: 4, 3333cccc: 1}`<br>by `1111aaaa` at `10:13Z`                                  | `"Buy oat milk"`<br>`{1111aaaa: 17, 2222bbbb: 5}`<br>by `2222bbbb` at `10:12Z`                                                                        | **`"Buy oat milk, eggs, bread and jam"`**<br><code>{1111aaaa: <b>18</b>, 2222bbbb: <b>5</b>, 3333cccc: <b>2</b>}</code><br>by **`3333cccc`** at **`10:15Z`** | tablet ahead all |
-| Laptop and phone sync and fast-forward | **`"Buy oat milk, eggs, bread and jam"`**<br><code>{1111aaaa: 18, 2222bbbb: <b>5</b>, 3333cccc: <b>2</b>}</code><br>by **`3333cccc`** at **`10:15Z`** | **`"Buy oat milk, eggs, bread and jam"`**<br><code>{1111aaaa: <b>18</b>, 2222bbbb: 5, 3333cccc: <b>2</b>}</code><br>by **`3333cccc`** at **`10:15Z`** | `"Buy oat milk, eggs, bread and jam"`<br>`{1111aaaa: 18, 2222bbbb: 5, 3333cccc: 2}`<br>by `3333cccc` at `10:15Z`                                             | all equal      |
+| Laptop and phone sync and fast-forward | **`"Buy oat milk, eggs, bread and jam"`**<br><code>{1111aaaa: 18, 2222bbbb: <b>5</b>, 3333cccc: <b>2</b>}</code><br>by **`3333cccc`** at **`10:15Z`** | **`"Buy oat milk, eggs, bread and jam"`**<br><code>{1111aaaa: <b>18</b>, 2222bbbb: 5, 3333cccc: <b>2</b>}</code><br>by **`3333cccc`** at **`10:15Z`** | `"Buy oat milk, eggs, bread and jam"`<br>`{1111aaaa: 18, 2222bbbb: 5, 3333cccc: 2}`<br>by `3333cccc` at `10:15Z`                                             | all equal        |
 
 ### 3. The sync cycle
 
@@ -283,13 +281,13 @@ Every 3 s and on window focus, a full sync cycle starts:
 ### 4. Race conditions
 
 1. File and folder in Sync Folder
-There can be no race condition when writing file into the sync folder.
-If the snapshot file is synching by the cloud provider client, it won't be read.
+   There can be no race condition when writing file into the sync folder.
+   If the snapshot file is synching by the cloud provider client, it won't be read.
 
 2. Application content
-Only one device needs to resolve the conflict of application's data.
-When the race condition happens between 2 or more device, no quorum is needed to resolve.
-The version vector only detetects that a race condition has happened. There is no preventation method in the app.
+   Only one device needs to resolve the conflict of application's data.
+   When the race condition happens between 2 or more device, no quorum is needed to resolve.
+   The version vector only detetects that a race condition has happened. There is no preventation method in the app.
 
 When merge conflict, only content from concurrent devices are choosen. If the tablet's vector is `{17, 4, 1}` and the laptop's vector is `{18, 4, 1}`, then tablet's text won't be a part of the merge resolution.
 
