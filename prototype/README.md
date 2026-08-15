@@ -88,7 +88,7 @@ the _system_ picker (Storage Access Framework). The grant is kept across restart
 | Term           | Definition                                                                                                                                                                                                               |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Sync Folder    | A specific shared folder in the cloud provider directory, which contains all items of the application.                                                                                                                   |
-| Local Folder   | The folder on the device local storage. The cloud provider's client mirrors its content to the Sync Folder. The app's RW only to this folder.|
+| Local Folder   | The folder on the device local storage. The cloud provider's client mirrors its content to the Sync Folder. The app's RW only to this folder.                                                                            |
 | Windows bundle | An official embeddable Python staged on the Windows side plus a desktop shortcut to `pythonw.exe`. No `.exe` is produced deliberately, as a shortcut to Microsoft's own signed binary raises no SmartScreen warning.     |
 | Demo mode      | `?demo` in the URL, running the app against an in-memory folder with no disk and no network.                                                                                                                             |
 | Device-id      | Eight hex characters, generated on a device's first run and kept in `localStorage` under `proto.deviceId`. Reset by "Clear site data" in DevTools.                                                                       |
@@ -360,11 +360,6 @@ The Android APK build process happens inside a Docker container.
 An offline edit is just a written file in Local Folder. The cloud client uploads it to Sync Folder when it can.
 The application never communicate directly with Sync Folder.
 
-
-Android is the exception, and it is the weakest part of the design: it needs an app that maintains a **genuine local
-folder**. The Dropbox, Drive and OneDrive Android apps are on-demand browsers for cloud files and do not mirror a folder
-onto the device the way their desktop clients do. Syncthing, FolderSync/Dropsync and Nextcloud do.
-
 ## Browser interaction
 
 This is the real constraint the prototype turned up, because Mozilla objected to the File System Access API.
@@ -376,3 +371,59 @@ Hence the two ways for setting the Sync Folder in Laptop.
 | **Firefox**           | **No**                | The local helper (`--folder`)                |
 
 For the Anroid, the user needs to use folder picker after the first install or update.
+
+
+## Development
+
+### Where the code lives
+
+```
+prototype/
+├── core/                       Sync process with no I/O, no clock, no window
+│   ├── merge.mjs               Version vector
+│   ├── device.mjs              Edit and resolve rules
+│   └── folder-sync.mjs         Sync cycle
+├── adapters/                   One per place a folder can come from, same three methods each
+│   ├── node-folder.mjs         Real directory on disk
+│   ├── fsaa-folder.mjs         Browser directory handle
+│   ├── http-folder.mjs         Loopback helper
+│   ├── android-folder.mjs      SAF grant, via WebView bridge
+│   └── memory-folder.mjs       Nothing — UI test mode
+├── install/
+│   ├── serve.py                Stdlib-only loopback helper
+│   ├── cli.mjs                 Same core driven from a terminal
+│   └── make_windows_bundle.py  Bundle install for Windows
+├── public/                     Web page; picks an adapter and hands it to core/
+│   ├── index.html
+│   ├── app.js
+│   └── style.css
+├── android/                    WebView shell and its Docker build; web assets copied in at build time
+└── test/
+    ├── scenario.mjs            Headless merge
+    ├── bridge.mjs              Helper path
+    ├── ui.mjs                  Page in a browser
+    └── android-bridge.mjs      Java bridge, stubbed
+```
+
+**Folder adapter**: `core/folder-sync.mjs` receives an object with `list()`, `read(name)`, `write(name, content)` and
+nothing else. Those three methods are its only route to a Local Folder.
+
+
+### Code Standards
+
+#### Path Handling
+- Use relative paths
+- Never hardcode absolute paths or home directories
+- Use `path.join()` for cross-platform compatibility
+
+#### Naming Conventions
+- Files: `kebab-case.js`, `PascalCase.js` (for classes)
+- Functions/Variables: `camelCase`
+- Constants: `UPPER_SNAKE_CASE`
+- Components: `hyphenated-names`
+
+#### Error Handling
+- Use try/catch for async operations
+- Provide helpful error messages
+- Log errors with context
+- Implement fallback mechanisms
