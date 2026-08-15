@@ -213,10 +213,66 @@ is(
   [fileNameFor(ID.laptop), fileNameFor(ID.phone)].sort().join(),
 );
 
+// README §2.5 case B: the resolver keeps the *other* side's text. The device
+// that already holds that text sees no new sentence, but its vector still moves
+// — and a device that skipped the write for lack of a visible change would keep
+// re-raising a conflict everybody else considers settled.
+console.log("\n9. a resolution with no new text is still a change");
+{
+  // A folder of its own, so the pair starts from an empty one rather than from
+  // the state the sections above left behind.
+  const root2 = await mkdtemp(join(tmpdir(), "checklist-proto-b-"));
+  const cloud2 = join(root2, "cloud");
+  const dir2 = (id) => join(root2, id);
+  await mkdir(cloud2, { recursive: true });
+
+  const join2 = async (id, label) => {
+    await mkdir(dir2(id), { recursive: true });
+    const d = createDevice({
+      deviceId: id,
+      label,
+      folder: nodeFolder(dir2(id)),
+      now,
+    });
+    await d.load();
+    return d;
+  };
+  const deliver2 = async (id) => {
+    const mine = fileNameFor(id);
+    if ((await readdir(dir2(id))).includes(mine))
+      await copyFile(join(dir2(id), mine), join(cloud2, mine));
+    for (const name of await readdir(cloud2))
+      if (name !== mine)
+        await copyFile(join(cloud2, name), join(dir2(id), name));
+  };
+
+  const lap = await join2("3333cccc", "laptop-b");
+  const pho = await join2("4444dddd", "phone-b");
+
+  await lap.edit("Buy milk, eggs and bread");
+  await pho.edit("Buy oat milk");
+  await deliver2("4444dddd");
+  await deliver2("3333cccc");
+  is("they raced", (await lap.sync()).conflict?.length, 2);
+
+  // The user picks the phone's wording, on the laptop.
+  await lap.resolve("Buy oat milk");
+  await deliver2("3333cccc");
+  await deliver2("4444dddd");
+  const caught = await pho.sync();
+
+  is("the phone's text never changed", textOf(pho), "Buy oat milk");
+  is("but the sync still counted as a change", caught.changed, true);
+  is("because the vector fast-forwarded", sClockOf(pho), sClockOf(lap));
+  is("and no conflict survived it", pho.conflict, null);
+
+  await rm(root2, { recursive: true, force: true });
+}
+
 // ---------------------------------------------------------------------------
 // Property test: random edits, random delivery order, N devices. Convergence
 // must not depend on who syncs when. Same bar as merge.test.ts in the real app.
-console.log("\n9. randomised convergence (4 devices, 300 steps)");
+console.log("\n10. randomised convergence (4 devices, 300 steps)");
 {
   const ids = ["aaaa0001", "bbbb0002", "cccc0003", "dddd0004"];
   const devs = {};
