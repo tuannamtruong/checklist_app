@@ -22,13 +22,13 @@ The four questions, answered. Each one is proven in the section it points at.
 
 1. **Laptop and phone synchronise through a Sync Folder, never with each other.** Every device writes exactly one snapshot
    `checklist.<device-id>.json` and reads all of them. The cloud provider's client syncs the files between
-   devices. → §2
-2. **Race conditions are not prevented, they are detected.** Comparing version vectors derives whether race condition happens. 
-One user with one edit will create new maximal set, all devices can fast-forward this version to solve the concurrent.
- → §2.3, §4.
+   devices. → [§2 Application content synchronisation](#2-application-content-synchronisation)
+2. **Race conditions are not prevented, they are detected.** Comparing version vectors derives whether race condition happens.
+   One user with one edit will create new maximal set, all devices can fast-forward this version to solve the concurrent.
+   → [§2.3 Race condition handle](#23-race-condition-handle), [§4 Race conditions](#4-race-conditions)
 3. **The Sync Folder is the whole database.** Each device's copy is a full replica, so the app works offline by default. The
-   only other storage is `localStorage`, holding the device id and label. No database engine, no IndexedDB. → Storage
-4. Chrome, Edge and Firefox can host the app. → Browser interaction
+   only other storage is `localStorage`, holding the device id and label. No database engine, no IndexedDB. → [Storage](#storage)
+4. Chrome, Edge and Firefox can host the app. → [Browser interaction](#browser-interaction)
 
 ## Setup
 
@@ -42,7 +42,7 @@ Creating and install the bundle
 python3 install/make_windows_bundle.py
 ```
 
-To also pass the sync folder while install
+To also pass the Sync Folder while install
 
 ```bash
 python3 install/make_windows_bundle.py --folder "C:\Dropbox\checklist"
@@ -85,14 +85,15 @@ the _system_ picker (Storage Access Framework). The grant is kept across restart
 
 ## Glossary
 
-| Term           | Definition                                                                                                                                                                                                           |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Sync folder    | A specific shared folder in the cloud provider directory, which contains all items of the application.                                                                                                               |
-| Windows bundle | An official embeddable Python staged on the Windows side plus a desktop shortcut to `pythonw.exe`. No `.exe` is produced deliberately, as a shortcut to Microsoft's own signed binary raises no SmartScreen warning. |
-| Demo mode      | `?demo` in the URL, running the app against an in-memory folder with no disk and no network.                                                                                                                         |
-| Device-id      | Eight hex characters, generated on a device's first run and kept in `localStorage` under `proto.deviceId`. Reset by "Clear site data" in DevTools.                                                                   |
-| Snapshot       | `checklist.<device-id>.json` files inside the sync folder. Each file is a device's replica of the shared state; every device holds a full replica, which enables the app to work offline.                            |
-| Maximal set        | Highest value of a version vector across all devices. Between `{1111aaaa: 17, 2222bbbb: 4}`, `{1111aaaa: 16, 2222bbbb: 5, 3333cccc: 1}` and `{1111aaaa: 17, 2222bbbb: 5, 3333cccc: 1}`, the last one is the maximal set.  |
+| Term           | Definition                                                                                                                                                                                                               |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Sync Folder    | A specific shared folder in the cloud provider directory, which contains all items of the application.                                                                                                                   |
+| Local Folder   | The folder on the device local storage. The cloud provider's client mirrors its content to the Sync Folder. The app's RW only to this folder.|
+| Windows bundle | An official embeddable Python staged on the Windows side plus a desktop shortcut to `pythonw.exe`. No `.exe` is produced deliberately, as a shortcut to Microsoft's own signed binary raises no SmartScreen warning.     |
+| Demo mode      | `?demo` in the URL, running the app against an in-memory folder with no disk and no network.                                                                                                                             |
+| Device-id      | Eight hex characters, generated on a device's first run and kept in `localStorage` under `proto.deviceId`. Reset by "Clear site data" in DevTools.                                                                       |
+| Snapshot       | `checklist.<device-id>.json` files inside the Sync Folder. Each file is a device's replica of the shared state; every device holds a full replica, which enables the app to work offline.                                |
+| Maximal set    | Highest value of a version vector across all devices. Between `{1111aaaa: 17, 2222bbbb: 4}`, `{1111aaaa: 16, 2222bbbb: 5, 3333cccc: 1}` and `{1111aaaa: 17, 2222bbbb: 5, 3333cccc: 1}`, the last one is the maximal set. |
 
 ## Synchronisation Logic
 
@@ -114,11 +115,11 @@ this.
 
 #### 2.1. Snapshot
 
-The synced folder has no locking or conditional write. Each device writes a distinct snapshot
-`checklist.<device-id>.json`, that describes its state to the sync folder.
+The Sync Folder has no locking or conditional write. Each device writes a distinct snapshot
+`checklist.<device-id>.json`, that describes its state to the Sync Folder.
 
 ```
-Sync-Folder/
+Sync Folder/
   checklist.1111aaaa.json     <- only the laptop ever writes this
   checklist.2222bbbb.json     <- only the phone ever writes this
 ```
@@ -159,7 +160,7 @@ Sync works by comparing two `sClock` against each other: `ours`, from this devic
 peer's snapshot.
 
 `dominates(a, b)` answers whether every one of `a`'s counters is at least `b`'s. Calling it twice in different direction,
- determines the relation between the two.
+determines the relation between the two.
 
 | `dominates(peer, ours)` | `dominates(ours, peer)` | Relation    | Consequence       |
 | ----------------------- | ----------------------- | ----------- | ----------------- |
@@ -210,10 +211,10 @@ Each cell contains one device's partial snapshot: application content, vector, a
 | Laptop goes offline and update text | **`"Buy milk, eggs and bread"`**<br><code>{1111aaaa: <b>16</b>, 2222bbbb: 3}</code><br>by **`1111aaaa`** at **`10:03Z`**        | `"Buy milk and eggs"`<br>`{1111aaaa: 15, 2222bbbb: 3}`<br>by `2222bbbb` at `10:02Z`                                             | laptop ahead   |
 | Phone rewrites the line meanwhile   | `"Buy milk, eggs and bread"`<br>`{1111aaaa: 16, 2222bbbb: 3}`<br>by `1111aaaa` at `10:03Z`                                      | **`"Buy oat milk"`**<br><code>{1111aaaa: 15, 2222bbbb: <b>4</b>}</code><br>by `2222bbbb` at **`10:04Z`**                        | **concurrent** |
 
-Any device can resolve the race condition; in this example it is the laptop. 
+Any device can resolve the race condition; in this example it is the laptop.
 
-In all 3 following cases the laptop writes the resolved text, which joins both racing vectors and then bumps its own 
-counter. The result is a new maximal set, and the phone can fast-forward to it. The maximal set is always `{17, 4}` 
+In all 3 following cases the laptop writes the resolved text, which joins both racing vectors and then bumps its own
+counter. The result is a new maximal set, and the phone can fast-forward to it. The maximal set is always `{17, 4}`
 at the end in all cases, because the arithmetic is identical.
 
 **A: the user keeps the laptop's text.**
@@ -230,7 +231,6 @@ at the end in all cases, because the arithmetic is identical.
 | Laptop reconnects and resolves | **`"Buy oat milk"`**<br><code>{1111aaaa: <b>17</b>, 2222bbbb: <b>4</b>}</code><br>by `1111aaaa` at **`10:05Z`** | `"Buy oat milk"`<br>`{1111aaaa: 15, 2222bbbb: 4}`<br>by `2222bbbb` at `10:04Z`                           | laptop ahead |
 | Phone syncs and fast-forwards  | `"Buy oat milk"`<br>`{1111aaaa: 17, 2222bbbb: 4}`<br>by `1111aaaa` at `10:05Z`                                  | `"Buy oat milk"`<br><code>{1111aaaa: <b>17</b>, 2222bbbb: 4}</code><br>by **`1111aaaa`** at **`10:05Z`** | equal        |
 
-
 **C: the user combines them by hand.** (The taken path in `test/scenario.mjs`)
 
 | Event                          | Laptop                                                                                                                          | Phone                                                                                                                        | Relation     |
@@ -246,7 +246,7 @@ There is **no**:
 - count of the total existing snapshots or devices
 - leader, quorum, membership, vote
 
-It is the same code, and any device may resolve a given conflict (§4). If there are `n` amount of devices with `n` race conditions happening.
+It is the same code, and any device may resolve a given conflict ([§4](#4-race-conditions)). If there are `n` amount of devices with `n` race conditions happening.
 It stills means, that `1` edit will produces a dominating `sClock`, the new maximal set solves the race condition in all devices.
 
 ##### Sync when a third device joins
@@ -282,7 +282,7 @@ ancestor and its text is not part of the resolution.
 
 Three devices can of course produce a three-sided race, and then all three texts are offered.
 
-The resolution works exactly as in §2.5. Any device can pick one side, or write a combination of them all. The result dominates 
+The resolution works exactly as in [§2.5](#25-sync-between-two-devices). Any device can pick one side, or write a combination of them all. The result dominates
 every racing vector and becomes the new maximal set that the others fast-forward to.
 
 Here the tablet resolves, keeping content from both the laptop and the phone.
@@ -305,15 +305,15 @@ Every 3 s and on window focus, a full sync cycle starts:
 
 ### 4. Race conditions
 
-1. **File and folder in Sync Folder.** There can be no race condition when writing a file into the sync folder, because
+1. **File and folder in Sync Folder.** There can be no race condition when writing a file into the Sync Folder, because
    a device only ever writes its own. A snapshot the cloud provider's client is still syncing fails to parse and is
    skipped until the next cycle.
 
 2. **Application content.** Only one device needs to resolve a conflict, however many devices are racing, and no quorum
-   is involved. The version vector only detects that a race condition has happened. There is no preventation method in 
+   is involved. The version vector only detects that a race condition has happened. There is no preventation method in
    the app by design.
 
-When merge conflict, only content from concurrent devices are choosen. If the tablet's vector is `{17, 4, 1}` and 
+When merge conflict, only content from concurrent devices are choosen. If the tablet's vector is `{17, 4, 1}` and
 the laptop's vector is `{18, 4, 1}`, then tablet's text won't be a part of the merge resolution.
 
 Resolving conflict create a maximal set, so every devices can fast-forward to.
@@ -328,7 +328,7 @@ One command builds both bundles:
 make proto_all
 ```
 
-Or either half on its own:
+Or step by step:
 
 ```bash
 make proto_exe_win FOLDER='C:\Users\Nam\Dropbox\checklist'
@@ -336,37 +336,30 @@ make proto_android
 make proto_clean
 ```
 
-Neither installs a toolchain on this machine. The Windows target downloads an official embeddable Python and stages it
-on the Windows side — no installer, no pip, no admin rights — which is what the stdlib-only rule in `serve.py` buys. The
-Android target does everything inside Docker.
+### Windows bundle
 
-No `.exe` is produced, deliberately: a shortcut to Microsoft's own signed `pythonw.exe` raises no SmartScreen warning,
-an unsigned executable does. The prototype is not copied to the Windows side either — the shortcut points at `serve.py`
-where it already lives (over `\\wsl.localhost` under WSL), so there is one copy of the code and git keeps working.
+The Windows target downloads an official embeddable Python and stages it
+on the Windows side. It needs **no** installer, pip, or admin rights.
 
-`android/Dockerfile` doubles as a Jenkins agent: the SDK licences are accepted in the image rather than in someone's
-home directory, the Gradle daemon is off so no state survives a run, and the container runs as the invoking user so
-artifacts are not written to the workspace as root. A pipeline step is the same `docker run` that `build.sh` already
-issues.
+No `.exe` is produced: a shortcut to Microsoft's own signed `pythonw.exe` raises no SmartScreen warning.
+The prototype is not copied to the Windows side either. The bundle points at `serve.py` (over `\\wsl.localhost` under WSL).
+
+### APK
+
+The Android APK build process happens inside a Docker container.
 
 ## Storage
 
-### On the device
+| What           | Where                                                   | Holds                                                                                                                                                        |
+| -------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Sync Folder    | Cloud provider                                          | The shared state. Every device's copy is a full replica, so local-first is automatic.                                                                        |
+| Local Folder   | A folder, resides in local Android/Windows environment. | Full local replica of Sync Folder.                                                                                                                           |
+| IndexedDB      | Browser                                                 | A pointer to the Local Folder that survive restart. The browser holds the right to use the folder. It's needed to not reprompting folder-picker every start. |
+| `localStorage` | Browser                                                 | The device's identity: `deviceId` and `label`.                                                                                                               |
 
-| Where          | Holds                                                                                                                                                  |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Sync folder    | The shared state. Every device's copy is a full replica, so local-first is automatic — the app reads its own folder whether or not the internet exists |
-| `localStorage` | The device id and label only (`proto.deviceId`, `proto.label`). Synchronous and ~5 MB — wrong for list data                                            |
-| IndexedDB      | What the real app already uses via Dexie. For a prototype syncing one sentence it earns nothing, so this does not use it                               |
+An offline edit is just a written file in Local Folder. The cloud client uploads it to Sync Folder when it can.
+The application never communicate directly with Sync Folder.
 
-Note what the folder model removes: there is no outbox and no pending queue. An offline edit is just a written file. The
-cloud client uploads it when it can, and its retry logic is code you do not write, test or own.
-
-### In the cloud
-
-`list`, `read`, `write` on a folder is the whole requirement, so the provider can be chosen on price or on which client
-is already installed. The one thing worth measuring per provider is how aggressively its client uploads a small file
-that changes often — that sets how long "a few seconds" actually is.
 
 Android is the exception, and it is the weakest part of the design: it needs an app that maintains a **genuine local
 folder**. The Dropbox, Drive and OneDrive Android apps are on-demand browsers for cloud files and do not mirror a folder
@@ -374,13 +367,12 @@ onto the device the way their desktop clients do. Syncthing, FolderSync/Dropsync
 
 ## Browser interaction
 
-This is the real constraint the prototype turned up, and it decides how the app gets built.
+This is the real constraint the prototype turned up, because Mozilla objected to the File System Access API.
+Hence the two ways for setting the Sync Folder in Laptop.
 
-| Browser                | `showDirectoryPicker` | How it reaches the folder                     |
-| ---------------------- | --------------------- | --------------------------------------------- |
-| Chrome / Edge desktop  | Yes                   | Either: pick in the page, or the local helper |
-| **Firefox**            | **No, deliberately**  | The local helper (`--folder`)                 |
-| **Safari**             | **No**                | The local helper (`--folder`)                 |
-| Any browser on Android | No                    | Neither — and no local helper can run there   |
+| Browser in PC         | `showDirectoryPicker` | How it reaches the folder                    |
+| --------------------- | --------------------- | -------------------------------------------- |
+| Chrome / Edge desktop | Yes                   | Folder picker in browser or the local helper |
+| **Firefox**           | **No**                | The local helper (`--folder`)                |
 
-Mozilla objected to the File System Access API. Hence the two ways for setting the sync folder in Laptop.
+For the Anroid, the user needs to use folder picker after the first install or update.
