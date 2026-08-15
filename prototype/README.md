@@ -241,7 +241,7 @@ sequenceDiagram
 
 #### 2.7. Sync between two devices
 
-`test/scenario.mjs` demonstrates every relation between two devices. The next table walks the same sequence, with the
+`test/e2e/scenario.mjs` demonstrates every relation between two devices. The next table walks the same sequence, with the
 same numbers the test asserts.
 
 Each cell contains one device's partial snapshot: application content, vector, author and updatedAt.
@@ -279,7 +279,7 @@ at the end in all cases, because the arithmetic is identical.
 | Laptop reconnects and resolves | **`"Buy oat milk"`**<br><code>{1111aaaa: <b>17</b>, 2222bbbb: <b>4</b>}</code><br>by `1111aaaa` at **`10:05Z`** | `"Buy oat milk"`<br>`{1111aaaa: 15, 2222bbbb: 4}`<br>by `2222bbbb` at `10:04Z`                           | laptop ahead |
 | Phone syncs and fast-forwards  | `"Buy oat milk"`<br>`{1111aaaa: 17, 2222bbbb: 4}`<br>by `1111aaaa` at `10:05Z`                                  | `"Buy oat milk"`<br><code>{1111aaaa: <b>17</b>, 2222bbbb: 4}</code><br>by **`1111aaaa`** at **`10:05Z`** | equal        |
 
-**C: the user combines them by hand.** (The taken path in `test/scenario.mjs`)
+**C: the user combines them by hand.** (The taken path in `test/e2e/scenario.mjs`)
 
 | Event                          | Laptop                                                                                                                          | Phone                                                                                                                        | Relation     |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------ |
@@ -436,15 +436,37 @@ prototype/
 │   ├── app.js
 │   └── style.css
 ├── android/                    WebView shell and its Docker build; web assets copied in at build time
-└── test/
-    ├── scenario.mjs            Headless merge
-    ├── bridge.mjs              Helper path
-    ├── ui.mjs                  Page in a browser
-    └── android-bridge.mjs      Java bridge, stubbed
+└── test/                       Plain node scripts, no test runner. Each run prints ok/FAIL and exits non-zero on failure
+    ├── ui.mjs                  The page in Chromium: conflict UI, resolution, layout
+    ├── android-bridge.mjs      The Android startup branch, Java bridge stubbed in-page
+    └── e2e/                    Nothing stubbed in: real files, real processes, real browsers
+        ├── scenario.mjs        The merge rules, two devices and a modelled cloud client, no browser
+        └── bridge.mjs          The loopback helper path, driven with showDirectoryPicker deleted
 ```
+
 
 **Folder adapter**: `core/folder-sync.mjs` receives an object with `list()`, `read(name)`, `write(name, content)` and
 nothing else. Those three methods are its only route to a Local Folder.
+
+### Test
+
+Each file in `test/` asserts one part of the prototype's logic.
+No test runner and nothing mocked in `core/`: what runs is the code that ships. A stand-in appears only where the real collaborator cannot run on this machine.
+
+| Test                 | Run                     | What it test                                                                                                                                                                                                                                                                                                          |
+| -------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `e2e/scenario.mjs`   | `npm run proto:test`    | The merge rules between two devices.                                                                                 |
+| `e2e/bridge.mjs`     | `npm run proto:bridge`  | The helper path works with Firefox, which has no `File System Access API`, and nothingdepends on said API. |
+| `ui.mjs`             | `npm run proto:ui`      | One local edit writes exactly one file. <br> A peer that dominates is adopted silently. <br> A peer that raced raises the conflict panel <br> Resolving it dominates both sides.                                           |
+| `android-bridge.mjs` | `npm run proto:android` | Behaviour of an Android app: startup, edits, conflict and resolution. It runs against an in-page stub.                   |
+
+Test in `e2e/`
+- self-contained tests for end-to-end with no stand-in at all
+- test runs build their own temp folder on disk
+- real processes, real browsers, and a modelled cloud client that only copies files.
+
+`ui.mjs` and `android-bridge.mjs` test by using a page in Chromium. The helper has to be serving already
+(`npm run proto`); `BASE` and `SHOTS` override the URL and where the screenshots land.
 
 
 ### Code Standards

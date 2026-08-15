@@ -43,9 +43,13 @@ npm run proto -- --folder ~/Dropbox/checklist</pre>
 
       <div id="work" hidden>
         <label class="label" for="text">The sentence</label>
+        <!-- autocomplete=off is load-bearing: without it the browser restores
+             the value it remembers from the last session and fires input, which
+             would be committed as a fresh edit of stale text. -->
         <textarea
           id="text"
           rows="3"
+          autocomplete="off"
           placeholder="Type here — it goes into your file in the folder"
         ></textarea>
 
@@ -83,8 +87,20 @@ npm run proto -- --folder ~/Dropbox/checklist</pre>
           </div>
         </dl>
 
-        <h2 class="label">Files in the folder</h2>
-        <ul id="files" class="files"></ul>
+        <h2 class="label">Snapshots in the folder</h2>
+        <div class="snapshots-wrap">
+          <table id="snapshots" class="snapshots">
+            <thead>
+              <tr>
+                <th>Device</th>
+                <th>Text</th>
+                <th>Version vector</th>
+                <th>Updated in the file</th>
+              </tr>
+            </thead>
+            <tbody id="snapshot-rows"></tbody>
+          </table>
+        </div>
 
         <h2 class="label">Log</h2>
         <ol id="log" class="log"></ol>

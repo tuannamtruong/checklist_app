@@ -107,20 +107,59 @@ function render({ state, conflict }) {
   $("m-sclock").textContent = state ? JSON.stringify(state.sClock) : "—";
   $("m-sync").textContent = new Date().toLocaleTimeString();
   renderConflict(conflict);
+  renderSnapshots();
 }
 
-async function renderFiles(folder) {
-  const names = await folder.list();
-  $("files").replaceChildren(
-    ...names
-      .filter((n) => !n.startsWith("."))
-      .map((n) => {
-        const li = document.createElement("li");
-        li.textContent = n;
-        if (n === fileNameFor(deviceId)) li.className = "mine";
-        return li;
-      }),
-  );
+/**
+ * Every snapshot the folder holds, side by side.
+ *
+ * A file name alone says nothing about why two devices disagree. The four
+ * things that decide that — who wrote it, what it says, what it has seen, and
+ * when it was authored — are the whole state of the sync, so the debugging view
+ * is just those columns for every device at once.
+ */
+function renderSnapshots() {
+  const cell = (text, className) => {
+    const td = document.createElement("td");
+    td.textContent = text;
+    if (className) td.className = className;
+    return td;
+  };
+
+  // Ours first: it is the one row the reader is comparing everything against.
+  const rows = device.snapshots
+    .filter(Boolean)
+    .sort((a, b) =>
+      a.device === deviceId
+        ? -1
+        : b.device === deviceId
+          ? 1
+          : a.device.localeCompare(b.device),
+    )
+    .map((s) => {
+      const tr = document.createElement("tr");
+      const who = document.createElement("td");
+      who.className = "who";
+      const name = document.createElement("strong");
+      name.textContent = s.label || s.device;
+      const id = document.createElement("span");
+      id.className = "id";
+      id.textContent = s.device;
+      who.append(name, id);
+      tr.append(
+        who,
+        cell(s.text, "text"),
+        cell(JSON.stringify(s.sClock), "vector"),
+        cell(new Date(s.updatedAt).toLocaleTimeString(), "when"),
+      );
+      // The author is the device that wrote the text, which is not always the
+      // device that owns the file — worth seeing when a row looks surprising.
+      tr.title = `${fileNameFor(s.device)} — text by ${s.author}, ${s.updatedAt}`;
+      if (s.device === deviceId) tr.className = "mine";
+      return tr;
+    });
+
+  $("snapshot-rows").replaceChildren(...rows);
 }
 
 // ------------------------------------------------------------------ actions
@@ -133,7 +172,7 @@ async function start(folder, label) {
     onChange: render,
   });
   await device.load();
-  await cycle(folder);
+  await cycle();
 
   $("setup").hidden = true;
   $("work").hidden = false;
@@ -143,11 +182,11 @@ async function start(folder, label) {
   clearInterval(polling);
   // Polling is the only option: a synced folder has no change notification, and
   // the cloud client writes to it behind our back.
-  polling = setInterval(() => cycle(folder), POLL_MS);
-  window.addEventListener("focus", () => cycle(folder));
+  polling = setInterval(cycle, POLL_MS);
+  window.addEventListener("focus", cycle);
 }
 
-async function cycle(folder) {
+async function cycle() {
   try {
     const before = device.state?.text;
     const result = await device.sync();
@@ -158,7 +197,6 @@ async function cycle(folder) {
         `picked up "${device.state?.text}" from ${labelFor(device.state?.author, device.snapshots)}`,
         "in",
       );
-    await renderFiles(folder);
   } catch (err) {
     log(`folder error: ${err.message}`, "bad");
     setStatus("folder unreachable", "warn");
@@ -175,8 +213,29 @@ async function resolve(text) {
 let debounce;
 $("text").addEventListener("input", (e) => {
   const text = e.target.value;
-  pendingEdit = true;
+  // Whatever this event turns out to be, an earlier keystroke's write must not
+  // outlive it — that timer was scheduled for text the box no longer holds.
   clearTimeout(debounce);
+
+  // An input event on a box the user is not in did not come from the user. The
+  // browser fires one when it restores the value it remembers from the last
+  // session, and committing that would bump our counter for text that is older
+  // than what the folder already holds — a stale maximal set every peer then
+  // fast-forwards to. Typing always has focus, so this costs a real edit
+  // nothing. `autocomplete="off"` stops the restore; this is the backstop.
+  if (document.activeElement !== e.target) {
+    pendingEdit = false;
+    if (device) render({ state: device.state, conflict: device.conflict });
+    return;
+  }
+  // Typing back to what we already store is not an edit: a write would bump the
+  // vector and make peers fast-forward to a text they already have.
+  if (text === (device?.state?.text ?? "")) {
+    pendingEdit = false;
+    return;
+  }
+
+  pendingEdit = true;
   // One file write per keystroke would mean one cloud upload per keystroke.
   debounce = setTimeout(async () => {
     await device.edit(text);
@@ -227,7 +286,7 @@ $("uitest").addEventListener("click", async () => {
         updatedAt: new Date().toISOString(),
       }),
     );
-    await cycle(folder);
+    await cycle();
   };
   log(
     "UI test mode: no folder, no network. window.__injectPeer(id, text, sClock)",

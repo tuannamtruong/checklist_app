@@ -16,6 +16,8 @@ const { chromium } = createRequire(import.meta.url)("playwright");
 
 const BASE = process.env.BASE ?? "http://localhost:38531";
 const SHOTS = process.env.SHOTS ?? "/tmp/checklist-proto";
+/** Mirrors DEBOUNCE_MS in public/app.js: how long a write may take to appear. */
+const DEBOUNCE_MS = 600;
 mkdirSync(SHOTS, { recursive: true });
 
 let failures = 0;
@@ -68,10 +70,17 @@ else fail("minted a device id", String(laptopId));
 
 await page.locator("#text").fill("Buy milk");
 await expectEventually(
-  "our file appears in the folder",
-  async () =>
-    (await page.locator("#files li").allTextContents()).join() ===
-    `checklist.${laptopId}.json`,
+  "one snapshot in the table — ours",
+  async () => {
+    const rows = await page.locator("#snapshot-rows tr").all();
+    if (rows.length !== 1) return `${rows.length} rows`;
+    const cells = await rows[0].locator("td").allTextContents();
+    return (
+      cells[0].includes(laptopId) &&
+      cells[1] === "Buy milk" &&
+      cells[2] === JSON.stringify({ [laptopId]: 1 })
+    );
+  },
 );
 await expectEventually(
   "the version vector counts our edit",
@@ -107,6 +116,20 @@ await expectEventually(
   "the peer is named by its label, not its id",
   async () => (await page.locator("#m-author").textContent()) === "phone",
 );
+await expectEventually("the peer has its own row in the table", async () => {
+  const rows = await page.locator("#snapshot-rows tr").all();
+  if (rows.length !== 2) return `${rows.length} rows`;
+  const cells = await Promise.all(
+    rows.map((row) => row.locator("td").allTextContents()),
+  );
+  // Ours first, then the peer — each with the text and vector of its own file.
+  return (
+    cells[0][0].includes(laptopId) &&
+    cells[1][0].includes("phone") &&
+    cells[1][0].includes("99999999") &&
+    cells[1][1] === "Buy milk and eggs"
+  );
+});
 
 console.log("\n4. a peer file that raced raises the conflict UI");
 await page.locator("#text").fill("Buy milk, eggs and bread");
@@ -166,7 +189,40 @@ await expectEventually("the resolution dominates both", async () => {
 });
 await page.screenshot({ path: `${SHOTS}/3-resolved.png`, fullPage: true });
 
-console.log("\n6. layout");
+console.log("\n6. a value the browser restores is not an edit");
+// Reopening a closed tab makes the browser put back the text the box held last
+// session and fire `input`. Committing that would write text older than the
+// folder's own and bump the vector past it, so every peer would fast-forward to
+// the stale version. This is that event, exactly: value set, input fired, no
+// focus.
+const beforeRestore = await page.locator("#m-sclock").textContent();
+if ((await page.locator("#text").getAttribute("autocomplete")) === "off")
+  ok("the box opts out of form restoration");
+else fail("the box opts out of form restoration", "autocomplete is not off");
+
+await page.evaluate(() => {
+  const box = document.getElementById("text");
+  box.blur();
+  box.value = "STALE TEXT FROM LAST SESSION";
+  box.dispatchEvent(new Event("input", { bubbles: true }));
+});
+await page.waitForTimeout(DEBOUNCE_MS + 600);
+
+if ((await page.locator("#m-sclock").textContent()) === beforeRestore)
+  ok("the version vector did not move");
+else
+  fail(
+    "the version vector did not move",
+    `${beforeRestore} → ${await page.locator("#m-sclock").textContent()}`,
+  );
+await expectEventually(
+  "the box shows the folder's text again",
+  async () =>
+    (await page.locator("#text").inputValue()) ===
+    "Buy oat milk, eggs and bread",
+);
+
+console.log("\n7. layout");
 const overflow = await page.evaluate(
   () => document.body.scrollWidth - window.innerWidth,
 );
