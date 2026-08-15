@@ -209,11 +209,12 @@ $("pick").addEventListener("click", async () => {
 
 $("keep-merged").addEventListener("click", () => resolve($("merged").value));
 
-$("demo").addEventListener("click", async () => {
+$("uitest").addEventListener("click", async () => {
   // In-memory folder plus a fake peer, so the merge and the conflict UI can be
-  // exercised anywhere — including browsers with no folder access at all.
+  // exercised anywhere — including browsers with no folder access at all. This
+  // is what test/ui.mjs drives; a peer file cannot be planted any other way.
   const folder = memoryFolder();
-  await start(folder, "demo (in memory)");
+  await start(folder, "UI test (in memory)");
   window.__injectPeer = async (peer, text, sClock, peerLabel = peer) => {
     await folder.write(
       fileNameFor(peer),
@@ -229,7 +230,7 @@ $("demo").addEventListener("click", async () => {
     await cycle(folder);
   };
   log(
-    "demo mode: no folder, no network. window.__injectPeer(id, text, sClock)",
+    "UI test mode: no folder, no network. window.__injectPeer(id, text, sClock)",
     "warn",
   );
 });
@@ -253,7 +254,7 @@ const bridge =
     ? { configured: false }
     : await bridgeInfo();
 
-if (androidAvailable() && !params.has("demo")) {
+if (androidAvailable() && !params.has("uitest")) {
   if (android.configured) {
     $("pick").textContent = "Change folder…";
     $("pick").onclick = pickAndroidFolder;
@@ -265,7 +266,7 @@ if (androidAvailable() && !params.has("demo")) {
     $("pick").textContent = "Choose folder…";
     $("pick").onclick = pickAndroidFolder;
   }
-} else if (bridge.configured && !params.has("demo")) {
+} else if (bridge.configured && !params.has("uitest")) {
   $("pick").hidden = true;
   await start(httpFolder(), bridge.name);
   log(`folder supplied by the local helper: ${bridge.path}`, "ok");
@@ -296,4 +297,4 @@ if (androidAvailable() && !params.has("demo")) {
   }
 }
 
-if (params.has("demo")) $("demo").click();
+if (params.has("uitest")) $("uitest").click();

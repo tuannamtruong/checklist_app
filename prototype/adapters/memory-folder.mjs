@@ -1,5 +1,5 @@
 // Folder adapter backed by a plain object. Lets the UI be exercised without a
-// real folder — the demo mode in the browser, and the peer-injection the UI
+// real folder — the UI test mode in the browser, and the peer-injection the UI
 // test needs.
 
 export function memoryFolder(files = {}) {
