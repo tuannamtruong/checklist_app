@@ -3,7 +3,7 @@
 //
 //   NODE_PATH=/home/nam/.npm/_npx/e41f203b7505f1fb/node_modules node prototype/test/ui.mjs
 //
-// It runs in demo mode against an in-memory folder. The real folder path cannot
+// It runs in UI test mode against an in-memory folder. The real folder path cannot
 // be automated — showDirectoryPicker() opens an OS dialog Playwright cannot
 // drive — so correctness of the merge is proved by scenario.mjs instead. What
 // this covers is the wiring: DOM in, DOM out.
@@ -45,9 +45,9 @@ const page = await browser.newPage({ viewport: { width: 1100, height: 950 } });
 page.on("pageerror", (e) => errors.push(e.message));
 page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
 
-await page.goto(`${BASE}/?device=laptop&demo=1`);
+await page.goto(`${BASE}/?device=laptop&uitest=1`);
 
-console.log("\n1. starts up in demo mode");
+console.log("\n1. starts up in UI test mode");
 await expectEventually(
   "editor is shown",
   async () => (await page.locator("#text").isVisible()) === true,
@@ -174,7 +174,7 @@ if (overflow <= 0) ok("no horizontal overflow");
 else fail("no horizontal overflow", `overflows by ${overflow}px`);
 
 const phone = await browser.newPage({ viewport: { width: 390, height: 844 } });
-await phone.goto(`${BASE}/?device=phone&demo=1`);
+await phone.goto(`${BASE}/?device=phone&uitest=1`);
 await phone.locator("#text").fill("Buy milk");
 const phoneOverflow = await phone.evaluate(
   () => document.body.scrollWidth - window.innerWidth,
