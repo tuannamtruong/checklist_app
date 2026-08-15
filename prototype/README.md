@@ -16,23 +16,25 @@ synchronise.
 Which cloud provider is used makes no difference. The app needs three operations: `list`, `read`, `write`. Every
 provider grants those by just being a folder.
 
-## Answers
+## 1. Answers
 
 The four questions, answered. Each one is proven in the section it points at.
 
-1. **Laptop and phone synchronise through a Sync Folder, never with each other.** Every device writes exactly one snapshot
-   `checklist.<device-id>.json` and reads all of them. The cloud provider's client syncs the files between
-   devices. → [§2 Application content synchronisation](#2-application-content-synchronisation)
-2. **Race conditions are not prevented, they are detected.** Comparing version vectors derives whether race condition happens.
-   One user with one edit will create new maximal set, all devices can fast-forward this version to solve the concurrent.
-   → [§2.3 Race condition handle](#23-race-condition-handle), [§4 Race conditions](#4-race-conditions)
-3. **The Sync Folder is the whole database.** Each device's copy is a full replica, so the app works offline by default. The
-   only other storage is `localStorage`, holding the device id and label. No database engine, no IndexedDB. → [Storage](#storage)
-4. Chrome, Edge and Firefox can host the app. → [Browser interaction](#browser-interaction)
+1. **Laptop and phone synchronise through a Sync Folder, never with each other.** Every device writes exactly one
+   snapshot `checklist.<device-id>.json` and reads all of them. The cloud provider's client syncs the files between
+   devices. → [§5.2 Application content synchronisation](#52-application-content-synchronisation)
+2. **Race conditions are not prevented, they are detected.** Comparing version vectors derives whether race condition
+   happens. One user with one edit will create new maximal set, all devices can fast-forward this version to solve the
+   concurrent. → [§5.2.3 Race condition handle](#523-race-condition-handle),
+   [§6 Race conditions](#6-race-conditions)
+3. **The Sync Folder is the whole database.** Each device's copy is a full replica, so the app works offline by
+   default. The only other storage is `localStorage`, holding the device id and label. No database engine, no
+   IndexedDB. → [§8 Storage](#8-storage)
+4. Chrome, Edge and Firefox can host the app. → [§9 Browser interaction](#9-browser-interaction)
 
-## Setup
+## 2. Setup
 
-### Install
+### 2.1 Install
 
 **Laptop - Bundle for Windows**
 
@@ -74,7 +76,7 @@ make proto_android
 Gradle task pulls `public/`, `core/` and `adapters/` from `prototype/` at build time, so there is one copy of the sync
 core and the phone cannot drift from the laptop.
 
-### Running
+### 2.2 Running
 
 The webapp will be located in `http://localhost:38531/`
 
@@ -83,7 +85,7 @@ Picking the folder in the page (if not specified during install): click **Choose
 On Android there is no localhost and no picker in the page: the app boots straight to **Choose folder…**, which opens
 the _system_ picker (Storage Access Framework). The grant is kept across restarts, so the folder is picked once.
 
-## Glossary
+## 3. Glossary
 
 | Term           | Definition                                                                                                                                                                                                               |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -102,7 +104,7 @@ There are two parts to synchronize:
 1. Files and directories in Sync Folder.
 2. Application Content: Values shown in the app's presentation layer for the end user.
 
-### 1. File and folder in Sync Folder
+### 5.1 Files and folders in the Sync Folder
 
 Each device **writes only its own single Snapshot file** in the Sync Folder. As long as the device-id is unique, no two
 devices write to the same file, so no race condition is possible for the items inside the Sync Folder.
@@ -111,9 +113,9 @@ The Sync Folder never tells a device that something happened. The files are quie
 not running. Sync of content inside the folder will be handled by the cloud provider. The application has no logic for
 this.
 
-### 2. Application content synchronisation
+### 5.2 Application content synchronisation
 
-#### 2.1. Snapshot
+#### 5.2.1 Snapshot
 
 The Sync Folder has no locking or conditional write. Each device writes a distinct snapshot
 `checklist.<device-id>.json`, that describes its state to the Sync Folder.
@@ -154,7 +156,7 @@ snapshot's `sClock` vector against its own.
 
 **Only a device may increment its own counter.** Folding in a peer's edit joins the two vectors.
 
-#### 2.2. Relation determination
+#### 5.2.2 Relation determination
 
 Sync works by comparing two `sClock` against each other: `ours`, from this device's snapshot, and `peer`, from the
 peer's snapshot.
@@ -169,7 +171,7 @@ determines the relation between the two.
 | true                    | true                    | equal       | Nothing           |
 | false                   | false                   | concurrent  | Race condition    |
 
-#### 2.3. Race condition handle
+#### 5.2.3 Race condition handle
 
 When a race condition happens, any device aware of it can resolve it by writing the up-to-date application content. That
 resolution carries an `sClock` that dominates every racing one, which makes it the new **maximal set**.
@@ -177,7 +179,7 @@ resolution carries an `sClock` that dominates every racing one, which makes it t
 The app does not prevent races, it detects them afterwards. The detection is derived from the relation between the
 version vectors of the snapshots in the folder.
 
-#### 2.4. Maximal set
+#### 5.2.4 Maximal set
 
 Every snapshot in the Sync Folder is handled at once. In each sync cycle a device does two steps:
 
@@ -191,7 +193,7 @@ Every snapshot in the Sync Folder is handled at once. In each sync cycle a devic
 | several, all the same text | Adopt it; the sClock is the join of all of them                               |
 | several, different texts   | Race condition between exactly those snapshots, raise conflict inside the app |
 
-#### 2.5. The sync cycle
+#### 5.2.5 The sync cycle
 
 Every 3 s and on window focus, a full sync cycle starts:
 
@@ -200,10 +202,10 @@ Every 3 s and on window focus, a full sync cycle starts:
 - `applyPeers()` the read files against its own snapshot (`core/device.mjs`, which reconciles in `core/merge.mjs`),
 - write its own file back, but only if the merge changed something.
 
-#### 2.6. Flowchart for normal sync between two devices
+#### 5.2.6 Flowchart for normal sync between two devices
 
 One edit on the laptop reaching the phone, with no race condition. Similar to the table in
-[§2.7 Sync between two devices](#27-sync-between-two-devices)
+[§5.2.7 Sync between two devices](#527-sync-between-two-devices)
 
 There is no message exchange. The app only interacts with its Local Folder.
 
@@ -239,7 +241,7 @@ sequenceDiagram
     Note over L: vectors equal, same text —<br/>nothing changed, no write
 ```
 
-#### 2.7. Sync between two devices
+#### 5.2.7 Sync between two devices
 
 `test/e2e/scenario.mjs` demonstrates every relation between two devices. The next table walks the same sequence, with the
 same numbers the test asserts.
@@ -286,7 +288,7 @@ at the end in all cases, because the arithmetic is identical.
 | Laptop reconnects and resolves | **`"Buy oat milk, eggs and bread"`**<br><code>{1111aaaa: <b>17</b>, 2222bbbb: <b>4</b>}</code><br>by `1111aaaa` at **`10:05Z`** | `"Buy oat milk"`<br>`{1111aaaa: 15, 2222bbbb: 4}`<br>by `2222bbbb` at `10:04Z`                                               | laptop ahead |
 | Phone syncs and fast-forwards  | `"Buy oat milk, eggs and bread"`<br>`{1111aaaa: 17, 2222bbbb: 4}`<br>by `1111aaaa` at `10:05Z`                                  | **`"Buy oat milk, eggs and bread"`**<br><code>{1111aaaa: <b>17</b>, 2222bbbb: 4}</code><br>by **`1111aaaa`** at **`10:05Z`** | equal        |
 
-#### 2.8. Sync with more than 2 devices
+#### 5.2.8 Sync with more than 2 devices
 
 There is **no**:
 
@@ -294,7 +296,7 @@ There is **no**:
 - count of the total existing snapshots or devices
 - leader, quorum, membership, vote
 
-It is the same code, and any device may resolve a given conflict ([§4](#4-race-conditions)). If there are `n` amount of devices with `n` race conditions happening.
+It is the same code, and any device may resolve a given conflict ([§6 Race conditions](#6-race-conditions)). If there are `n` amount of devices with `n` race conditions happening.
 It stills means, that `1` edit will produces a dominating `sClock`, the new maximal set solves the race condition in all devices.
 
 ##### Sync when a third device joins
@@ -330,7 +332,7 @@ ancestor and its text is not part of the resolution.
 
 Three devices can of course produce a three-sided race, and then all three texts are offered.
 
-The resolution works exactly as in [§2.5](#25-sync-between-two-devices). Any device can pick one side, or write a combination of them all. The result dominates
+The resolution works exactly as in [§5.2.7 Sync between two devices](#527-sync-between-two-devices). Any device can pick one side, or write a combination of them all. The result dominates
 every racing vector and becomes the new maximal set that the others fast-forward to.
 
 Here the tablet resolves, keeping content from both the laptop and the phone.
@@ -341,7 +343,7 @@ Here the tablet resolves, keeping content from both the laptop and the phone.
 | Laptop and phone sync and fast-forward | **`"Buy oat milk, eggs, bread and jam"`**<br><code>{1111aaaa: 18, 2222bbbb: <b>5</b>, 3333cccc: <b>2</b>}</code><br>by **`3333cccc`** at **`10:15Z`** | **`"Buy oat milk, eggs, bread and jam"`**<br><code>{1111aaaa: <b>18</b>, 2222bbbb: 5, 3333cccc: <b>2</b>}</code><br>by **`3333cccc`** at **`10:15Z`** | `"Buy oat milk, eggs, bread and jam"`<br>`{1111aaaa: 18, 2222bbbb: 5, 3333cccc: 2}`<br>by `3333cccc` at `10:15Z`                                             | all equal        |
 
 
-### 4. Race conditions
+## 6. Race conditions
 
 1. **File and folder in Sync Folder.** There can be no race condition when writing a file into the Sync Folder, because
    a device only ever writes its own. A snapshot the cloud provider's client is still syncing fails to parse and is
@@ -358,7 +360,7 @@ Resolving conflict create a maximal set, so every devices can fast-forward to.
 
 A resolution is itself an edit, so two devices resolving the same conflict independently are just two more concurrent edits
 
-## Build pipeline
+## 7. Build pipeline
 
 One command builds both bundles:
 
@@ -374,7 +376,7 @@ make proto_android
 make proto_clean
 ```
 
-### Windows bundle
+### 7.1 Windows bundle
 
 The Windows target downloads an official embeddable Python and stages it
 on the Windows side. It needs **no** installer, pip, or admin rights.
@@ -382,11 +384,11 @@ on the Windows side. It needs **no** installer, pip, or admin rights.
 No `.exe` is produced: a shortcut to Microsoft's own signed `pythonw.exe` raises no SmartScreen warning.
 The prototype is not copied to the Windows side either. The bundle points at `serve.py` (over `\\wsl.localhost` under WSL).
 
-### APK
+### 7.2 APK
 
 The Android APK build process happens inside a Docker container.
 
-## Storage
+## 8. Storage
 
 | What           | Where                                                   | Holds                                                                                                                                                        |
 | -------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -398,7 +400,7 @@ The Android APK build process happens inside a Docker container.
 An offline edit is just a written file in Local Folder. The cloud client uploads it to Sync Folder when it can.
 The application never communicate directly with Sync Folder.
 
-## Browser interaction
+## 9. Browser interaction
 
 This is the real constraint the prototype turned up, because Mozilla objected to the File System Access API.
 Hence the two ways for setting the Sync Folder in Laptop.
@@ -411,9 +413,9 @@ Hence the two ways for setting the Sync Folder in Laptop.
 For the Anroid, the user needs to use folder picker after the first install or update.
 
 
-## Development
+## 10. Development
 
-### Where the code lives
+### 10.1 Where the code lives
 
 ```
 prototype/
@@ -448,7 +450,7 @@ prototype/
 **Folder adapter**: `core/folder-sync.mjs` receives an object with `list()`, `read(name)`, `write(name, content)` and
 nothing else. Those three methods are its only route to a Local Folder.
 
-### Test
+### 10.2 Test
 
 Each file in `test/` asserts one part of the prototype's logic.
 No test runner and nothing mocked in `core/`: what runs is the code that ships. A stand-in appears only where the real collaborator cannot run on this machine.
@@ -469,7 +471,7 @@ Test in `e2e/`
 (`npm run proto`); `BASE` and `SHOTS` override the URL and where the screenshots land.
 
 
-### Code Standards
+### 10.3 Code standards
 
 #### Path Handling
 - Use relative paths
