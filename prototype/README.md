@@ -26,13 +26,13 @@ The four questions, answered. Each one is proven in the section it points at.
 2. **Race conditions are not prevented, they are detected.** Comparing version vectors derives whether race condition
    happens. One user with one edit will create new maximal set, all devices can fast-forward this version to solve the
    concurrent. → [§5.2.3 Race condition handle](#523-race-condition-handle),
-   [§6 Race conditions](#6-race-conditions)
+   [§5.3 Race conditions](#53-race-conditions)
 3. **The Sync Folder is the whole database.** Each device's copy is a full replica, so the app works offline by
    default. The only other storage is `localStorage`, holding the device id and label. No database engine, no
-   IndexedDB. → [§8 Storage](#8-storage)
-4. Chrome, Edge and Firefox can host the app. → [§9 Browser interaction](#9-browser-interaction)
+   IndexedDB. → [§4.5 Storage](#45-storage)
+4. Chrome, Edge and Firefox can host the app. → [§4.3 Browser interaction](#43-browser-interaction)
 
-## 2. Setup
+## 2. Setup and Build
 
 ### 2.1 Install
 
@@ -85,6 +85,34 @@ Picking the folder in the page (if not specified during install): click **Choose
 On Android there is no localhost and no picker in the page: the app boots straight to **Choose folder…**, which opens
 the _system_ picker (Storage Access Framework). The grant is kept across restarts, so the folder is picked once.
 
+### 2.3 Build pipeline
+
+One command builds both bundles:
+
+```bash
+make proto_all
+```
+
+Or step by step:
+
+```bash
+make proto_exe_win FOLDER='C:\Users\Nam\Dropbox\checklist'
+make proto_android
+make proto_clean
+```
+
+#### 2.3.1 Windows bundle
+
+The Windows target downloads an official embeddable Python and stages it
+on the Windows side. It needs **no** installer, pip, or admin rights.
+
+No `.exe` is produced: a shortcut to Microsoft's own signed `pythonw.exe` raises no SmartScreen warning.
+The prototype is not copied to the Windows side either. The bundle points at `serve.py` (over `\\wsl.localhost` under WSL).
+
+#### 2.3.2 APK
+
+The Android APK build process happens inside a Docker container.
+
 ## 3. Glossary
 
 | Term           | Definition                                                                                                                                                                                                               |
@@ -97,7 +125,105 @@ the _system_ picker (Storage Access Framework). The grant is kept across restart
 | Snapshot       | `checklist.<device-id>.json` files inside the Sync Folder. Each file is a device's replica of the shared state; every device holds a full replica, which enables the app to work offline.                                |
 | Maximal set    | Highest value of a version vector across all devices. Between `{1111aaaa: 17, 2222bbbb: 4}`, `{1111aaaa: 16, 2222bbbb: 5, 3333cccc: 1}` and `{1111aaaa: 17, 2222bbbb: 5, 3333cccc: 1}`, the last one is the maximal set. |
 
-## Synchronisation Logic
+## 4. Architecture
+
+### 4.1 The layers
+
+```
+UI               Web Page
+            (Windows, Android)
+                     │       
+                     ▼
+Logic          Sync logic
+               Snapshot Object
+               Adapters for directory interaction
+                     │   
+                     ▼
+Storage        Local Folder  ──▶  cloud provider's client  ──▶  Sync Folder
+```
+### 4.2 Adapter
+
+An adapter implements only `list()`, `read(name)` and `write(name, content)`. Every folder storage can offer 
+theses functions. All interact with the disks are through the adapter.
+
+| Adapter | Runs in | Way of communication |
+| --- | --- | --- |
+| `node-folder.mjs` | Node | `fs`, a real directory |
+| `fsaa-folder.mjs` | Chrome, Edge | a File System Access handle, kept in IndexedDB across restarts |
+| `http-folder.mjs` | any desktop browser (needed for Firefox) | `fetch` to this device's own helper on 127.0.0.1:38531 |
+| `android-folder.mjs` | the Android WebView | a Storage Access Framework grant, over the Java bridge |
+| `memory-folder.mjs` | anywhere | a Fake for UI testing, no disk |
+
+
+On every page load, "How can this browser reach a local folder?" is asked.
+Adapter interaction with browser at startup (every open and reload):
+
+```mermaid
+flowchart TD
+    S([page loads]) --> S1[uitest param exist?]
+    S1 -->|yes| S2A[memory-folder adapter]
+    S1 -->|no| S2B[window.AndroidFolder?]
+    
+    S2B -->|yes| S3A["AndroidFolder<br/>.hasFolder()"]
+    S2B -->|no| S3B["GET /folder/info"]
+    
+    S3A -->|yes| S4A["android-folder adapter"]
+    S3A -->|no| S4B["User pick folder in UI"]
+    S3B -->|configured: true| S4C["http-folder adapter"]
+    S3B -->|configured: false| S4D["FSAA supported?"]
+
+    S4B -->S5A["reload"]
+    S4D -->|yes| S5B["Load IndexedDB handle"]
+    S4D -->|no| S5C["show unsupported"]
+
+    S5B -->|granted| S6A["stored fsaa-folder adapter"]
+    S5B -->|re-grant needed| S6B["Reopen UI"]
+    S5B -->|none| S6C["User pick folder in UI"]
+    
+    S6C -->S7A["fsaa-folder adapter"]
+```
+
+### 4.3 Browser interaction
+
+This is the real constraint the prototype turned up, because Mozilla objected to the File System Access API.
+Hence the two ways for setting the Sync Folder in Laptop.
+
+| Browser in PC         | `showDirectoryPicker` | How it reaches the folder                    |
+| --------------------- | --------------------- | -------------------------------------------- |
+| Chrome / Edge desktop | Yes                   | Folder picker in browser or the local helper |
+| **Firefox**           | **No**                | The local helper (`--folder`)                |
+
+For the Anroid, the user needs to use folder picker after the first install or update.
+
+### 4.4 What the page shows
+
+Normal state: <Ref to picture..>
+
+
+### 4.5 Storage
+
+| What           | Where                                                   | Holds                                                                                                                                                        |
+| -------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Sync Folder    | Cloud provider                                          | The shared state. Every device's copy is a full replica, so local-first is automatic.                                                                        |
+| Local Folder   | A folder, resides in local Android/Windows environment. | Full local replica of Sync Folder.                                                                                                                           |
+| IndexedDB      | Browser                                                 | A pointer to the Local Folder that survive restart. The browser holds the right to use the folder. It's needed to not reprompting folder-picker every start. |
+| `localStorage` | Browser                                                 | The device's identity: `deviceId` and `label`.                                                                                                               |
+
+An offline edit is just a written file in Local Folder. The cloud client uploads it to Sync Folder when it can.
+The application never communicate directly with Sync Folder.
+
+### 4.6 Absent by design
+
+| Not here | Consequence |
+| --- | --- |
+| Application server, API, account, network code | Nothing to deploy and nothing to log into. The provider's client is the only thing on the network |
+| Database engine | The folder is the database, and every device holds a full replica ([§4.5 Storage](#45-storage)) |
+| Locking, conditional write, transactions | Unneeded: one writer per file, so no write ever contends with another |
+| Leader, quorum, membership, registration | A device joins by writing a file, and any device can settle any conflict ([§5.3 Race conditions](#53-race-conditions)) |
+| Change notification | A synced folder cannot say that something arrived, so the app polls every 3 s and on window focus |
+| Background sync | The phone syncs while the app is open. Accepted cost of a WebView shell with no service of its own |
+
+## 5. Synchronisation logic
 
 There are two parts to synchronize:
 
@@ -296,7 +422,7 @@ There is **no**:
 - count of the total existing snapshots or devices
 - leader, quorum, membership, vote
 
-It is the same code, and any device may resolve a given conflict ([§6 Race conditions](#6-race-conditions)). If there are `n` amount of devices with `n` race conditions happening.
+It is the same code, and any device may resolve a given conflict ([§5.3 Race conditions](#53-race-conditions)). If there are `n` amount of devices with `n` race conditions happening.
 It stills means, that `1` edit will produces a dominating `sClock`, the new maximal set solves the race condition in all devices.
 
 ##### Sync when a third device joins
@@ -343,7 +469,7 @@ Here the tablet resolves, keeping content from both the laptop and the phone.
 | Laptop and phone sync and fast-forward | **`"Buy oat milk, eggs, bread and jam"`**<br><code>{1111aaaa: 18, 2222bbbb: <b>5</b>, 3333cccc: <b>2</b>}</code><br>by **`3333cccc`** at **`10:15Z`** | **`"Buy oat milk, eggs, bread and jam"`**<br><code>{1111aaaa: <b>18</b>, 2222bbbb: 5, 3333cccc: <b>2</b>}</code><br>by **`3333cccc`** at **`10:15Z`** | `"Buy oat milk, eggs, bread and jam"`<br>`{1111aaaa: 18, 2222bbbb: 5, 3333cccc: 2}`<br>by `3333cccc` at `10:15Z`                                             | all equal        |
 
 
-## 6. Race conditions
+### 5.3 Race conditions
 
 1. **File and folder in Sync Folder.** There can be no race condition when writing a file into the Sync Folder, because
    a device only ever writes its own. A snapshot the cloud provider's client is still syncing fails to parse and is
@@ -360,62 +486,42 @@ Resolving conflict create a maximal set, so every devices can fast-forward to.
 
 A resolution is itself an edit, so two devices resolving the same conflict independently are just two more concurrent edits
 
-## 7. Build pipeline
+## 6. Stale state
 
-One command builds both bundles:
+A browser remembers what was in a text field and puts it back when the tab is reopened — and it fires `input` while
+doing it. The page used to treat that as an edit, so reopening a tab republished last session's text under a counter one
+higher than anything in the folder. That is a valid maximal set carrying old text, and every device fast-forwards to it
+([§5.2.4 Maximal set](#524-maximal-set)).
 
-```bash
-make proto_all
-```
+Measured against a real folder and the helper, with the peer's newer text already adopted:
 
-Or step by step:
+| Moment | Text in our file | Our `sClock` |
+| --- | --- | --- |
+| Phone's edit adopted, both devices agree | `NEW PEER TEXT` | `{1111aaaa: 1, 2222bbbb: 1}` |
+| Tab reopened, browser restores the box | `OLD LOCAL TEXT` | `{1111aaaa: 2, 2222bbbb: 1}` |
 
-```bash
-make proto_exe_win FOLDER='C:\Users\Nam\Dropbox\checklist'
-make proto_android
-make proto_clean
-```
+Nothing in [§5.2 Application content synchronisation](#52-application-content-synchronisation) is wrong here. The
+vectors say what they always said: this device made an edit, later, having seen the peer's. The write itself was the
+lie, and no merge rule can find that out afterwards — a device cannot tell a text it meant from a text the browser
+typed for it. So the fix belongs at the point of the write, not in the merge:
 
-### 7.1 Windows bundle
+1. **Opt out of restoration.** `autocomplete="off"` on the box. Its value is application state, not something the user
+   is re-entering.
+2. **An `input` event on a box that is not focused is not an edit.** Typing always has focus; restoration never does.
+   The event is discarded and the box is re-rendered from our own state, so the display cannot drift either.
+3. **A value equal to the one already stored is not an edit.** Writing it would bump the vector and make every peer
+   fast-forward to a text it already has.
 
-The Windows target downloads an official embeddable Python and stages it
-on the Windows side. It needs **no** installer, pip, or admin rights.
+Rule 1 is the prevention and rules 2 and 3 are the backstop, because rule 1 is a request to the browser rather than a
+guarantee. Step 6 of `test/ui.mjs` asserts all three: it blurs the box, sets a value, fires `input`, then expects the
+vector not to have moved and the folder's text to come back.
 
-No `.exe` is produced: a shortcut to Microsoft's own signed `pythonw.exe` raises no SmartScreen warning.
-The prototype is not copied to the Windows side either. The bundle points at `serve.py` (over `\\wsl.localhost` under WSL).
+The same trap is waiting for the real app, where a title commits on blur, on a timer, or on every keystroke depending on
+the pane, and no field opts out of restoration yet.
 
-### 7.2 APK
+## 7. Development
 
-The Android APK build process happens inside a Docker container.
-
-## 8. Storage
-
-| What           | Where                                                   | Holds                                                                                                                                                        |
-| -------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Sync Folder    | Cloud provider                                          | The shared state. Every device's copy is a full replica, so local-first is automatic.                                                                        |
-| Local Folder   | A folder, resides in local Android/Windows environment. | Full local replica of Sync Folder.                                                                                                                           |
-| IndexedDB      | Browser                                                 | A pointer to the Local Folder that survive restart. The browser holds the right to use the folder. It's needed to not reprompting folder-picker every start. |
-| `localStorage` | Browser                                                 | The device's identity: `deviceId` and `label`.                                                                                                               |
-
-An offline edit is just a written file in Local Folder. The cloud client uploads it to Sync Folder when it can.
-The application never communicate directly with Sync Folder.
-
-## 9. Browser interaction
-
-This is the real constraint the prototype turned up, because Mozilla objected to the File System Access API.
-Hence the two ways for setting the Sync Folder in Laptop.
-
-| Browser in PC         | `showDirectoryPicker` | How it reaches the folder                    |
-| --------------------- | --------------------- | -------------------------------------------- |
-| Chrome / Edge desktop | Yes                   | Folder picker in browser or the local helper |
-| **Firefox**           | **No**                | The local helper (`--folder`)                |
-
-For the Anroid, the user needs to use folder picker after the first install or update.
-
-
-## 10. Development
-
-### 10.1 Where the code lives
+### 7.1 Where the code lives
 
 ```
 prototype/
@@ -450,10 +556,22 @@ prototype/
 **Folder adapter**: `core/folder-sync.mjs` receives an object with `list()`, `read(name)`, `write(name, content)` and
 nothing else. Those three methods are its only route to a Local Folder.
 
-### 10.2 Test
+### 7.2 Test
 
 Each file in `test/` asserts one part of the prototype's logic.
 No test runner and nothing mocked in `core/`: what runs is the code that ships. A stand-in appears only where the real collaborator cannot run on this machine.
+
+Run them:
+
+```bash
+npm run proto:test       # merge rules, no browser — start here
+npm run proto:bridge     # the helper path, its own helper on a temp folder
+npm run proto:ui         # the page in Chromium; needs `npm run proto` already serving
+npm run proto:android    # the Android startup path, Java bridge stubbed
+```
+
+Each script runs every check, prints `ok`/`FAIL` for each, and exits non-zero if any failed — so one failure still
+shows you the rest, and the four chain with `&&`.
 
 | Test                 | Run                     | What it test                                                                                                                                                                                                                                                                                                          |
 | -------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -471,7 +589,7 @@ Test in `e2e/`
 (`npm run proto`); `BASE` and `SHOTS` override the URL and where the screenshots land.
 
 
-### 10.3 Code standards
+### 7.3 Code standards
 
 #### Path Handling
 - Use relative paths
