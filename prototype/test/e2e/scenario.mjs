@@ -1,6 +1,6 @@
 // Two devices, separate internet connections, one shared cloud folder.
 //
-//   node prototype/test/scenario.mjs
+//   node prototype/test/e2e/scenario.mjs
 //
 // Nothing here talks to a network, and the two devices never address each
 // other. Each has its OWN local folder, exactly as it would on disk. A
@@ -19,9 +19,9 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createDevice } from "../core/folder-sync.mjs";
-import { nodeFolder } from "../adapters/node-folder.mjs";
-import { deviceIdFrom, fileNameFor } from "../core/device.mjs";
+import { createDevice } from "../../core/folder-sync.mjs";
+import { nodeFolder } from "../../adapters/node-folder.mjs";
+import { deviceIdFrom, fileNameFor } from "../../core/device.mjs";
 
 let failures = 0;
 const ok = (name) => console.log(`  ok   ${name}`);

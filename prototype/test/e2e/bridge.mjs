@@ -2,7 +2,7 @@
 // the local helper using nothing but fetch(). That is what makes Firefox and
 // Safari work, so this test deliberately touches no Chromium-only API.
 //
-//   NODE_PATH=/home/nam/.npm/_npx/e41f203b7505f1fb/node_modules node prototype/test/bridge.mjs
+//   NODE_PATH=/home/nam/.npm/_npx/e41f203b7505f1fb/node_modules node prototype/test/e2e/bridge.mjs
 //
 // It starts its own helper on a spare port over a temp folder, then drives two
 // browser contexts against it — plus a Node CLI device in the same folder, to
@@ -52,7 +52,7 @@ const TABLET = "33333333";
 const helper = spawn(
   "python3",
   [
-    join(HERE, "..", "install", "serve.py"),
+    join(HERE, "..", "..", "install", "serve.py"),
     "--folder",
     folder,
     "--port",
@@ -138,7 +138,7 @@ console.log("\n4. a device on a different adapter converges too");
 await new Promise((resolve, reject) => {
   const cli = spawn(
     process.execPath,
-    [join(HERE, "..", "install", "cli.mjs"), folder, TABLET, "Buy oat milk", "--label", "tablet"],
+    [join(HERE, "..", "..", "install", "cli.mjs"), folder, TABLET, "Buy oat milk", "--label", "tablet"],
     { stdio: "pipe" },
   );
   cli.on("exit", (code) =>
@@ -307,7 +307,7 @@ const second = await new Promise((resolve) => {
   const proc = spawn(
     "python3",
     [
-      join(HERE, "..", "install", "serve.py"),
+      join(HERE, "..", "..", "install", "serve.py"),
       "--folder",
       folder,
       "--port",

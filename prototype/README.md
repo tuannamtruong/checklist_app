@@ -191,7 +191,55 @@ Every snapshot in the Sync Folder is handled at once. In each sync cycle a devic
 | several, all the same text | Adopt it; the sClock is the join of all of them                               |
 | several, different texts   | Race condition between exactly those snapshots, raise conflict inside the app |
 
-#### 2.5. Sync between two devices
+#### 2.5. The sync cycle
+
+Every 3 s and on window focus, a full sync cycle starts:
+
+- `list()` the folder,
+- `read()` every file,
+- `applyPeers()` the read files against its own snapshot (`core/device.mjs`, which reconciles in `core/merge.mjs`),
+- write its own file back, but only if the merge changed something.
+
+#### 2.6. Flowchart for normal sync between two devices
+
+One edit on the laptop reaching the phone, with no race condition. Similar to the table in
+[§2.7 Sync between two devices](#27-sync-between-two-devices)
+
+There is no message exchange. The app only interacts with its Local Folder.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as User
+    participant L as Laptop app<br/>1111aaaa
+    participant LF as Laptop<br/>Local Folder
+    participant SF as Sync Folder<br/>cloud provider
+    participant PF as Phone<br/>Local Folder
+    participant P as Phone app<br/>2222bbbb
+
+    U->>L: types "Buy milk"
+    Note over L: localEdit — bump own counter<br/>{1111aaaa: 15, 2222bbbb: 2}
+    L->>LF: write checklist.1111aaaa.json
+    LF-->>SF: provider client uploads
+    SF-->>PF: provider client downloads
+
+    Note over P: sync cycle, every 3 s
+    P->>PF: list()
+    PF-->>P: both snapshot names
+    P->>PF: read(checklist.1111aaaa.json)
+    PF-->>P: laptop's snapshot
+    Note over P: reconcile — laptop's vector dominates,<br/>one text survives: adopt it
+    P->>PF: write checklist.2222bbbb.json<br/>text "Buy milk", author 1111aaaa
+    Note over P: UI shows "Buy milk"
+    PF-->>SF: provider client uploads
+    SF-->>LF: provider client downloads
+
+    Note over L: next sync cycle
+    L->>LF: list() + read(checklist.2222bbbb.json)
+    Note over L: vectors equal, same text —<br/>nothing changed, no write
+```
+
+#### 2.7. Sync between two devices
 
 `test/scenario.mjs` demonstrates every relation between two devices. The next table walks the same sequence, with the
 same numbers the test asserts.
@@ -238,7 +286,7 @@ at the end in all cases, because the arithmetic is identical.
 | Laptop reconnects and resolves | **`"Buy oat milk, eggs and bread"`**<br><code>{1111aaaa: <b>17</b>, 2222bbbb: <b>4</b>}</code><br>by `1111aaaa` at **`10:05Z`** | `"Buy oat milk"`<br>`{1111aaaa: 15, 2222bbbb: 4}`<br>by `2222bbbb` at `10:04Z`                                               | laptop ahead |
 | Phone syncs and fast-forwards  | `"Buy oat milk, eggs and bread"`<br>`{1111aaaa: 17, 2222bbbb: 4}`<br>by `1111aaaa` at `10:05Z`                                  | **`"Buy oat milk, eggs and bread"`**<br><code>{1111aaaa: <b>17</b>, 2222bbbb: 4}</code><br>by **`1111aaaa`** at **`10:05Z`** | equal        |
 
-#### 2.6. Sync with more than 2 devices
+#### 2.8. Sync with more than 2 devices
 
 There is **no**:
 
@@ -292,16 +340,6 @@ Here the tablet resolves, keeping content from both the laptop and the phone.
 | Tablet resolves                        | `"Buy milk, eggs, bread, jam and coffee"`<br>`{1111aaaa: 18, 2222bbbb: 4, 3333cccc: 1}`<br>by `1111aaaa` at `10:13Z`                                  | `"Buy oat milk"`<br>`{1111aaaa: 17, 2222bbbb: 5}`<br>by `2222bbbb` at `10:12Z`                                                                        | **`"Buy oat milk, eggs, bread and jam"`**<br><code>{1111aaaa: <b>18</b>, 2222bbbb: <b>5</b>, 3333cccc: <b>2</b>}</code><br>by **`3333cccc`** at **`10:15Z`** | tablet ahead all |
 | Laptop and phone sync and fast-forward | **`"Buy oat milk, eggs, bread and jam"`**<br><code>{1111aaaa: 18, 2222bbbb: <b>5</b>, 3333cccc: <b>2</b>}</code><br>by **`3333cccc`** at **`10:15Z`** | **`"Buy oat milk, eggs, bread and jam"`**<br><code>{1111aaaa: <b>18</b>, 2222bbbb: 5, 3333cccc: <b>2</b>}</code><br>by **`3333cccc`** at **`10:15Z`** | `"Buy oat milk, eggs, bread and jam"`<br>`{1111aaaa: 18, 2222bbbb: 5, 3333cccc: 2}`<br>by `3333cccc` at `10:15Z`                                             | all equal        |
 
-### 3. The sync cycle
-
-`core/folder-sync.mjs` is generic over the folder it is handed.
-
-Every 3 s and on window focus, a full sync cycle starts:
-
-- `list()` the folder,
-- `read()` every file, skipping its own,
-- `applyPeers()` them against its own snapshot (`core/device.mjs`, which reconciles in `core/merge.mjs`),
-- write its own file back, but only if the merge changed something.
 
 ### 4. Race conditions
 
@@ -388,7 +426,7 @@ prototype/
 │   ├── fsaa-folder.mjs         Browser directory handle
 │   ├── http-folder.mjs         Loopback helper
 │   ├── android-folder.mjs      SAF grant, via WebView bridge
-│   └── memory-folder.mjs       Nothing — UI test mode
+│   └── memory-folder.mjs       Used for UI test mode
 ├── install/
 │   ├── serve.py                Stdlib-only loopback helper
 │   ├── cli.mjs                 Same core driven from a terminal
