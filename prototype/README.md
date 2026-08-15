@@ -197,8 +197,16 @@ For the Anroid, the user needs to use folder picker after the first install or u
 
 ### 4.4 What the page shows
 
-Normal state: <Ref to picture..>
+The page shows: the application context i.e the single text box, this device's own state, every snapshot read in
+the last cycle, and log.
 
+**Normal state**
+
+![The page in its normal state](UI-images/normal_state.png)
+
+**Merge conflict state**
+
+![The page with a merge conflict](UI-images/merge_conflict_state.png)
 
 ### 4.5 Storage
 
@@ -486,38 +494,20 @@ Resolving conflict create a maximal set, so every devices can fast-forward to.
 
 A resolution is itself an edit, so two devices resolving the same conflict independently are just two more concurrent edits
 
-## 6. Stale state
+## 6. Known issues
 
-A browser remembers what was in a text field and puts it back when the tab is reopened — and it fires `input` while
-doing it. The page used to treat that as an edit, so reopening a tab republished last session's text under a counter one
-higher than anything in the folder. That is a valid maximal set carrying old text, and every device fast-forwards to it
-([§5.2.4 Maximal set](#524-maximal-set)).
+### 6.1 Stale state
 
-Measured against a real folder and the helper, with the peer's newer text already adopted:
+Problem:
+A browser remembers what was in a text field and puts it back when the tab is reopened. The text is registered as new text.
+The page treats that as an edit, therefore a new version vector with staled content is made.
+Consequently, every device fast-forwards to this staled text.
 
-| Moment | Text in our file | Our `sClock` |
-| --- | --- | --- |
-| Phone's edit adopted, both devices agree | `NEW PEER TEXT` | `{1111aaaa: 1, 2222bbbb: 1}` |
-| Tab reopened, browser restores the box | `OLD LOCAL TEXT` | `{1111aaaa: 2, 2222bbbb: 1}` |
-
-Nothing in [§5.2 Application content synchronisation](#52-application-content-synchronisation) is wrong here. The
-vectors say what they always said: this device made an edit, later, having seen the peer's. The write itself was the
-lie, and no merge rule can find that out afterwards — a device cannot tell a text it meant from a text the browser
-typed for it. So the fix belongs at the point of the write, not in the merge:
-
-1. **Opt out of restoration.** `autocomplete="off"` on the box. Its value is application state, not something the user
-   is re-entering.
-2. **An `input` event on a box that is not focused is not an edit.** Typing always has focus; restoration never does.
-   The event is discarded and the box is re-rendered from our own state, so the display cannot drift either.
-3. **A value equal to the one already stored is not an edit.** Writing it would bump the vector and make every peer
-   fast-forward to a text it already has.
-
-Rule 1 is the prevention and rules 2 and 3 are the backstop, because rule 1 is a request to the browser rather than a
-guarantee. Step 6 of `test/ui.mjs` asserts all three: it blurs the box, sets a value, fires `input`, then expects the
-vector not to have moved and the folder's text to come back.
-
-The same trap is waiting for the real app, where a title commits on blur, on a timer, or on every keystroke depending on
-the pane, and no field opts out of restoration yet.
+Solution:
+1. Opt out of restoration. `autocomplete="off"` on the box. The content should comes from the application.
+2. Typing always has focus; restoration never does. If an `input` event happened but no focus on the box, it won't count 
+as an edit. The event is discarded and the box is re-rendered from application content, so the display cannot drift either.
+3. A value equal to the one already stored is not an edit. 
 
 ## 7. Development
 
