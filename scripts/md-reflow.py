@@ -29,6 +29,13 @@ LIST = re.compile(r"^(\s*)([-*+]|\d+[.)])(\s+)(.*)$")
 # Two trailing spaces or a backslash is an explicit line break the author asked
 # for. It ends the unit being wrapped rather than being folded away.
 HARD_BREAK = re.compile(r"(  |\\)$")
+LINK = re.compile(r"\[[^\]]*\]\([^)]*\)")
+
+# Stand-in characters for a link while it is being wrapped. Neither can appear
+# in Markdown source, and neither is whitespace, so the wrapper sees one word.
+SENTINEL = "\x00"
+FILLER = "\x01"
+PLACEHOLDER = re.compile(f"{SENTINEL}(\\d+){SENTINEL}{FILLER}*")
 
 
 def is_verbatim(line):
@@ -44,8 +51,35 @@ def is_verbatim(line):
     )
 
 
+def protect_links(text):
+    """Swap each link for an equal-length stand-in that holds no spaces.
+
+    The wrapper breaks on whitespace, and `[§2 What it settled](#anchor)` is
+    five whitespace-separated words, so an unprotected link can wrap in the
+    middle of itself. The page still renders, but the link is no longer on one
+    line, and anything reading line by line stops seeing a link at all —
+    check_doc.py then reports the `§2` in the label as a bare cross-reference.
+
+    The stand-in is padded to the length of what it replaces, because the
+    wrapper measures it: a short one would leave the restored line over width.
+    A link with no space in it is already one word and is left alone.
+    """
+    links = []
+
+    def swap(match):
+        link = match.group(0)
+        if " " not in link:
+            return link
+        token = f"{SENTINEL}{len(links)}{SENTINEL}"
+        links.append(link)
+        return token + FILLER * max(0, len(link) - len(token))
+
+    return LINK.sub(swap, text), links
+
+
 def wrap(text, width, indent, hanging):
-    return textwrap.wrap(
+    text, links = protect_links(text)
+    lines = textwrap.wrap(
         text,
         width=width,
         initial_indent=indent,
@@ -53,6 +87,7 @@ def wrap(text, width, indent, hanging):
         break_long_words=False,  # never split a URL or a long identifier
         break_on_hyphens=False,  # `write-then-rename` stays one word
     ) or [indent.rstrip()]
+    return [PLACEHOLDER.sub(lambda m: links[int(m.group(1))], line) for line in lines]
 
 
 def reflow(src, width=120):
