@@ -2,12 +2,16 @@
 
 Requirement docs and its current state.
 
-**Nothing is implemented.** The repository holds `prototype/` and `docs/`, and no production source tree. Rows marked
-`pt.` are proven by running code in `prototype/`, which does not share code with production and is not on the way to it
-— the design crosses over, the source does not.
+**Milestone M1 is built** — the production tree is `src/`, and every ✅ row below names the file that implements it. Rows
+marked `pt.` are proven by running code in `prototype/`, which does not share code with production and is not on the way
+to it — the design crosses over, the source does not.
 
-Once production code exists, every row carries the file that implements it and the test that pins it down, and this line
-is replaced by the command that verifies them.
+Two commands verify the ✅ rows:
+
+```bash
+npm test          # the logic layer, in Node
+npm run ui-smoke  # the built app in Chromium: the keyboard model, a reload, a cold start offline
+```
 
 Legend:
 
@@ -16,7 +20,7 @@ Legend:
 | ✅ | done |
 | ◐ | partial |
 | ✗ | not built |
-| pt. | proven in `prototype/`|
+| pt. | proven in `prototype/` |
 
 Sections marked _Not written yet._ are placeholders: the heading records that the topic is owed, and the content is
 still to be decided.
@@ -27,10 +31,10 @@ still to be decided.
 
 | # | Stated requirement | State | Note |
 | --- | --- | --- | --- |
-| 1 | Folder structure: a tree | ✗ | |
+| 1 | Folder structure: a tree | ✅ | `src/core/tree.ts`, `src/ui/TreeView.svelte` |
 | 2 | Sync between PCs and phones via a cloud file service | pt. | Transport proven for one text field; the tree payload is an append-only op log per device — [sync-flow.md §4.6 The decision](sync-flow.md#46-the-decision) |
-| 3 | Lists and sub-lists | ✗ | Nesting is the tree; indent/outdent, drag-free reorder |
-| 4 | Either a checklist or a text note | ✗ | |
+| 3 | Lists and sub-lists | ✅ | Nesting is the tree; indent/outdent, drag-free reorder — `src/core/edit.ts` |
+| 4 | Either a checklist or a text note | ✅ | `src/ui/NodePage.svelte`, `src/ui/NoteBody.svelte` |
 
 ## 2. Data model
 
@@ -44,6 +48,7 @@ and never replays per read — [sync-flow.md §4.6 The decision](sync-flow.md#46
 | `id` | string | Minted by the creating device, never reused |
 | `parent` | node id or `root` | Always read through the cycle-repair resolver, never directly — T-6 |
 | `parentSetAt` | timestamp | When the move was written. The repair reads it; nothing reads the local clock |
+| `parentSetBy` | device id | The device that wrote the move, and the repair's tiebreak when two `parentSetAt` collide — [sync-flow.md §6.2 The repair](sync-flow.md#62-the-repair) |
 | `kind` | one of `folder`, `list`, `note`, `task` | K-1. Mutable after the fact — K-5 |
 | `title` | string | The row label, every kind |
 | `done` | boolean | Tasks only — K-2 |
@@ -83,51 +88,68 @@ would not want to converge across devices belongs here rather than in the tree.
 
 | ID | Requirement | State | Where / test |
 | --- | --- | --- | --- |
-| T-1 | Unlimited nesting of lists inside lists inside folders | ✗ | |
-| T-2 | Children render in a stable order every device agrees on | ✗ | [sync-flow.md §5 Sibling ordering](sync-flow.md#5-sibling-ordering) |
-| T-3 | Indent (become child of sibling above) / outdent (become parent's next sibling) | ✗ | |
-| T-4 | Move up/down among siblings | ✗ | |
-| T-5 | A move that would create a loop is refused | ✗ | Local check only — it catches one device dragging a folder into its own child, never the merge case, which is T-6: [sync-flow.md §6.1 T-5 is not the loop defence](sync-flow.md#61-t-5-is-not-the-loop-defence) |
-| T-6 | A Cyclic tree state (concurrent A→B, B→A) is repaired at _read_ time by re-rooting, never by writing | ✗ | Drop the cycle edge with the oldest `(parentSetAt, device id)` — [sync-flow.md §6.2 The repair](sync-flow.md#62-the-repair) |
-| T-7 | Deleting a node tombstones its whole subtree, not just the node | ✗ | The ancestor walk must climb the T-6-resolved parent, or a tombstoned subtree containing a cycle hangs — [sync-flow.md §6.2 The repair](sync-flow.md#62-the-repair) |
-| T-8 | Collapse/expand state is per-device and never synced | ✗ | |
-| T-9 | Breadcrumbs show the path back up from any node | ✗ | |
-| T-10 | Sidebar shows only containers (folder/list/note); tasks would drown it | ✗ | |
+| T-1 | Unlimited nesting of lists inside lists inside folders | ✅ | `src/core/tree.ts`; `tree.test.ts` |
+| T-2 | Children render in a stable order every device agrees on | ✅ | `src/core/order.ts`, sorted on `(order, orderBy, id)` — [sync-flow.md §5 Sibling ordering](sync-flow.md#5-sibling-ordering); `order.test.ts` |
+| T-3 | Indent (become child of sibling above) / outdent (become parent's next sibling) | ✅ | `src/core/edit.ts` `indent`/`outdent`; `edit.test.ts`, `scripts/ui-smoke.mjs` |
+| T-4 | Move up/down among siblings | ✅ | `src/core/edit.ts` `moveUp`/`moveDown`; `edit.test.ts` |
+| T-5 | A move that would create a loop is refused | ◐ | `src/core/edit.ts` `canMoveTo`; `edit.test.ts`. M1 has no drag and no move-to picker, so no UI path can attempt one yet. Local check only — it catches one device dragging a folder into its own child, never the merge case, which is T-6: [sync-flow.md §6.1 T-5 is not the loop defence](sync-flow.md#61-t-5-is-not-the-loop-defence) |
+| T-6 | A Cyclic tree state (concurrent A→B, B→A) is repaired at _read_ time by re-rooting, never by writing | ✅ | Drop the cycle edge with the oldest `(parentSetAt, device id)` — [sync-flow.md §6.2 The repair](sync-flow.md#62-the-repair) — `src/core/tree.ts` `resolveTree`; `tree.test.ts`. Cannot arise on one device — the tests are the proof until M2 |
+| T-7 | Deleting a node tombstones its whole subtree, not just the node | ✅ | The ancestor walk must climb the T-6-resolved parent, or a tombstoned subtree containing a cycle hangs — [sync-flow.md §6.2 The repair](sync-flow.md#62-the-repair) — `src/core/tree.ts`; `tree.test.ts` covers the tombstoned subtree that contains a cycle |
+| T-8 | Collapse/expand state is per-device and never synced | ✅ | `src/app/view-state.svelte.ts` — `localStorage`, never a file |
+| T-9 | Breadcrumbs show the path back up from any node | ✅ | `src/ui/Breadcrumbs.svelte`, over `ancestorsOf` |
+| T-10 | Sidebar shows only containers (folder/list/note); tasks would drown it | ✅ | `src/ui/SidebarBranch.svelte` |
 
 [sync-flow.md §3 Why a snapshot does not scale to a tree](sync-flow.md#3-why-a-snapshot-does-not-scale-to-a-tree) is why
 T-2, T-5, T-6 and T-7 constrain the sync payload, not just the UI.
 
 ### 3.1 Keyboard (desktop)
 
+All of it is in `src/ui/keyboard.ts`, which resolves every key to an action from `src/ui/actions.ts` — the list the row
+menu renders.
+
 | Key | Behaviour | Where |
 | --- | --- | --- |
-| `Enter` | New sibling below — or a **first child** if the row is an expanded parent | |
-| `Tab` / `Shift-Tab` | Indent / outdent | |
-| `Alt-↑` / `Alt-↓` | Move among siblings | |
-| `↑` / `↓` | Move the caret between rows | |
-| `Backspace` on an empty row | Delete it — **refused if it has children** | |
-| `Escape` | Discard the in-progress title edit | |
+| `Enter` | New sibling below — or a **first child** if the row is an expanded parent | ✅ `new-below` / `new-inside` |
+| `Tab` / `Shift-Tab` | Indent / outdent | ✅ `indent` / `outdent` |
+| `Alt-↑` / `Alt-↓` | Move among siblings | ✅ `move-up` / `move-down` |
+| `↑` / `↓` | Move the caret between rows | ✅ over the flattened visible rows, `src/ui/rows.ts` |
+| `Backspace` on an empty row | Delete it — **refused if it has children** | ✅ `canBackspaceDelete`, against the typed title |
+| `Escape` | Discard the in-progress title edit | ✅ the row's draft, never a written op |
 
 Every one of these also has to exist in the row `⋮` menu, which is where a phone reaches them, and that menu is where
-the keyboard list is shown to the user.
+the keyboard list is shown to the user. `src/ui/actions.test.ts` fails if a key ever binds something the menu does not
+show, and `scripts/ui-smoke.mjs` checks the same thing against the rendered menu.
 
 ## 4. Item kinds
 
 | ID | Requirement | State | Where |
 | --- | --- | --- | --- |
-| K-1 | A row is one of four kinds: `folder`, `list`, `note` or `task` | ✗ | Only a task is checkable; the other three are the containers T-10 shows in the sidebar. Kind drives rendering, never structure — any kind may own children |
-| K-2 | Tasks render a checkbox; folders/lists/notes render a kind icon | ✗ | |
-| K-3 | A note has a long free-text body with its own full-page editor | ✗ | |
-| K-4 | A note can still own checklist children (heading + items pattern) | ✗ | |
-| K-5 | Any row can be converted to any kind after the fact ("Turn into") | ✗ | Two devices converting one row differently resolve by `(at, device id)`, with a notice — [§9 Conflict presentation](#9-conflict-presentation) |
-| K-6 | A note can be promoted to a checklist from its own page | ✗ | |
-| K-7 | Note body saves are debounced (500 ms) so typing is not one op per keystroke | ✗ | The 500 ms debounce governs the store; an **op** is emitted on blur, on navigating away, or after 60 s of continuous editing — S-20 |
+| K-1 | A row is one of four kinds: `folder`, `list`, `note` or `task` | ✅ | `src/core/types.ts`. Only a task is checkable; the other three are the containers T-10 shows in the sidebar. Kind drives rendering, never structure — any kind may own children |
+| K-2 | Tasks render a checkbox; folders/lists/notes render a kind icon | ✅ | `src/ui/Row.svelte`, `src/ui/KindIcon.svelte` |
+| K-3 | A note has a long free-text body with its own full-page editor | ✅ | `src/ui/NodePage.svelte`, `src/ui/NoteBody.svelte` |
+| K-4 | A note can still own checklist children (heading + items pattern) | ✅ | The note's page renders its body and its children; `edit.test.ts` |
+| K-5 | Any row can be converted to any kind after the fact ("Turn into") | ✅ | `turnInto` in `src/core/edit.ts`, in the row menu. Two devices converting one row differently resolve by `(at, device id)`, with a notice — [§9 Conflict presentation](#9-conflict-presentation) |
+| K-6 | A note can be promoted to a checklist from its own page | ✅ | `src/ui/NodePage.svelte`; the body is kept, so it is reversible |
+| K-7 | Note body saves are debounced (500 ms) so typing is not one op per keystroke | ✅ | `src/ui/NoteBody.svelte`. The 500 ms debounce governs the store; an **op** is emitted on blur, on navigating away, or after 60 s of continuous editing — S-20 |
 
 Notes are deliberately not checkable.
 
 ## 5. Navigation and routing
 
-_Not written yet._
+Hash routing, per X-7, so the fragment never reaches a server and the app deploys to a static host, to the loopback
+helper and to the Android WebView unchanged. `src/app/router.svelte.ts` holds the whole of it.
+
+| Route | Renders | Where |
+| --- | --- | --- |
+| `#/` | The root: every top-level row | `src/ui/NodePage.svelte` with no node |
+| `#/n/<node-id>` | One node's page — its path, its title, its body if it is a note, and its children | `src/ui/NodePage.svelte` |
+| anything else | The recovery page, per X-11 | `src/ui/RecoveryPage.svelte` |
+
+A node id that no longer resolves is not an error state: `#/n/<id>` of a deleted or unknown node renders the recovery
+page, which tells deletion from absence because T-7 keeps the two distinguishable.
+
+Two navigations exist besides the routes: the sidebar (T-10, containers only) and breadcrumbs (T-9). Both climb the
+T-6-resolved parent, never the stored one.
 
 ## 6. Search
 
@@ -167,7 +189,8 @@ The transport is proven and the payload is chosen — an append-only op log per 
 | S-16 | Retiring a device, so a dead replica stops contributing a counter | ✗ | Cosmetic, not correctness: a dead device is dominated and drops out of the maximal set as an ancestor. Advisory `lastSeen` only — [§8 Device management](#8-device-management) |
 | S-18 | Adapter conformance suite covering all five adapters | ✗ | [test.md §3.3 Adapter conformance](test.md#33-adapter-conformance) |
 | S-19 | The sync cycle runs on activity: the write path *is* the cycle, decaying to window focus and a manual refresh when idle | ✗ | Cadence is device-local and never synced — [sync-flow.md §4.6 The decision](sync-flow.md#46-the-decision) |
-| S-20 | A note body is emitted as an op on blur, on navigating away, or after 60 s of continuous editing | ✗ | Not on K-7's 500 ms store debounce. Whole-body ops are the dominant growth term, so the emission trigger is what bounds the log |
+| S-20 | A note body is emitted as an op on blur, on navigating away, or after 60 s of continuous editing | ✅ | `src/ui/NoteBody.svelte` and `Session.commitBody`; navigating away is `src/ui/App.svelte`. Not on K-7's 500 ms store debounce. Whole-body ops are the dominant growth term, so the emission trigger is what bounds the log |
+| S-21 | M1 persists this device's own op log through a folder adapter backed by `localStorage` | ✅ | `src/adapters/local-folder.ts`. M1 has one device and no Sync Folder, but the payload is already decided, so M1 writes the real `checklist.<device-id>.ops.jsonl` and reloads by folding it. M2 swaps the adapter, not the write path — [architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter) |
 
 ### 7.3 Fixed constraints
 
@@ -222,16 +245,16 @@ C-2 and C-3 need no resolution path — the user drags the node back, and that c
 
 | ID | Requirement | State | Where |
 | --- | --- | --- | --- |
-| X-1 | One codebase and one layout for desktop and phone | ✗ | |
-| X-2 | Sidebar permanent from `md` up, dismissible drawer below | ✗ | |
-| X-3 | Installable to a phone home screen and a desktop taskbar | ✗ | |
-| X-4 | Maskable Android icon, padded so the mask cannot clip it | ✗ | |
-| X-5 | Full cold-start offline — everything precached, no API calls | ✗ | |
-| X-6 | New builds take effect on next launch without an update prompt | ✗ | |
-| X-7 | Hash routing, so it deploys to any static host with no rewrite rules | ✗ | |
-| X-8 | Deep links survive a cold launch from a home-screen icon | ✗ | |
-| X-10 | UI repaints automatically on any data change, including a merged remote one | ✗ | |
-| X-11 | Deleted/missing node renders a recovery page rather than a crash | ✗ | |
+| X-1 | One codebase and one layout for desktop and phone | ✅ | `src/ui/Shell.svelte` — one markup, breakpoints only |
+| X-2 | Sidebar permanent from `md` up, dismissible drawer below | ✅ | `src/ui/Shell.svelte`; `scripts/ui-smoke.mjs` drives both widths |
+| X-3 | Installable to a phone home screen and a desktop taskbar | ◐ | Manifest and service worker ship (`vite.config.ts`). The install itself is a device check — [test.md §3.6 Platform](test.md#36-platform) |
+| X-4 | Maskable Android icon, padded so the mask cannot clip it | ◐ | `public/icons/icon-maskable.svg`, rendered by `scripts/make-icons.mjs` to the 80% safe zone. Uncropped on a real launcher is a device check — [test.md §3.6 Platform](test.md#36-platform) |
+| X-5 | Full cold-start offline — everything precached, no API calls | ✅ | Workbox precache; `scripts/ui-smoke.mjs` reloads with the network off |
+| X-6 | New builds take effect on next launch without an update prompt | ✅ | `registerType: 'prompt'` with no prompt: the waiting worker activates when the last tab closes |
+| X-7 | Hash routing, so it deploys to any static host with no rewrite rules | ✅ | `src/app/router.svelte.ts`, and a relative `base` |
+| X-8 | Deep links survive a cold launch from a home-screen icon | ✅ | The fragment never reaches the network; a reload on `#/n/<id>` is checked in `scripts/ui-smoke.mjs`. The home-screen launch itself is [test.md §3.6 Platform](test.md#36-platform) |
+| X-10 | UI repaints automatically on any data change, including a merged remote one | ✅ | The store publishes; rows hold a draft so a repaint cannot eat the caret — `src/ui/Row.svelte` |
+| X-11 | Deleted/missing node renders a recovery page rather than a crash | ✅ | `src/ui/RecoveryPage.svelte`; it tells absence from deletion, per T-7 |
 
 Packaging decides which of these are reachable, and it answers them per target rather than once — see
 [architecture.md §7 Packaging](architecture.md#7-packaging). X-3 in particular is a PWA install on Chromium and an APK
@@ -257,8 +280,16 @@ _Not written yet._ Expected to cover: the no-server rule, the three-method adapt
 
 ## 15. Deviations and defects found during verification
 
-_Not written yet._ Nothing to verify against until production code exists. Ordered by how much they matter, once there
-is something to order.
+What M1 leaves standing, in the order it matters. Every row here is a deliberate gap rather than a discovered bug — `npm
+test` and `npm run ui-smoke` both pass.
+
+| # | Deviation | Why it stands |
+| --- | --- | --- |
+| 1 | T-5's refusal has no UI that can provoke it | M1 moves rows with the keyboard and the row menu, and neither can express "into my own child". The check and its test exist; a drag or a move-to picker is what will reach them |
+| 2 | X-3 and X-4 are verified in a browser, not on a device | An install and a launcher icon cannot be asserted from WSL — [test.md §3.6 Platform](test.md#36-platform) carries them as a written checklist |
+| 3 | T-6 cannot arise on one device | The repair is implemented and tested against hand-built cycles. Nothing writes a second device's file until M2 |
+| 4 | The op log is never compacted | S-14, and it is M3's. On one device a checklist's log grows by kilobytes a month — [sync-flow.md §4.6 The decision](sync-flow.md#46-the-decision) |
+| 5 | `local-folder` has no quota story | A `localStorage` quota failure is reported and the ops stay queued, so nothing is lost in the session. It is the same growth problem as row 4, arriving early |
 
 ## 16. Explicitly out of scope
 
@@ -271,10 +302,12 @@ form of application server or hosted database.
 | ID | Milestone | Contains |
 | --- | --- | --- |
 | M0 | Decisions | **Closed.** The payload is an append-only op log per device — [sync-flow.md §4.6 The decision](sync-flow.md#46-the-decision) — and [§2 Data model](#2-data-model), [§8 Device management](#8-device-management) and [§9 Conflict presentation](#9-conflict-presentation) are written. The stack, the packaging and the application shape were already settled — [architecture.md §6 Technology stack](architecture.md#6-technology-stack), [architecture.md §7 Packaging](architecture.md#7-packaging), [past_decision.md §3 State Management](past_decision.md#3-state-management) |
-| M1 | Local-first core | The tree, the item kinds, the keyboard model, the shell — [§3 Tree structure and editing](#3-tree-structure-and-editing), [§4 Item kinds](#4-item-kinds) and [§10 Application shell, PWA, offline](#10-application-shell-pwa-offline), on one device |
+| M1 | Local-first core | **Closed.** The tree, the item kinds, the keyboard model, the shell — [§3 Tree structure and editing](#3-tree-structure-and-editing), [§4 Item kinds](#4-item-kinds) and [§10 Application shell, PWA, offline](#10-application-shell-pwa-offline), on one device. The store is `src/app/Session.svelte.ts`, the payload is already the real op log (S-21), and what it left standing is [§15 Deviations and defects found during verification](#15-deviations-and-defects-found-during-verification) |
 | M2 | Sync | The op log, tree-aware merge, the activity-driven cycle (S-19), the conflict nav of [§9 Conflict presentation](#9-conflict-presentation), and the adapter set proven against a real provider folder |
 | M3 | Compaction and polish | Snapshots once S-14's trigger fires, note-body diffing, search, archive |
 
-The sections M0 was blocking are written, so M1 can start. What M0 deliberately did **not** settle is listed in
-[sync-flow.md §7 What is still open](sync-flow.md#7-what-is-still-open); none of it blocks M1, and the compaction cut
+M1 is closed, so M2 can start, and it starts from a write path that already emits the op log M2 has to merge: what M2
+adds is reading every device's file rather than this one's, folding them together, the activity-driven cycle (S-19) and
+the conflict nav. What M0 deliberately did **not** settle is listed in
+[sync-flow.md §7 What is still open](sync-flow.md#7-what-is-still-open); none of it blocked M1, and the compaction cut
 rule is the only item that blocks M3.

@@ -8,8 +8,8 @@ History of project's decision. The situation, its options and resolution.
 | --- | --- | --- | 
 | [Tech stack](#2-tech-stack) | Vite + TypeScript + Svelte, in a browser | Kotlin, Dart, Rust, Go, C#/.NET, React Native; and vanilla ESM, React, Lit | 
 | [T-6 Cyclic tree state](sync-flow.md#62-the-repair) | Drop the cycle edge with the oldest `(parentSetAt, device id)` at read time, never written | - non-temporal tiebreak (node id)<br>- Prevention by limitting hierarchy level (flat groups)<br> -pre-defined hierarchy folder->list->item |
-| [Sync data model](#4-sync-data-model) |  append-only op log per device | -  whole-tree snapshot per device<br>-  snapshot plus op tail<br>-  one file per node |  
-| [State Management](#3-state-management) |  Materialised State Store, reactive views | -  prototype logic, scaled up<br>-  local database, folder as a sync target<br>-  event-driven<br>-  CRDT document | 
+| [Sync data model](#4-sync-data-model) | append-only op log per device | -  whole-tree snapshot per device<br>-  snapshot plus op tail<br>-  one file per node |  
+| [State Management](#3-state-management) | Materialised State Store, reactive views | -  prototype logic, scaled up<br>-  local database, folder as a sync target<br>-  event-driven<br>-  CRDT document | 
 
 ---
 

@@ -35,8 +35,14 @@ vectors rather than approximations.
 | UI | the page in a browser | does an edit produce exactly one write, does a race raise the panel, does the keyboard model work | `test/ui.mjs`, and `test/android-bridge.mjs` for the Android startup path |
 | Platform | the WebView shell, the installed PWA | does startup, the folder grant, and a cold offline launch work on the device | — |
 
-Three of the six are implemented, and merge properties only in the weak form
+Three of the six are implemented in the prototype, and merge properties only in the weak form
 [§3.1 Merge properties](#31-merge-properties) describes. Adapter conformance and the platform checklist are new work.
+
+M1 added production tests at two of the layers. `src/core/*.test.ts` runs the logic layer under Vitest — order keys, the
+fold, the T-6 repair, the T-7 tombstone walk and every edit intent — and `scripts/ui-smoke.mjs` drives the built app in
+Chromium for the keyboard model, a reload through the op log and a cold start with the network off. Neither mocks
+anything below itself: the UI run uses the real `local-folder` adapter, seeded by writing the device file it would have
+written.
 
 ## 3. What each layer owes
 
@@ -147,8 +153,24 @@ choice is the stack changing, not the test suite growing.
 
 ## 6. Commands
 
-Production commands wait on a `package.json`. The repository has none, so every `npm run` line in
-[prototype/README.md §7.2 Test](../prototype/README.md#72-test) names a script that cannot run.
+Production, as of M1:
+
+```bash
+npm test              # Vitest over src/**/*.test.ts — the logic layer and the row-action parity
+npm run check         # svelte-check, in strict TypeScript
+npm run ui-smoke      # builds, serves dist/ on 38531, drives Chromium, screenshots to ui-smoke/
+npm run seed          # the same app with a small tree in it, in a window, to look at
+npm run make-icons    # re-render the PWA PNGs from public/icons/*.svg
+```
+
+`ui-smoke` and `seed` need Playwright on `NODE_PATH`, which is installed on this machine rather than in the project:
+
+```bash
+NODE_PATH=/home/nam/.npm/_npx/e41f203b7505f1fb/node_modules npm run ui-smoke
+```
+
+The prototype's own `npm run` lines in [prototype/README.md §7.2 Test](../prototype/README.md#72-test) still name
+scripts that do not exist — that `package.json` was never written, and this one is not it.
 
 The prototype's tests need no runner, so `node` runs them directly, and does today:
 

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Checklist">
+  <!-- X-4: the mark sits inside the 80% safe zone (a 410px circle), so a
+       launcher's mask — circle, squircle, teardrop — cannot clip it. The
+       background is full-bleed because the mask cuts the background, not the
+       mark. -->
+  <rect width="512" height="512" fill="#2f4f8f" />
+  <g
+    transform="translate(256 256) scale(0.62) translate(-260 -239)"
+    stroke="#ffffff"
+    stroke-width="30"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    fill="none"
+  >
+    <path d="M136 176l38 38 74-74" />
+    <path d="M136 300l38 38 74-74" />
+    <path d="M300 190h84" />
+    <path d="M300 314h84" />
+  </g>
+</svg>

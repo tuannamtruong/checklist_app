@@ -1,0 +1,31 @@
+{
+  "name": "check_list",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Checklist and notes app. Local-first, no application server; devices sync through a folder.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "seed": "node scripts/seed.mjs",
+    "ui-smoke": "node scripts/ui-smoke.mjs",
+    "docs:check": "python3 scripts/md-reflow.py docs/*.md --check",
+    "make-icons": "node scripts/make-icons.mjs"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.3.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^24.13.3",
+    "svelte": "^5.56.9",
+    "svelte-check": "^4.4.4",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.9.3",
+    "vite": "^8.2.1",
+    "vite-plugin-pwa": "^1.3.0",
+    "vitest": "^4.1.10"
+  }
+}

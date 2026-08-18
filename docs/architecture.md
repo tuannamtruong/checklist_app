@@ -16,7 +16,7 @@ The sync process and what a device actually writes into the folder in [sync-flow
 | Folder-based transport between Windows and Android | Proven | `prototype/core/`, `prototype/adapters/` |
 | Browser reach to a local folder, per browser | Proven | [§4 The folder adapter](#4-the-folder-adapter) |
 | Convergence of a single text field | Proven | [sync-flow.md §2 What the prototype settled](sync-flow.md#2-what-the-prototype-settled) |
-| Convergence of a tree | Decided  | [sync-flow.md §4.6 The decision](sync-flow.md#46-the-decision) |
+| Convergence of a tree | Decided | [sync-flow.md §4.6 The decision](sync-flow.md#46-the-decision) |
 | Internal shape of the app | Decided | [past_decision.md §3 State Management](past_decision.md#3-state-management) |
 | Technology stack | Decided | [§6 Technology stack](#6-technology-stack) |
 | Packaging per platform | Decided | [§7 Packaging](#7-packaging) |
@@ -86,9 +86,16 @@ Every storage that can hold a folder can offer them. The prototype ships five:
 | `http-folder` | any desktop browser, needed for Firefox | `fetch` to this device's own helper on `127.0.0.1:38531` |
 | `android-folder` | Android WebView | Storage Access Framework grant, over the Java bridge |
 | `memory-folder` | anywhere | a fake for UI tests, no disk |
+| `local-folder` | any browser | `localStorage`, one key per file name |
 
-The production app needs the same five for the same reasons. Keeping the interface at three methods is what lets the
-merge logic be tested against a plain object and shipped against a phone.
+`local-folder` is the sixth, and it exists because M1 has one device and no Sync Folder while the payload is already
+decided. It keeps the op log the only persistence and the three methods the only route to it, so M2 replaces an adapter
+rather than a write path — requirement S-21. It is not a sync adapter: `localStorage` is per-origin and nothing mirrors
+it anywhere.
+
+The production app needs the prototype's five for the same reasons; M1 ships two of them, `memory-folder` and
+`local-folder`, and M2 brings the rest. Keeping the interface at three methods is what lets the merge logic be tested
+against a plain object and shipped against a phone.
 
 **Adapter selection at startup.** On every page load, "How can this browser reach a local folder?" is asked.
 
