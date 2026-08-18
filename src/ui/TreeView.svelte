@@ -4,12 +4,14 @@
   // Flat rather than recursive because the keyboard model works on what the
   // user can see: `↑` from the first child of a collapsed-away subtree has to
   // land on the row above it, whatever their depths — rows.ts.
+  import { finishedChildCount } from '../core/done';
   import { createFirstChild, createLastChild } from '../core/edit';
   import { childrenOf } from '../core/tree';
   import type { Kind, ParentId } from '../core/types';
   import type { Session } from '../app/Session.svelte';
   import type { ViewState } from '../app/view-state.svelte';
   import type { RowFocus } from './focus.svelte';
+  import { DONE_HREF } from '../app/router.svelte';
   import Row from './Row.svelte';
   import { visibleRows } from './rows';
 
@@ -22,6 +24,9 @@
 
   const rows = $derived(visibleRows(session.tree, parent, (id) => view.isCollapsed(id)));
   const isEmpty = $derived(childrenOf(session.tree, parent).length === 0);
+  // Only asked when the list looks empty, which is the only time the answer
+  // changes what it says — T-11.
+  const finished = $derived(isEmpty ? finishedChildCount(session.tree, parent) : 0);
 
   function add(kind: Kind): void {
     const ops = session.run((tree, ctx) =>
@@ -39,7 +44,12 @@
 
 {#if isEmpty}
   <p class="px-2 py-6 text-sm text-ink-muted" data-testid="empty">
-    Nothing here yet.
+    {#if finished > 0}
+      All done — {finished} finished {finished === 1 ? 'row is' : 'rows are'} in
+      <a class="text-accent hover:underline" href={DONE_HREF}>Done</a>.
+    {:else}
+      Nothing here yet.
+    {/if}
   </p>
 {/if}
 

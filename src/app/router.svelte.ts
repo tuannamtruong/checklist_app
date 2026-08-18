@@ -8,11 +8,13 @@ import type { NodeId } from '../core/types';
 export type Route =
   | { name: 'root' }
   | { name: 'node'; id: NodeId }
+  | { name: 'done' }
   | { name: 'unknown'; hash: string };
 
 export function routeOf(hash: string): Route {
   const path = hash.replace(/^#/, '');
   if (path === '' || path === '/') return { name: 'root' };
+  if (path === '/done') return { name: 'done' };
   const node = /^\/n\/([^/]+)$/.exec(path);
   if (node) return { name: 'node', id: decodeURIComponent(node[1]!) };
   return { name: 'unknown', hash: path };
@@ -24,10 +26,15 @@ export function hrefOf(route: Route): string {
       return '#/';
     case 'node':
       return `#/n/${encodeURIComponent(route.id)}`;
+    case 'done':
+      return '#/done';
     case 'unknown':
       return `#${route.hash}`;
   }
 }
+
+/** T-12's view, always in the nav — see requirements.md §5 Navigation and routing. */
+export const DONE_HREF = hrefOf({ name: 'done' });
 
 export function nodeHref(id: NodeId): string {
   return hrefOf({ name: 'node', id });

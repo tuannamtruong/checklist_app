@@ -122,9 +122,17 @@ export function resolveTree(nodes: NodeMap): ResolvedTree {
   };
   for (const id of Object.keys(nodes)) isDeleted(id);
 
+  // Two filters, and they are not the same shape. T-7's tombstone is inherited,
+  // so a whole subtree leaves at once. T-11's tick is not: a finished row leaves
+  // its parent's list, but its own children stay under it, which is what lets
+  // the Done view open a finished list and find something inside — core/done.ts.
+  //
+  // Filtering here rather than in the views is what keeps an edit honest. Every
+  // caller of childrenOf sees exactly what the user sees, so `Alt-↓` cannot walk
+  // a row past a hidden one and `Backspace` is not refused by invisible children.
   const children = new Map<ParentId, NodeId[]>();
   for (const id of Object.keys(nodes)) {
-    if (deleted.has(id)) continue;
+    if (deleted.has(id) || nodes[id]!.done) continue;
     const parent = effectiveParent(id);
     const bucket = children.get(parent);
     if (bucket) bucket.push(id);

@@ -92,6 +92,10 @@ function op(fields, counter, at) {
 /**
  * A small tree that covers every kind and two levels of nesting, written as the
  * device file the app reads at startup — glossary.md's op log.
+ *
+ * It seeds one ticked row and one deleted one on purpose. Both are invisible in
+ * the tree (T-11, T-7) and both are what the Done view has to show (T-12), so a
+ * seeded window and a smoke run start with that view already populated.
  */
 export function seedLog(device = DEVICE) {
   const start = Date.UTC(2026, 7, 18, 9, 0, 0);
@@ -113,12 +117,14 @@ export function seedLog(device = DEVICE) {
     { id: 'n_seed0007', parent: 'n_seed0006', kind: 'task', order: 'a1', title: 'Descale the kettle' },
     { id: 'n_seed0008', parent: 'root', kind: 'note', order: 'a3', title: 'Trip notes' },
     { id: 'n_seed0009', parent: 'n_seed0008', kind: 'task', order: 'a1', title: 'Book the ferry' },
+    { id: 'n_seed0010', parent: 'root', kind: 'note', order: 'a4', title: 'Old receipts', deleted: true },
   ];
 
   for (const row of rows) {
     emit({ op: 'create', id: row.id, parent: row.parent, kind: row.kind, order: row.order });
     emit({ op: 'set', id: row.id, title: row.title });
     if (row.done) emit({ op: 'set', id: row.id, done: true });
+    if (row.deleted) emit({ op: 'delete', id: row.id });
   }
   emit({
     op: 'set',

@@ -6,18 +6,21 @@
   import type { Session } from '../app/Session.svelte';
   import type { ViewState } from '../app/view-state.svelte';
   import SidebarBranch from './SidebarBranch.svelte';
+  import { DONE_HREF } from '../app/router.svelte';
   import { ROOT } from '../core/types';
 
   let {
     session,
     view,
     currentId,
+    doneOpen,
     folderLabel,
     children,
   }: {
     session: Session;
     view: ViewState;
     currentId: string | null;
+    doneOpen: boolean;
     folderLabel: string;
     children: Snippet;
   } = $props();
@@ -60,6 +63,20 @@
         {currentId}
         onNavigate={() => view.setDrawer(false)}
       />
+
+      <!-- T-12. Always here, even when empty: a view that appeared only once it
+           had something in it is a view the user never learns exists. -->
+      <a
+        href={DONE_HREF}
+        class="mt-2 flex items-center gap-2 rounded-md border-t border-line px-2 pt-3 pb-1.5 text-sm hover:bg-surface-sunken"
+        class:text-accent={doneOpen}
+        class:text-ink-muted={!doneOpen}
+        data-testid="done-link"
+        onclick={() => view.setDrawer(false)}
+      >
+        <span class="size-4 shrink-0 text-center" aria-hidden="true">☑</span>
+        <span class="truncate">Done</span>
+      </a>
     </nav>
 
     <footer class="border-t border-line px-3 py-2 text-xs text-ink-faint">

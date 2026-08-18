@@ -239,4 +239,18 @@ describe('deleting — T-7 and §3.1', () => {
     session.apply(remove(session.tree, ctx, a));
     expect(remove(session.tree, ctx, a)).toEqual([]);
   });
+
+  it('refuses every field write to a tombstoned row', () => {
+    // Backspace deletes the row and then moves the caret, and the blur that
+    // follows would commit the emptied title after the delete — which the Done
+    // view of T-12 would then render as "Untitled".
+    const [a] = threeRows();
+    ctx.tick();
+    session.apply(remove(session.tree, ctx, a));
+    expect(setTitle(session.tree, ctx, a, '')).toEqual([]);
+    expect(toggleDone(session.tree, ctx, a)).toEqual([]);
+    expect(setBody(session.tree, ctx, a, 'text')).toEqual([]);
+    expect(turnInto(session.tree, ctx, a, 'note')).toEqual([]);
+    expect(session.tree.nodes[a]!.title).toBe('a');
+  });
 });

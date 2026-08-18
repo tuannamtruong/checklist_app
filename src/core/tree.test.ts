@@ -24,6 +24,10 @@ function remove(id: string, dev = 'aaaa0001', at = 900): Op {
   return { op: 'delete', id, c: ++counter, at, dev };
 }
 
+function tick(id: string, done = true, dev = 'aaaa0001', at = 800): Op {
+  return { op: 'set', id, done, c: ++counter, at, dev };
+}
+
 function treeOf(ops: readonly Op[]) {
   return resolveTree(foldOps(ops));
 }
@@ -165,5 +169,46 @@ describe('resolveTree — T-7 tombstones', () => {
     ]);
     expect([...tree.deleted].sort()).toEqual(['n_a', 'n_b', 'n_c']);
     expect(childrenOf(tree, ROOT)).toEqual([]);
+  });
+});
+
+describe('resolveTree — T-11 finished rows', () => {
+  const list = [
+    create('n_a', ROOT, 'a1'),
+    create('n_b', ROOT, 'a2'),
+    create('n_c', ROOT, 'a3'),
+  ];
+
+  it('takes a ticked row out of its parent, and puts it back when unticked', () => {
+    const done = treeOf([...list, tick('n_b')]);
+    expect(childrenOf(done, ROOT)).toEqual(['n_a', 'n_c']);
+    expect(done.nodes['n_b']).toBeDefined();
+    expect(childrenOf(treeOf([...list, tick('n_b'), tick('n_b', false)]), ROOT)).toEqual([
+      'n_a',
+      'n_b',
+      'n_c',
+    ]);
+  });
+
+  it('does not inherit, so a finished row still shows what is inside it', () => {
+    // Unlike T-7. A finished list opened from the Done view has to have
+    // something in it, or the view would be a page of empty titles.
+    const tree = treeOf([...list, create('n_b1', 'n_b', 'a1'), tick('n_b')]);
+    expect(childrenOf(tree, ROOT)).toEqual(['n_a', 'n_c']);
+    expect(childrenOf(tree, 'n_b')).toEqual(['n_b1']);
+  });
+
+  it('leaves the siblings the caret and every edit can see', () => {
+    // The point of filtering in resolveTree rather than in the view: siblingAt
+    // is what `↑`/`↓` and Alt-↑/Alt-↓ both walk.
+    const tree = treeOf([...list, tick('n_b')]);
+    expect(siblingAt(tree, 'n_a', 1)).toBe('n_c');
+    expect(siblingAt(tree, 'n_c', -1)).toBe('n_a');
+  });
+
+  it('is beaten by a tombstone — a deleted row is deleted, ticked or not', () => {
+    const tree = treeOf([...list, tick('n_b'), remove('n_b')]);
+    expect(tree.deleted.has('n_b')).toBe(true);
+    expect(childrenOf(tree, ROOT)).toEqual(['n_a', 'n_c']);
   });
 });

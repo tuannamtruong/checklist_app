@@ -263,12 +263,12 @@ id)` order, so the newest write to a field wins and disjoint fields never intera
 — it is this rule's timestamp for the `parent` field, which [§6.2 The repair](#62-the-repair) happens to read.
 Converting a row's kind (K-5) and ticking a box are settled the same way: a notice in the conflict nav, never a prompt.
 
-**Note bodies, not task edits, drive growth.** K-3 gives a note a long free-text body and K-7 debounces its saves at 500
-ms. A whole-body op is orders of magnitude larger than a tick or a rename, so a single editing session can outweigh a
-month of checklist use. Two rules bound that without new machinery: the 500 ms debounce governs the in-memory store,
-while an op is emitted only on blur, on navigating away, or after 60 s of continuous editing; and a body two devices
-edited concurrently resolves by whole-body last-writer-wins, like every other field. Diffing a body against a checkpoint
-and folding the diffs at compaction is option C applied to one field, and it waits for the same trigger.
+**Note bodies, not task edits, drive growth.** K-3 gives a note a long free-text body and K-7 debounces its saves at 1
+s. A whole-body op is orders of magnitude larger than a tick or a rename, so a single editing session can outweigh a
+month of checklist use. Two rules bound that without new machinery: the 1 s debounce governs the in-memory store, while
+an op is emitted only on blur, on navigating away, or after 60 s of continuous editing; and a body two devices edited
+concurrently resolves by whole-body last-writer-wins, like every other field. Diffing a body against a checkpoint and
+folding the diffs at compaction is option C applied to one field, and it waits for the same trigger.
 
 **The cycle runs on activity, not on a timer.** The write path is the sync cycle — a debounced edit reads, folds and
 writes in one pass, which S-1 already requires. After writing stops the cadence decays through 5 s, 15 s and 60 s and
@@ -527,9 +527,12 @@ Questions the payload decision does not answer, listed so they are not mistaken 
    the rare case in a checklist and the threshold can be generous.
 3. **Tombstone retention.** T-7 tombstones are the majority of the node count after a year of use, and dropping one
    safely needs the same cross-device floor that vector pruning needed. Keeping them is the same trade
-   [§4.6 The decision](#46-the-decision) makes: bytes in exchange for no coordination problem. An archive view that
-   hides finished and deleted rows is a read-time filter over `done` and age — derived rather than stored, so it needs
-   no sync and no writes — and it belongs with M3.
+   [§4.6 The decision](#46-the-decision) makes: bytes in exchange for no coordination problem. The view side of this is
+   now settled and built: the Done view of
+   [requirements.md §3 Tree structure and editing](requirements.md#3-tree-structure-and-editing) T-12 is a read-time
+   filter over `done` and the tombstone — derived rather than stored, so it needs no sync and no writes. What stays open
+   is retention itself, and one thing the view makes visible: a tombstone the user can now see is a tombstone the user
+   will eventually ask to reverse, which is T-13 and needs an op this payload does not have.
 4. **Retiring a device.** No longer a correctness question. A dead device's file is dominated by every live one, so
    [§2.2 The maximal set reduces the whole folder at once](#22-the-maximal-set-reduces-the-whole-folder-at-once) drops
    it from the maximal set as an ancestor and it never joins a resolution again. What remains is presentation, and one

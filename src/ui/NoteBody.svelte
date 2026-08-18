@@ -2,7 +2,7 @@
   // K-3's full-page note body, and the two timings that keep it from flooding
   // the log.
   //
-  // K-7: 500 ms of quiet updates the store. S-20: an op is emitted on blur, on
+  // K-7: 1 s of quiet updates the store. S-20: an op is emitted on blur, on
   // navigating away, or after 60 s of continuous editing. A whole-body op is
   // orders of magnitude larger than a tick, so the emission trigger — not the
   // debounce — is what bounds the log's growth.
@@ -11,7 +11,7 @@
 
   let { session, id }: { session: Session; id: NodeId } = $props();
 
-  const STORE_DEBOUNCE_MS = 500;
+  const STORE_DEBOUNCE_MS = 1_000;
   const EMIT_AFTER_MS = 60_000;
 
   // Filled by the effect below, which is also what keeps it in step with a body

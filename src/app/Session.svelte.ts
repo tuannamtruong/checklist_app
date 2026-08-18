@@ -80,7 +80,7 @@ export class Session {
   }
 
   /**
-   * K-7: a note body's 500 ms debounce governs the store, and only the store.
+   * K-7: a note body's 1 s debounce governs the store, and only the store.
    * The op waits for blur, for navigation, or for 60 s of continuous editing —
    * S-20, because whole-body ops are what actually grow the log.
    *

@@ -8,6 +8,7 @@
   import { Session } from '../app/Session.svelte';
   import { ViewState } from '../app/view-state.svelte';
   import { RowFocus } from './focus.svelte';
+  import DonePage from './DonePage.svelte';
   import NodePage from './NodePage.svelte';
   import RecoveryPage from './RecoveryPage.svelte';
   import Shell from './Shell.svelte';
@@ -22,6 +23,7 @@
   opening.then((opened) => (session = opened));
 
   const currentId = $derived(router.route.name === 'node' ? router.route.id : null);
+  const doneOpen = $derived(router.route.name === 'done');
 
   // S-20's "on navigating away": leaving a note's page emits its body, and so
   // does leaving the page altogether.
@@ -41,9 +43,11 @@
 />
 
 {#if session}
-  <Shell {session} {view} {currentId} folderLabel={choice.label}>
+  <Shell {session} {view} {currentId} {doneOpen} folderLabel={choice.label}>
     {#if router.route.name === 'unknown'}
       <RecoveryPage {session} id={null} />
+    {:else if doneOpen}
+      <DonePage {session} />
     {:else if currentId !== null && !isVisible(session.tree, currentId)}
       <RecoveryPage {session} id={currentId} />
     {:else}

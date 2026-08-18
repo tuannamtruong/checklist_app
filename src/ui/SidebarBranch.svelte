@@ -1,7 +1,10 @@
 <script lang="ts">
-  // T-10: the sidebar carries containers only. Tasks are the bulk of a
-  // checklist, and putting them here would bury the three kinds that are
-  // actually navigation.
+  // T-10: the sidebar carries containers only — folders and lists. A note owns
+  // children (K-4) but is a place the user goes rather than goes through, and
+  // tasks are the bulk of a checklist, so either would bury the navigation.
+  //
+  // Finished and deleted branches are already gone: childrenOf is the filtered
+  // set, so T-11 and T-7 take them out of here without this file knowing.
   import { childrenOf } from '../core/tree';
   import { CONTAINER_KINDS, type ParentId } from '../core/types';
   import type { Session } from '../app/Session.svelte';

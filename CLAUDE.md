@@ -115,8 +115,15 @@ Reading is the same path backwards, once, at startup: `adapter.read` -> `decodeL
 store materialises the tree once and keeps it; nothing replays the log per read.
 
 Two edits do not follow the straight path, and both are deliberate: a title is a draft in its input until it is
-committed, and a note body updates the store on a 500 ms debounce but only becomes an op on blur, on navigation, or
-after 60 s (K-7, S-20).
+committed, and a note body updates the store on a 1 s debounce but only becomes an op on blur, on navigation, or after
+60 s (K-7, S-20).
+
+### What the normal view leaves out
+
+`resolveTree` drops two things from `children`, and every edit and every view reads the filtered set: a tombstoned
+subtree (T-7, inherited) and a row whose own `done` is set (T-11, **not** inherited). Both are still in `tree.nodes`.
+`src/core/done.ts` reads them back out for the Done view at `#/done` (T-12), which is where a finished row is un-ticked
+and where a deleted one can be found. Nothing un-deletes — T-13 is not built.
 
 ## Testing
 

@@ -17,8 +17,12 @@ export type Kind = 'folder' | 'list' | 'note' | 'task';
 
 export const KINDS: readonly Kind[] = ['folder', 'list', 'note', 'task'];
 
-/** T-10. The sidebar shows these; tasks would drown it. */
-export const CONTAINER_KINDS: readonly Kind[] = ['folder', 'list', 'note'];
+/**
+ * T-10. The sidebar shows these and nothing else. A note may own children (K-4),
+ * but it is somewhere the user goes rather than somewhere they go *through*, and
+ * a task would bury both kinds that are actually navigation.
+ */
+export const CONTAINER_KINDS: readonly Kind[] = ['folder', 'list'];
 
 export interface Node {
   id: NodeId;

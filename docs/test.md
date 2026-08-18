@@ -106,6 +106,10 @@ adopted silently, a racing peer raises the conflict panel, and resolving dominat
 keyboard model — `Enter`, `Tab`/`Shift-Tab`, `Alt-↑`/`Alt-↓`, `Backspace` on an empty row, `Escape` — and the rule that
 every keyboard action also exists in the row menu, since phones have no Tab key.
 
+Two of the checks are about what is *not* on screen, which a unit test cannot see: ticking a row makes it leave the tree
+and the sidebar (T-11), and the Done view at `#/done` then holds it beside every deleted row, with the path each sat on
+(T-12). Un-ticking there returns the row to the tree it came from; the deleted ones stay put, because T-13 is not built.
+
 `test/android-bridge.mjs` drives the same page in the same browser with `window.AndroidFolder` replaced by an in-page
 stub, which is how the Android startup path — first-run folder pick, edit, conflict, resolution — is exercised without a
 JVM. It is a UI test wearing the phone's clothes, not a platform test; the platform layer starts where the stub stops.

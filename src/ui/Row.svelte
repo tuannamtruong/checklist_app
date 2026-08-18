@@ -10,6 +10,7 @@
   import type { NodeId } from '../core/types';
   import type { RowActionContext } from './actions';
   import { handleRowKey } from './keyboard';
+  import { rowAbove, rowBelow } from './rows';
   import KindIcon from './KindIcon.svelte';
   import RowMenu from './RowMenu.svelte';
   import { nodeHref } from '../app/router.svelte';
@@ -49,6 +50,15 @@
     session.run((tree, c) => setTitle(tree, c, id, draft));
   }
 
+  // T-11: ticking removes the row from under the cursor, so the caret has to be
+  // put somewhere. The row below is the one the user is working towards; the row
+  // above is the fallback when this was the last one.
+  function tick(): void {
+    const next = rowBelow(ctx.rows, id) ?? rowAbove(ctx.rows, id);
+    session.run((tree, c) => toggleDone(tree, c, id));
+    if (next) focus.request(next);
+  }
+
   function onKeyDown(event: KeyboardEvent): void {
     const handled = handleRowKey(event, {
       ...ctx,
@@ -83,6 +93,8 @@
       <span class="inline-block transition-transform" class:-rotate-90={collapsed} aria-hidden="true">▾</span>
     </button>
 
+    <!-- Always unchecked in practice: T-11 takes a ticked row out of the tree,
+         so the only place a checked box renders is the Done view. -->
     {#if node.kind === 'task'}
       <input
         type="checkbox"
@@ -90,7 +102,7 @@
         checked={node.done}
         aria-label="Done"
         data-testid="done"
-        onchange={() => session.run((tree, c) => toggleDone(tree, c, id))}
+        onchange={tick}
       />
     {:else}
       <a
@@ -107,8 +119,6 @@
       bind:this={input}
       bind:value={draft}
       class="min-w-0 flex-1 bg-transparent px-1 py-1.5 text-sm outline-none placeholder:text-ink-faint"
-      class:line-through={node.kind === 'task' && node.done}
-      class:text-ink-muted={node.kind === 'task' && node.done}
       placeholder="Untitled"
       data-testid="title"
       onfocus={() => {

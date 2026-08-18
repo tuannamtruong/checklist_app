@@ -98,29 +98,42 @@ function createAt(ctx: EditContext, parent: ParentId, order: string, options: Cr
   return ops;
 }
 
+/**
+ * A field write to a tombstoned node is dropped.
+ *
+ * T-7 already says the tombstone wins over everything in the subtree, so the op
+ * would cost bytes and change nothing. It is not a theoretical case: `Backspace`
+ * on an empty row deletes it and then moves the caret, and the blur that follows
+ * would otherwise commit the emptied title *after* the delete — which the Done
+ * view of T-12 renders, so the row would be listed as "Untitled".
+ */
+function isWritable(node: Node | undefined): node is Node {
+  return node !== undefined && !node.deleted;
+}
+
 export function setTitle(tree: ResolvedTree, ctx: EditContext, id: NodeId, title: string): Op[] {
   const node = tree.nodes[id];
-  if (!node || node.title === title) return [];
+  if (!isWritable(node) || node.title === title) return [];
   return [{ op: 'set', id, title, ...stamp(ctx) }];
 }
 
 /** K-2: only a task is checkable, so only a task can be ticked. */
 export function toggleDone(tree: ResolvedTree, ctx: EditContext, id: NodeId): Op[] {
   const node = tree.nodes[id];
-  if (!node || node.kind !== 'task') return [];
+  if (!isWritable(node) || node.kind !== 'task') return [];
   return [{ op: 'set', id, done: !node.done, ...stamp(ctx) }];
 }
 
 export function setBody(tree: ResolvedTree, ctx: EditContext, id: NodeId, body: string): Op[] {
   const node = tree.nodes[id];
-  if (!node || node.body === body) return [];
+  if (!isWritable(node) || node.body === body) return [];
   return [{ op: 'set', id, body, ...stamp(ctx) }];
 }
 
 /** K-5 "Turn into", and K-6's promotion of a note to a checklist. */
 export function turnInto(tree: ResolvedTree, ctx: EditContext, id: NodeId, kind: Kind): Op[] {
   const node = tree.nodes[id];
-  if (!node || node.kind === kind) return [];
+  if (!isWritable(node) || node.kind === kind) return [];
   return [{ op: 'set', id, kind, ...stamp(ctx) }];
 }
 

@@ -69,10 +69,11 @@ async function main() {
       titles.includes('Shopping') && titles.includes('Milk') && titles.includes('Descale the kettle'),
       `${titles.length} rows`,
     );
+    const sidebar = (await page.locator('[data-testid="sidebar-link"]').allInnerTexts()).map((t) => t.trim());
     check(
-      'the sidebar shows containers only — T-10',
-      (await page.locator('[data-testid="sidebar-link"]').count()) === 4 &&
-        (await page.locator('[data-testid="sidebar-link"]').allInnerTexts()).join(',').includes('Kitchen'),
+      'the sidebar shows folders and lists only — T-10',
+      sidebar.length === 3 && sidebar.includes('Kitchen') && !sidebar.includes('Trip notes'),
+      sidebar.join(','),
     );
 
     // --- the row menu carries every keyboard action — §3.1 ----------------
@@ -97,7 +98,7 @@ async function main() {
     await page.keyboard.press('ArrowUp');
     check(
       'Enter makes a sibling below, and the typed title sticks',
-      (await titlesUnder(page, 'Shopping')).join('|') === 'Milk|Bread|Coffee beans|Oat milk',
+      (await titlesUnder(page, 'Shopping')).join('|') === 'Milk|Coffee beans|Oat milk',
       (await titlesUnder(page, 'Shopping')).join('|'),
     );
 
@@ -120,13 +121,13 @@ async function main() {
     await page.keyboard.press('Alt+ArrowUp');
     check(
       'Alt-↑ moves among siblings — T-4',
-      (await titlesUnder(page, 'Shopping')).join('|') === 'Milk|Bread|Oat milk|Coffee beans',
+      (await titlesUnder(page, 'Shopping')).join('|') === 'Milk|Oat milk|Coffee beans',
       (await titlesUnder(page, 'Shopping')).join('|'),
     );
     await page.keyboard.press('Alt+ArrowDown');
     check(
       'Alt-↓ moves it back',
-      (await titlesUnder(page, 'Shopping')).join('|') === 'Milk|Bread|Coffee beans|Oat milk',
+      (await titlesUnder(page, 'Shopping')).join('|') === 'Milk|Coffee beans|Oat milk',
     );
 
     // --- ↑ / ↓ move the caret --------------------------------------------
@@ -169,11 +170,60 @@ async function main() {
     await page.keyboard.type('Shopping');
     await page.keyboard.press('ArrowDown');
 
-    // --- ticking a task ---------------------------------------------------
-    const bread = await rowByTitle(page, 'Bread');
-    check('a done task shows as done — K-2', await bread.locator('[data-testid="done"]').isChecked());
+    // --- T-11: a ticked row is not in the normal view ---------------------
+    // Only a browser can answer this one: the assertion is about what is *not*
+    // on screen, and the seeded 'Bread' is ticked in the op log itself.
+    check(
+      'a row ticked in the folder never reaches the tree — T-11',
+      !(await titlesUnder(page, 'Shopping')).includes('Bread'),
+      (await titlesUnder(page, 'Shopping')).join('|'),
+    );
     await (await rowByTitle(page, 'Milk')).locator('[data-testid="done"]').click();
-    check('ticking writes through', await (await rowByTitle(page, 'Milk')).locator('[data-testid="done"]').isChecked());
+    check(
+      'ticking a row takes it out of its list',
+      !(await titlesUnder(page, 'Shopping')).includes('Milk'),
+      (await titlesUnder(page, 'Shopping')).join('|'),
+    );
+
+    // --- T-12: the Done view ----------------------------------------------
+    await page.locator('[data-testid="done-link"]').click();
+    await page.waitForSelector('[data-testid="done-page"]');
+    const finishedTitles = await archivedTitles(page, 'finished-row');
+    check(
+      'the Done view holds every finished row — T-12',
+      finishedTitles.join('|') === 'Milk|Bread',
+      finishedTitles.join('|'),
+    );
+    const deletedTitles = await archivedTitles(page, 'deleted-row');
+    check(
+      'and every deleted one, newest first',
+      deletedTitles.join('|') === 'Oat milk|Old receipts',
+      deletedTitles.join('|'),
+    );
+    const paths = (await page.locator('[data-testid="archived-path"]').allInnerTexts()).map((t) => t.trim());
+    check(
+      'each row carries the path it sat on',
+      paths.filter((path) => path === 'Shopping').length === 3,
+      paths.join('|'),
+    );
+    await page.screenshot({ path: join(shots, 'done.png'), fullPage: true });
+
+    // Un-ticking here is an ordinary field write, so the row goes back to its
+    // list. Nothing un-deletes — T-13.
+    await finishedRowByTitle(page, 'Milk').locator('[data-testid="done"]').click();
+    check(
+      'un-ticking in the Done view returns the row to its list',
+      (await archivedTitles(page, 'finished-row')).join('|') === 'Bread',
+      (await archivedTitles(page, 'finished-row')).join('|'),
+    );
+    await page.waitForTimeout(WRITE_SETTLE_MS);
+    await page.goto(BASE_URL);
+    await page.waitForSelector('[data-testid="tree"]');
+    check(
+      'and the list has it back',
+      (await titlesUnder(page, 'Shopping')).join('|') === 'Milk|Coffee beans',
+      (await titlesUnder(page, 'Shopping')).join('|'),
+    );
 
     // --- the note page ----------------------------------------------------
     await (await rowByTitle(page, 'Trip notes')).locator('[data-testid="open"]').click();
@@ -206,13 +256,18 @@ async function main() {
     const afterReload = await titlesUnder(page, 'Shopping');
     check(
       'the edits survived a reload, folded back out of the op log',
-      afterReload.join('|') === 'Milk|Bread|Coffee beans',
+      afterReload.join('|') === 'Milk|Coffee beans',
       afterReload.join('|'),
     );
+    await page.locator('[data-testid="done-link"]').click();
+    await page.waitForSelector('[data-testid="done-page"]');
     check(
-      'the tick survived too',
-      await (await rowByTitle(page, 'Milk')).locator('[data-testid="done"]').isChecked(),
+      'and so did the Done view, which is derived rather than stored — T-12',
+      (await archivedTitles(page, 'finished-row')).join('|') === 'Bread' &&
+        (await archivedTitles(page, 'deleted-row')).join('|') === 'Oat milk|Old receipts',
     );
+    await page.goto(BASE_URL);
+    await page.waitForSelector('[data-testid="tree"]');
 
     await page.screenshot({ path: join(shots, 'desktop.png'), fullPage: true });
 
@@ -256,7 +311,7 @@ async function main() {
     const offlineTitles = await titlesUnder(page, 'Shopping');
     check(
       'cold start offline, with the tree intact — X-5',
-      offlineTitles.join('|') === 'Milk|Bread|Coffee beans',
+      offlineTitles.join('|') === 'Milk|Coffee beans',
       offlineTitles.join('|'),
     );
     await context.setOffline(false);
@@ -281,6 +336,18 @@ async function rowByTitle(page, title) {
     if ((await row.locator('[data-testid="title"]').inputValue()) === title) return row;
   }
   throw new Error(`no row titled ${JSON.stringify(title)}`);
+}
+
+/** The Done view's rows of one section, in the order it renders them — T-12. */
+async function archivedTitles(page, testid) {
+  const titles = await page
+    .locator(`[data-testid="${testid}"] [data-testid="archived-title"]`)
+    .allInnerTexts();
+  return titles.map((title) => title.trim());
+}
+
+function finishedRowByTitle(page, title) {
+  return page.locator('[data-testid="finished-row"]').filter({ hasText: title });
 }
 
 /** The titles of the rows rendered directly under the row with this title. */
