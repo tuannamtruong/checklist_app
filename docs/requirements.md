@@ -1,6 +1,6 @@
-# Checklist — Requirements
+# Requirements
 
-What the application has to do, and what state each requirement is in.
+Requirement docs and its current state.
 
 **Nothing is implemented.** The repository holds `prototype/` and `docs/`, and no production source tree. Rows marked
 `pt.` are proven by running code in `prototype/`, which does not share code with production and is not on the way to it
@@ -13,10 +13,10 @@ Legend:
 
 | Mark | Meaning |
 | --- | --- |
-| ✅ | done in production code, with a test |
+| ✅ | done |
 | ◐ | partial |
 | ✗ | not built |
-| pt. | prototyped — proven in `prototype/`, not in production code |
+| pt. | proven in `prototype/`|
 
 Sections marked _Not written yet._ are placeholders: the heading records that the topic is owed, and the content is
 still to be decided.
@@ -46,7 +46,7 @@ whether a node is a record or a fold of ops.
 | T-3 | Indent (become child of sibling above) / outdent (become parent's next sibling) | ✗ | |
 | T-4 | Move up/down among siblings | ✗ | |
 | T-5 | A move that would create a loop is refused | ✗ | Local check only — it catches one device dragging a folder into its own child, never the merge case, which is T-6: [sync-flow.md §6.1 T-5 is not the loop defence](sync-flow.md#61-t-5-is-not-the-loop-defence) |
-| T-6 | A structurally impossible tree (concurrent A→B, B→A) is repaired at _read_ time by re-rooting, never by writing | ✗ | Drop the cycle edge with the oldest `(parentSetAt, device id)` — [sync-flow.md §6.2 The repair](sync-flow.md#62-the-repair) |
+| T-6 | A Cyclic tree state (concurrent A→B, B→A) is repaired at _read_ time by re-rooting, never by writing | ✗ | Drop the cycle edge with the oldest `(parentSetAt, device id)` — [sync-flow.md §6.2 The repair](sync-flow.md#62-the-repair) |
 | T-7 | Deleting a node tombstones its whole subtree, not just the node | ✗ | The ancestor walk must climb the T-6-resolved parent, or a tombstoned subtree containing a cycle hangs — [sync-flow.md §6.2 The repair](sync-flow.md#62-the-repair) |
 | T-8 | Collapse/expand state is per-device and never synced | ✗ | |
 | T-9 | Breadcrumbs show the path back up from any node | ✗ | |
@@ -69,11 +69,11 @@ T-2, T-5, T-6 and T-7 constrain the sync payload, not just the UI.
 Every one of these also has to exist in the row `⋮` menu, which is where a phone reaches them, and that menu is where
 the keyboard list is shown to the user.
 
-## 4. Item kinds — checklist item vs note
+## 4. Item kinds
 
 | ID | Requirement | State | Where |
 | --- | --- | --- | --- |
-| K-1 | A row is either a checkable item or a text note | ✗ | |
+| K-1 | A row is one of four kinds: `folder`, `list`, `note` or `task` | ✗ | Only a task is checkable; the other three are the containers T-10 shows in the sidebar. Kind drives rendering, never structure — any kind may own children |
 | K-2 | Tasks render a checkbox; folders/lists/notes render a kind icon | ✗ | |
 | K-3 | A note has a long free-text body with its own full-page editor | ✗ | |
 | K-4 | A note can still own checklist children (heading + items pattern) | ✗ | |

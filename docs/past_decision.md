@@ -2,15 +2,14 @@
 
 History of project's decision. The situation, its options and resolution.
 
-Every row below carries the condition that would have flipped it.
-
 ## 1. Decision log
 
-| Decision | Chosen | Over | Because |
-| --- | --- | --- | --- |
-| [Tech stack](#2-tech-stack) | Vite + TypeScript + Svelte, in a browser | Kotlin, Dart, Rust, Go, C#/.NET, React Native; and vanilla ESM, React, Lit | [X-10](requirements.md#10-application-shell-pwa-offline) rules out hand-written DOM, and targeted DOM updates keep a caret alive across a background merge |
-| [T-6 cycle repair rule](sync-flow.md#62-the-repair) | Drop the cycle edge with the oldest `(parentSetAt, device id)` at read time, never written | - A stable non-temporal tiebreak such as node id<br>- Prevent cycle by limitting hierarchy level: flat groups, pre-defined hierarchy for folder/list/item | "The newer move survives" is explicable to a user where an id ordering is arbitrary noise; forbidding nested containers would trade [T-1](requirements.md#3-tree-structure-and-editing) away to delete one bounded read-time function |
-| [Application shape](#3-application-shape) | B — observable store, reactive views | - A — prototype shape, scaled up<br>- C — local database, folder as a sync target<br>- D — event-sourced core<br>- E — CRDT document | No history is wanted in the model and the tree fits in memory, which is the whole two-question test |
+| Decision | Chosen | Over | 
+| --- | --- | --- | 
+| [Tech stack](#2-tech-stack) | Vite + TypeScript + Svelte, in a browser | Kotlin, Dart, Rust, Go, C#/.NET, React Native; and vanilla ESM, React, Lit | 
+| [T-6 Cyclic tree state](sync-flow.md#62-the-repair) | Drop the cycle edge with the oldest `(parentSetAt, device id)` at read time, never written | - non-temporal tiebreak (node id)<br>- Prevention by limitting hierarchy level (flat groups)<br> -pre-defined hierarchy folder->list->item |
+| [Sync data model](#4-sync-data-model) |  append-only op log per device | -  whole-tree snapshot per device<br>-  snapshot plus op tail<br>-  one file per node |  
+| [State Management](#3-state-management) |  Materialised State Store, reactive views | -  prototype logic, scaled up<br>-  local database, folder as a sync target<br>-  event-driven<br>-  CRDT document | 
 
 ---
 
@@ -68,19 +67,19 @@ or the adapters. Worth remembering before spending more time on a future stack a
 
 ---
 
-## 3. Application shape
+## 3. State Management
 
-**B — observable store, reactive views.** One store object holds the tree and publishes changes; the view layer
+**B — Materialised State Store, reactive views.** One store object holds the tree and publishes changes; the view layer
 re-renders the affected subtree. The folder remains the only persistence.
 
 ### 3.1 The options
 
 | Option | The idea | Its cost | Would have won if |
 | --- | --- | --- | --- |
-| A — prototype shape, scaled up | An in-memory object plus hand-written DOM updates. The folder is the only persistence | Rewrites the whole tree on every change, and rendering a nested tree by hand grows unpleasant fast. No history, so undo is built separately | Shipping early outranked everything, and the tree stayed a flat list. It is the only option already proven end to end |
-| **B — observable store (chosen)** | One store holds the tree and publishes changes; views re-render the affected subtree. Folder still the only persistence | Still rewrites the full state on each save. Buys a framework dependency | — |
+| A — prototype logic, scaled up | An in-memory object plus hand-written DOM updates. The folder is the only persistence | Rewrites the whole tree on every change, and rendering a nested tree by hand grows unpleasant fast. No history, so undo is built separately | Shipping early outranked everything, and the tree stayed a flat list. It is the only option already proven end to end |
+| **B — Materialised State Store (chosen)** | One store holds the tree and publishes changes; views re-render the affected subtree. Folder still the only persistence | Still rewrites the full state on each save. Buys a framework dependency | — |
 | C — local database | IndexedDB is the working set; a sync module reads and writes the folder on its own schedule | Two sources of truth to keep agreeing, and schema migrations become a permanent chore. Reverses the prototype's deliberate finding that no database is needed | The tree grew past what memory holds for free, or many devices went offline for long stretches. Its leading argument — cold start without the folder — was already removed by [architecture.md §7.3 Accepted limits](architecture.md#73-accepted-limits) accepting a lapsed grant as a rare click |
-| D — event-sourced core | The op log *is* the model; every view is a projection replayed from ops | Every read path goes through a replay, so snapshotting inside the app becomes necessary early. Hardest option to debug when a projection disagrees with expectation | Undo, history and per-device attribution had to be properties of the model rather than features — and only alongside an op-log payload |
+| D — Log-Derived State | The op log *is* the model; every view is a projection replayed from ops | Every read path goes through a replay, so snapshotting inside the app becomes necessary early. Hardest option to debug when a projection disagrees with expectation | Undo, history and per-device attribution had to be properties of the model rather than features — and only alongside an op-log payload |
 | E — CRDT document | A library document (Automerge, Yjs) holds the tree; its own encoding is what lands in the folder | The folder stops being readable — a binary document cannot be inspected, diffed or hand-repaired, which is a stated attraction of the whole design. Bundle size, and a dependency that dictates the data model | Owning merge logic stopped being acceptable, and an opaque folder were a fair trade for never writing a conflict UI |
 
 ### 3.2 The five options are answers to two questions

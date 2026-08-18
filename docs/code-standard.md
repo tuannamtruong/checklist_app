@@ -15,7 +15,7 @@
 | Files declaring one class | `PascalCase` matching the class | `RowMenu.tsx` |
 | Functions, variables | `camelCase` | `applyPeers`, `deviceId` |
 | Constants | `UPPER_SNAKE_CASE` | `POLL_MS`, `DEBOUNCE_MS` |
-| Types, classes | `PascalCase` | `Snapshot`, `SClock` |
+| Types, classes | `PascalCase` | `DeviceFile`, `SClock` |
 | Custom elements, CSS classes | `hyphenated-names` | `row-menu`, `conflict-panel` |
 | Test files | mirror the file under test | `merge.test.mjs` beside `merge.mjs` |
 

@@ -17,7 +17,7 @@ The sync process and what a device actually writes into the folder in [sync-flow
 | Browser reach to a local folder, per browser | Proven | [§4 The folder adapter](#4-the-folder-adapter) |
 | Convergence of a single text field | Proven | [sync-flow.md §2 What the prototype settled](sync-flow.md#2-what-the-prototype-settled) |
 | Convergence of a tree | Decided  | [sync-flow.md §4.6 The decision](sync-flow.md#46-the-decision) |
-| Internal shape of the app | Decided | [past_decision.md §3 Application shape](past_decision.md#3-application-shape) |
+| Internal shape of the app | Decided | [past_decision.md §3 State Management](past_decision.md#3-state-management) |
 | Technology stack | Decided | [§6 Technology stack](#6-technology-stack) |
 | Packaging per platform | Decided | [§7 Packaging](#7-packaging) |
 
@@ -139,7 +139,7 @@ No a local database sits between the UI and the Local Folder. The device id is p
 | Layer | Choice |
 | --- | --- |
 | Language | TypeScript, `strict`, no `any` in the merge logic |
-| View | Svelte components; a Svelte store is the observable store chosen in [past_decision.md §3 Application shape](past_decision.md#3-application-shape) |
+| View | Svelte components; a Svelte store is the Materialised State Store chosen in [past_decision.md §3 State Management](past_decision.md#3-state-management) |
 | Build | Vite, producing a static bundle |
 | Runs in | A desktop browser and an Android WebView |
 
