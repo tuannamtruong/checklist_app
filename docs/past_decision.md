@@ -94,3 +94,33 @@ Every option is a pair of answers to two independent questions:
 The app does not *need history in the model and need to stop holding the tree in memory?* -> B. Undo is wanted
 eventually but is not worth making every read a replay, and a one-person checklist tree fits in memory with room to
 spare.
+
+## 4. Sync data model
+
+**An append-only op log per device**, `checklist.<device-id>.ops.jsonl`.
+
+
+ The full comparison is [sync-flow.md §4.5 Comparison](sync-flow.md#45-comparison) and the reasoning is
+ [sync-flow.md §4.6 The decision](sync-flow.md#46-the-decision); what follows is only the record of what was not taken.
+
+This is the decision the rest of the application hung off, and it closed milestone M0.
+
+### 4.1 The options
+
+| Option | The idea | Its cost | Would have won if |
+| --- | --- | --- | --- |
+| A — whole-tree snapshot per device | The prototype exactly, with a tree where the string was | Conflict granularity is the whole database, so one tick and one unrelated rename become a choice between two trees with one real edit lost either way | Shipping the proven thing outranked everything and the tree stayed a flat list. It is the only option already proven end to end |
+| **B — append-only op log (chosen)** | One op per line per device; state is the fold of every log | The log grows until compaction exists, and the cut rule is genuinely hard for a peer months behind | — |
+| C — snapshot plus op tail | A periodic full snapshot per device, plus the ops since it | Two formats that must mean the same thing, and the ordering "old snapshot, new tail" loses ops outright | Growth or cold start actually hurt. **It still will** — C is a strict superset of B, so this is the planned evolution rather than a rejection, and its trigger is total log bytes exceeding device count × serialised tree bytes |
+| D — one file per node | The folder mirrors the checklist; each node is its own file | File count grows with the tree, and cloud clients degrade on thousands of small files. A move or a subtree delete stops being atomic | A running Windows and Android build showed a provider syncing thousands of small files without latency or quota cost. That observation is deferred, which is what ruled D out rather than leaving it neutral |
+| E — CRDT document | A library document holds the tree and its encoding lands in the folder | — | Already closed one level up by [§3 State Management](#3-state-management); it was never independently available here |
+
+### 4.2 Two rules that came out of it
+
+**Version vectors are never pruned.** An absent counter means zero, which is indistinguishable from never having seen
+that device, so pruning turns agreement into a false race — and an epoch attribute that claims otherwise turns it into
+silent data loss. Keeping the vector whole costs about twenty bytes per device forever. The saving that pruning was
+reaching for is available losslessly by carrying a delta vector per op instead of a full one.
+
+**Compaction is deferred, not solved.** The cut rule is the one thing M0 left genuinely open, and it blocks nothing
+before M3.
