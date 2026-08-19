@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   canBackspaceDelete,
+  canDrop,
   canIndent,
   canMoveTo,
   canOutdent,
   canRestore,
   createFirstChild,
   createSiblingBelow,
+  dropOnto,
   indent,
   moveDown,
   moveTo,
@@ -212,6 +214,67 @@ describe('arbitrary moves — T-5', () => {
     ctx.tick();
     session.apply(moveTo(session.tree, ctx, b, a, null));
     expect(parentOf(session.tree, b)).toBe(a);
+  });
+});
+
+describe('dragging — T-14', () => {
+  it('drops a row above the one it landed on', () => {
+    const [a, b, c] = threeRows();
+    ctx.tick();
+    session.apply(dropOnto(session.tree, ctx, c, a, 'before'));
+    expect(childrenOf(session.tree, ROOT)).toEqual([c, a, b]);
+  });
+
+  it('drops a row below the one it landed on', () => {
+    const [a, b, c] = threeRows();
+    ctx.tick();
+    session.apply(dropOnto(session.tree, ctx, a, b, 'after'));
+    expect(childrenOf(session.tree, ROOT)).toEqual([b, a, c]);
+  });
+
+  // The dragged row leaves the sibling list before the key is minted, or
+  // "below the row above me" would mean "below myself" and nothing would move.
+  it('drops a row below its own neighbour without moving it nowhere', () => {
+    const [a, b, c] = threeRows();
+    ctx.tick();
+    session.apply(dropOnto(session.tree, ctx, b, c, 'after'));
+    expect(childrenOf(session.tree, ROOT)).toEqual([a, c, b]);
+  });
+
+  it('drops a row inside the one it landed on, at the end of what is there', () => {
+    const [a, b] = threeRows();
+    ctx.tick();
+    const first = createFirstChild(session.tree, ctx, a, { title: 'kid' });
+    session.apply(first);
+    ctx.tick();
+    session.apply(dropOnto(session.tree, ctx, b, a, 'inside'));
+    expect(childrenOf(session.tree, a)).toEqual([first[0]!.id, b]);
+  });
+
+  // T-5, from the one gesture that can express it — requirements.md §15 row 2.
+  it('refuses a drop into the dragged row’s own descendant', () => {
+    const [a] = threeRows();
+    ctx.tick();
+    const child = createFirstChild(session.tree, ctx, a, { title: 'kid' });
+    session.apply(child);
+    const kid = child[0]!.id;
+    expect(canDrop(session.tree, a, kid, 'inside')).toBe(false);
+    expect(dropOnto(session.tree, ctx, a, kid, 'inside')).toEqual([]);
+    // Above the child is still inside `a`, and that is a move `a` can make.
+    expect(canDrop(session.tree, a, kid, 'before')).toBe(false);
+  });
+
+  it('refuses a drop onto the row being dragged', () => {
+    const [a] = threeRows();
+    expect(canDrop(session.tree, a, a, 'inside')).toBe(false);
+    expect(dropOnto(session.tree, ctx, a, a, 'after')).toEqual([]);
+  });
+
+  it('writes one move op, like every other move', () => {
+    const [a, b] = threeRows();
+    ctx.tick();
+    const ops = dropOnto(session.tree, ctx, a, b, 'after');
+    expect(ops.map((op) => op.op)).toEqual(['move']);
   });
 });
 

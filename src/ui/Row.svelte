@@ -5,7 +5,7 @@
   // The title in the input is a draft, not the node's title. An op is emitted
   // when the edit is committed, so a rename costs one write rather than one per
   // keystroke — and Escape can put the row back without ever having written.
-  import { setTitle, toggleDone } from '../core/edit';
+  import { canDrop, dropOnto, setTitle, toggleDone } from '../core/edit';
   import { childrenOf } from '../core/tree';
   import type { NodeId } from '../core/types';
   import type { RowActionContext } from './actions';
@@ -14,8 +14,9 @@
   import KindIcon from './KindIcon.svelte';
   import RowMenu from './RowMenu.svelte';
   import { nodeHref } from '../app/router.svelte';
+  import type { RowDrag } from './drag.svelte';
 
-  let { ctx, depth }: { ctx: RowActionContext; depth: number } = $props();
+  let { ctx, depth, drag }: { ctx: RowActionContext; depth: number; drag: RowDrag } = $props();
 
   const id: NodeId = $derived(ctx.id);
   const session = $derived(ctx.session);
@@ -59,6 +60,35 @@
     if (next) focus.request(next);
   }
 
+  // T-14. The whole gesture lives on the grip: it captures the pointer, so the
+  // rows being crossed hear nothing and `RowDrag` hit-tests the document instead.
+  const drop = $derived(drag.target?.id === id ? drag.target : null);
+  const refused = $derived(drop !== null && drag.refused);
+
+  function onDragStart(event: PointerEvent): void {
+    // A pointer that started on the grip is a drag and nothing else: no scroll
+    // on a phone, and no focus stolen from the title being typed.
+    event.preventDefault();
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    drag.start(id);
+  }
+
+  function onDragMove(event: PointerEvent): void {
+    if (drag.id !== id) return;
+    drag.over(event.clientX, event.clientY, (target) =>
+      canDrop(session.tree, id, target.id, target.where),
+    );
+  }
+
+  function onDragEnd(): void {
+    const target = drag.end();
+    if (!target) return;
+    // A drop into a collapsed row would otherwise put the row somewhere the
+    // user cannot see, which reads exactly like losing it.
+    if (target.where === 'inside') view.expand(target.id);
+    session.run((tree, c) => dropOnto(tree, c, id, target.id, target.where));
+  }
+
   function onKeyDown(event: KeyboardEvent): void {
     const handled = handleRowKey(event, {
       ...ctx,
@@ -74,13 +104,36 @@
 
 {#if node}
   <div
-    class="group flex items-center gap-1 rounded-md pr-1 hover:bg-surface-sunken"
+    class="group flex items-center gap-1 rounded-md border-y-2 border-transparent pr-1 hover:bg-surface-sunken"
+    class:opacity-50={drag.id === id}
+    class:border-t-accent={drop?.where === 'before' && !refused}
+    class:border-b-accent={drop?.where === 'after' && !refused}
+    class:bg-accent-soft={drop?.where === 'inside' && !refused}
+    class:outline-2={refused}
+    class:outline-danger={refused}
     style="padding-left: {depth * 1.25}rem"
     data-testid="row"
     data-row-id={id}
     data-kind={node.kind}
     data-depth={depth}
+    data-drop={drop?.where ?? ''}
+    data-drop-refused={refused}
   >
+    <!-- T-14. Always there on a touch screen, on hover or focus otherwise: a
+         grip on every row at rest is a column of dots down the page. -->
+    <button
+      type="button"
+      class="drag-handle row-control w-4 shrink-0 cursor-grab text-ink-faint opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+      aria-label="Move {node.title || 'untitled'}"
+      data-testid="drag-handle"
+      onpointerdown={onDragStart}
+      onpointermove={onDragMove}
+      onpointerup={onDragEnd}
+      onpointercancel={() => drag.cancel()}
+    >
+      <span aria-hidden="true">⠿</span>
+    </button>
+
     <button
       type="button"
       class="row-control w-5 shrink-0 text-ink-faint hover:text-ink"

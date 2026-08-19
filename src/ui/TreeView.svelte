@@ -13,6 +13,7 @@
   import type { RowFocus } from './focus.svelte';
   import { DONE_HREF } from '../app/router.svelte';
   import Row from './Row.svelte';
+  import { RowDrag } from './drag.svelte';
   import { visibleRows } from './rows';
 
   let {
@@ -21,6 +22,10 @@
     focus,
     parent,
   }: { session: Session; view: ViewState; focus: RowFocus; parent: ParentId } = $props();
+
+  // T-14. One drag at a time, and it belongs to the list being dragged within:
+  // a page renders one tree, and a pointer is in one of them.
+  const drag = new RowDrag();
 
   const rows = $derived(visibleRows(session.tree, parent, (id) => view.isCollapsed(id)));
   const isEmpty = $derived(childrenOf(session.tree, parent).length === 0);
@@ -38,7 +43,7 @@
 
 <div class="flex flex-col" data-testid="tree">
   {#each rows as row (row.id)}
-    <Row ctx={{ session, view, focus, rows, id: row.id }} depth={row.depth} />
+    <Row ctx={{ session, view, focus, rows, id: row.id }} depth={row.depth} {drag} />
   {/each}
 </div>
 
