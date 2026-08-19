@@ -66,17 +66,29 @@ async function waitForServer(url, timeoutMs = 30_000) {
   throw new Error(`server did not answer on ${url} within ${timeoutMs}ms`);
 }
 
-/** Serves `dist/` — the same bundle a static host would serve. */
+/**
+ * Serves `dist/` — the same bundle a static host would serve.
+ *
+ * Its own process group, because `npx` is a shell wrapper that does not pass a
+ * signal to the vite it spawned: killing the wrapper alone leaves the server
+ * holding port 38531, and the next run fails on `strictPort` for a reason that
+ * has nothing to do with the change being tested.
+ */
 export async function startPreview() {
   const child = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort'], {
     cwd: ROOT_DIR,
     stdio: ['ignore', 'pipe', 'pipe'],
+    detached: true,
   });
   child.stderr.on('data', (chunk) => process.stderr.write(`[preview] ${chunk}`));
   await waitForServer(BASE_URL);
   return {
     async stop() {
-      child.kill('SIGTERM');
+      try {
+        process.kill(-child.pid, 'SIGTERM');
+      } catch {
+        // Already gone, which is the outcome this was asking for.
+      }
     },
   };
 }
@@ -134,6 +146,29 @@ export function seedLog(device = DEVICE) {
 
   const header = JSON.stringify({ v: 1, dev: device, clock: { [device]: counter } });
   return { device, text: [header, ...lines].join('\n') + '\n' };
+}
+
+const PEER = '5eed0002';
+
+/**
+ * A second device's file, for the checks only a real browser can answer: does a
+ * peer's row arrive without a reload, and does a race raise the nav entry.
+ *
+ * It is written by hand rather than by a second app instance because that is
+ * what a Sync Folder delivers — bytes, from a device that is not here. The
+ * title op deliberately races the seed's own: `at` is later, so the peer wins,
+ * and neither file carries a receipt for the other, so the two are concurrent
+ * rather than ordered — sync-flow.md §2.1.
+ */
+export function peerLog(device = PEER) {
+  const at = Date.UTC(2026, 7, 18, 10, 0, 0);
+  const lines = [
+    { op: 'create', id: 'n_peer0001', parent: 'n_seed0001', kind: 'task', order: 'a5', c: 1, at },
+    { op: 'set', id: 'n_peer0001', title: 'Tea', c: 2, at: at + 1_000 },
+    { op: 'set', id: 'n_seed0004', title: 'Coffee', c: 3, at: at + 2_000 },
+  ].map((line) => JSON.stringify(line));
+  const header = JSON.stringify({ v: 1, dev: device, clock: { [device]: 3 } });
+  return { device, name: `checklist.${device}.ops.jsonl`, text: [header, ...lines].join('\n') + '\n' };
 }
 
 /**

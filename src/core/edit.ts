@@ -7,9 +7,19 @@
 // dropped before it reaches the log — and it is also what keeps `Escape` on an
 // unchanged title from costing a write.
 
+import type { ConflictField, FieldValue } from './conflicts';
 import { keyBetween } from './order';
 import { childrenOf, isAncestorOrSelf, parentOf, siblingsOf, type ResolvedTree } from './tree';
-import { ROOT, type EditContext, type Kind, type Node, type NodeId, type Op, type ParentId } from './types';
+import {
+  KINDS,
+  ROOT,
+  type EditContext,
+  type Kind,
+  type Node,
+  type NodeId,
+  type Op,
+  type ParentId,
+} from './types';
 
 function stamp(ctx: EditContext): { c: number; at: number; dev: string } {
   return { c: ctx.nextCounter(), at: ctx.now(), dev: ctx.deviceId };
@@ -135,6 +145,46 @@ export function turnInto(tree: ResolvedTree, ctx: EditContext, id: NodeId, kind:
   const node = tree.nodes[id];
   if (!isWritable(node) || node.kind === kind) return [];
   return [{ op: 'set', id, kind, ...stamp(ctx) }];
+}
+
+/**
+ * C-1: the value a concurrent write lost, written back by hand.
+ *
+ * It is an ordinary `set` and nothing more. Because the device doing it has read
+ * both sides, its op dominates both and the conflict row that offered it stops
+ * being derivable — which is the whole of "any device can settle any race",
+ * S-6, with no resolution protocol anywhere.
+ *
+ * `parent` is not offered. Putting a row back under a parent is a move, and a
+ * move needs an order key among siblings the losing device never saw; the user
+ * drags it instead, which is the same corrective edit sync-flow.md §6.2 relies on.
+ */
+export function restoreValue(
+  tree: ResolvedTree,
+  ctx: EditContext,
+  id: NodeId,
+  field: ConflictField,
+  value: FieldValue,
+): Op[] {
+  switch (field) {
+    case 'title':
+      return typeof value === 'string' ? setTitle(tree, ctx, id, value) : [];
+    case 'body':
+      return typeof value === 'string' ? setBody(tree, ctx, id, value) : [];
+    case 'kind':
+      return isKind(value) ? turnInto(tree, ctx, id, value) : [];
+    case 'done': {
+      const node = tree.nodes[id];
+      if (typeof value !== 'boolean' || !isWritable(node) || node.done === value) return [];
+      return [{ op: 'set', id, done: value, ...stamp(ctx) }];
+    }
+    case 'parent':
+      return [];
+  }
+}
+
+function isKind(value: FieldValue): value is Kind {
+  return typeof value === 'string' && (KINDS as readonly string[]).includes(value);
 }
 
 export function canIndent(tree: ResolvedTree, id: NodeId): boolean {

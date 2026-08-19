@@ -88,26 +88,32 @@ Every storage that can hold a folder can offer them. The prototype ships five:
 | `memory-folder` | anywhere | a fake for UI tests, no disk |
 | `local-folder` | any browser | `localStorage`, one key per file name |
 
-`local-folder` is the sixth, and it exists because M1 has one device and no Sync Folder while the payload is already
-decided. It keeps the op log the only persistence and the three methods the only route to it, so M2 replaces an adapter
+`local-folder` is the sixth, and it exists because M1 had one device and no Sync Folder while the payload was already
+decided. It keeps the op log the only persistence and the three methods the only route to it, so M2 replaced an adapter
 rather than a write path — requirement S-21. It is not a sync adapter: `localStorage` is per-origin and nothing mirrors
-it anywhere.
+it anywhere, which is why the app names it "This browser only" and says so where it shows the folder.
 
-The production app needs the prototype's five for the same reasons; M1 ships two of them, `memory-folder` and
-`local-folder`, and M2 brings the rest. Keeping the interface at three methods is what lets the merge logic be tested
-against a plain object and shipped against a phone.
+The production app needs the prototype's five for the same reasons. M1 shipped `memory-folder` and `local-folder`; M2
+added `fsaa-folder`, `http-folder` and `android-folder`, which is every browser-side one. `node-folder` has no caller in
+the app — nothing production runs in Node — so it stays the prototype's. Keeping the interface at three methods is what
+lets the merge logic be tested against a plain object and shipped against a phone.
 
 **Adapter selection at startup.** On every page load, "How can this browser reach a local folder?" is asked.
+`src/app/folder-choice.ts` is that question, and the flowchart below is its shape.
 
 ```mermaid
 flowchart TD
     S([page loads]) --> S1[uitest param exist?]
     S1 -->|yes| S2A[memory-folder adapter]
-    S1 -->|no| S2B[window.AndroidFolder?]
-    
+    S1 -->|no| S2M[stored choice?]
+
+    S2M -->|local| S3L[local-folder adapter]
+    S2M -->|fsaa| S5B
+    S2M -->|none| S2B[window.AndroidFolder?]
+
     S2B -->|yes| S3A["AndroidFolder<br/>.hasFolder()"]
     S2B -->|no| S3B["GET /folder/info"]
-    
+
     S3A -->|yes| S4A["android-folder adapter"]
     S3A -->|no| S4B["User pick folder in UI"]
     S3B -->|configured: true| S4C["http-folder adapter"]
@@ -115,14 +121,30 @@ flowchart TD
 
     S4B -->S5A["reload"]
     S4D -->|yes| S5B["Load IndexedDB handle"]
-    S4D -->|no| S5C["show unsupported"]
+    S4D -->|no| S5C["setup screen:<br/>this browser only"]
 
     S5B -->|granted| S6A["stored fsaa-folder adapter"]
     S5B -->|re-grant needed| S6B["Reopen UI"]
     S5B -->|none| S6C["User pick folder in UI"]
-    
+
+    S5C -->S3L
     S6C -->S7A["fsaa-folder adapter"]
 ```
+
+Three things the flowchart is worth reading twice for.
+
+**The stored choice is first, and it is only ever what the user picked.** A device that has been shown the setup screen
+never sees it again, so an app that reaches the folder through the helper today does not silently move to a File System
+Access handle tomorrow because the browser changed. It lives in `localStorage`, per-origin like the device id.
+
+**A folder that already holds this device's op log counts as a stored choice of `local`.** Without that rule, every
+device that ran M1 would come back to a setup screen with its tree apparently gone — the ops are in `localStorage`, the
+setup screen is not looking there, and "where did my checklist go" is not a question to answer with a migration note.
+
+**The unsupported branch ends in an adapter rather than an apology.** A browser that can reach no folder can still run
+the whole application against `local-folder`; what it cannot do is sync. The setup screen says exactly that, and the
+shell keeps saying it in the footer, because a user who believes they are synced and is not is the one failure this
+design must never produce silently.
 
 ## 5. Device identity and local storage
 
@@ -134,7 +156,7 @@ device. The label travels inside the file.
 | Sync Folder | provider's storage | the shared state; every device holds a full replica |
 | Local Folder | device disk | the replica this device reads and writes |
 | IndexedDB | browser | the folder handle, so startup does not re-prompt |
-| `localStorage` | browser | device id and label |
+| `localStorage` | browser | device id and label, which folder this device chose, collapse state, dismissed conflict rows |
 
 No a local database sits between the UI and the Local Folder. The device id is per-origin, which
 [§7.1 The two Windows bundles](#71-the-two-windows-bundles) turns into a live concern.

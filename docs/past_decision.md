@@ -124,3 +124,27 @@ reaching for is available losslessly by carrying a delta vector per op instead o
 
 **Compaction is deferred, not solved.** The cut rule is the one thing M0 left genuinely open, and it blocks nothing
 before M3.
+## 5. Reading a folder of logs
+
+Four decisions M2 made while building [§4 Sync data model](#4-sync-data-model)'s payload into a working cycle. None of
+them reopens the payload; each one is a place where the obvious implementation is wrong for a reason worth keeping.
+
+| Decision | Chosen | Over | Would be reopened by |
+| --- | --- | --- | --- |
+| Applying a peer's ops | Re-fold the whole op set whenever a cycle delivers anything | Applying the new ops onto the tree in arrival order; per-field timestamps carried on the node | A log large enough that a fold costs more than a frame — which is compaction's problem (S-14) and arrives with it |
+| Receipts | Counted from the ops actually held, per peer file | Joining the vector out of a peer's header, which is the cheaper-looking read | Nothing: it is the difference between under-claiming and over-claiming, and only one of those loses data |
+| The user-facing race | One row that states the resolution and offers the value it dropped | A prompt asking which of two states to keep, as the maximal set implies | A payload where the unit of conflict is the file again, which is option A |
+| A browser with no folder | Fall back to `local-folder` and say so, permanently, in the footer | Refusing to start; a read-only mode; silently pretending to sync | Nothing. The alternative to being honest here is a user who believes their phone has their tree |
+
+**Why not apply a peer's ops incrementally.** It is the natural implementation and it is wrong in a way that does not
+show up in a two-device test. A peer's op usually arrives *older* than ops already applied — that is what being offline
+means — so laying it on top turns last-writer-wins into last-arriving-wins. Two devices that received the same ops in a
+different order would then hold different trees, permanently, with nothing in either file to say which was right. The
+alternative that does work incrementally is a timestamp per field per node, which is a bigger node, a bigger file, and
+the same answer.
+
+**Why the conflict row is not a prompt.** Under the op log both values are on disk and the fold has already picked one
+by `(at, device id)`. Asking the user to choose would mean either blocking the merge until they answered — on a device
+that may not be opened for a week — or asking about a decision already taken. Stating it and offering to reverse it is
+the same information with none of the waiting, and the reversal is an ordinary `set` that dominates both sides, so there
+is no resolution protocol to write, test or converge.

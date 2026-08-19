@@ -6,9 +6,11 @@
 // burst of whole-file writes, and two writes must never be in flight at once,
 // or the shorter one can land last.
 
+import { receiptDelta } from '../core/merge';
 import { clockOf, decodeLog, deviceFileName, encodeLog, LOG_VERSION } from '../core/op-log';
+import { dominates, join } from '../core/sclock';
 import type { FolderAdapter } from '../core/folder';
-import type { DeviceId, Op } from '../core/types';
+import type { DeviceId, Op, SClock } from '../core/types';
 
 /** Long enough to swallow a burst of keystrokes, short enough to survive a tab close. */
 const WRITE_DEBOUNCE_MS = 250;
@@ -23,8 +25,12 @@ export class DeviceLog {
   readonly device: DeviceId;
   private readonly folder: FolderAdapter;
   private readonly events: DeviceLogEvents;
-  private ops: Op[] = [];
+  private entries: Op[] = [];
   private counter = 0;
+  /** Peers' counters this device has folded in — sync-flow.md §4.2. */
+  private receipts: SClock = {};
+  /** The receipts as of the last op appended, so `seen` can carry only the delta. */
+  private receipted: SClock = {};
   private timer: ReturnType<typeof setTimeout> | null = null;
   private writing: Promise<void> = Promise.resolve();
   private pending = false;
@@ -36,9 +42,9 @@ export class DeviceLog {
   }
 
   /**
-   * Reads this device's own file. M1 has one device, so that is the whole
-   * folder; M2 widens this to every `checklist.*.ops.jsonl` in it and folds
-   * them together, which is why the fold already takes ops from any device.
+   * Reads this device's own file, and only ever this one. Every other file in
+   * the folder is a peer's and belongs to `FolderSync`, which reads them and
+   * never writes one — the one-writer-per-file rule, S-3.
    */
   static async open(
     folder: FolderAdapter,
@@ -50,8 +56,15 @@ export class DeviceLog {
       const text = await folder.read(deviceFileName(device));
       const decoded = text === null ? null : decodeLog(text);
       if (decoded !== null) {
-        log.ops = decoded.ops;
+        log.entries = decoded.ops;
         log.counter = clockOf(decoded.ops)[device] ?? 0;
+        // Our own receipts, as we last wrote them. Reloading without them would
+        // make every peer edit already folded in look new again on the next
+        // write, and every one of our ops would carry a `seen` for it.
+        const peers: Record<DeviceId, number> = { ...decoded.header.clock };
+        delete peers[device];
+        log.receipts = peers;
+        log.receipted = peers;
         if (decoded.skipped > 0) events.onSkipped?.(decoded.skipped);
       } else if (text !== null) {
         // A file that does not parse is skipped whole and picked up next cycle
@@ -64,7 +77,12 @@ export class DeviceLog {
     } catch (error) {
       events.onError?.(error);
     }
-    return { log, ops: log.ops };
+    return { log, ops: log.entries };
+  }
+
+  /** Every op this device has ever written, in the order it wrote them. */
+  get ops(): readonly Op[] {
+    return this.entries;
   }
 
   /** This device's counter. Only an op that is actually written may take one. */
@@ -72,9 +90,28 @@ export class DeviceLog {
     return ++this.counter;
   }
 
+  /**
+   * Records what has been folded in from peers. The file is rewritten even when
+   * nothing else changed, because the header line is the receipt: a device that
+   * adopted a peer's edit without recording it would look, on its next edit,
+   * like it had edited concurrently — sync-flow.md §2.4.
+   */
+  noteReceipts(clock: SClock): void {
+    const next = join(this.receipts, clock);
+    if (dominates(this.receipts, next)) return;
+    this.receipts = next;
+    this.schedule();
+  }
+
   append(ops: readonly Op[]): void {
     if (ops.length === 0) return;
-    this.ops.push(...ops);
+    // Only the delta, and only on the first op of the batch. The full vector is
+    // in the header; replaying the file forward reconstructs the rest.
+    const delta = receiptDelta(this.receipted, this.receipts);
+    const carried =
+      Object.keys(delta).length === 0 ? ops : [{ ...ops[0]!, seen: delta }, ...ops.slice(1)];
+    this.receipted = this.receipts;
+    this.entries.push(...carried);
     this.schedule();
   }
 
@@ -92,10 +129,11 @@ export class DeviceLog {
     }
     if (!this.pending) return this.writing;
     this.pending = false;
-    const snapshot = [...this.ops];
+    const snapshot = [...this.entries];
+    const receipts = this.receipts;
     this.writing = this.writing.then(async () => {
       try {
-        const clock = clockOf(snapshot);
+        const clock = join(clockOf(snapshot), receipts);
         const content = encodeLog({ v: LOG_VERSION, dev: this.device, clock }, snapshot);
         await this.folder.write(deviceFileName(this.device), content);
       } catch (error) {

@@ -30,19 +30,27 @@ vectors rather than approximations.
 | --- | --- | --- | --- |
 | Merge properties | the logic layer, generated inputs | is the merge commutative, associative, idempotent | partly — `test/e2e/scenario.mjs` check 10 |
 | Scenario | the logic layer plus an in-memory folder | do N devices converge across a scripted sequence of edits, races and joins | `test/e2e/scenario.mjs` checks 1–9, against temp directories rather than memory |
-| Adapter conformance | each adapter in turn | do all five adapters honour the same three-method contract | — |
+| Adapter conformance | each adapter in turn | does every adapter honour the same three-method contract | — |
 | Integration | real files, real processes | does a device reach a real folder through the path its platform forces on it | `test/e2e/bridge.mjs` |
 | UI | the page in a browser | does an edit produce exactly one write, does a race raise the panel, does the keyboard model work | `test/ui.mjs`, and `test/android-bridge.mjs` for the Android startup path |
 | Platform | the WebView shell, the installed PWA | does startup, the folder grant, and a cold offline launch work on the device | — |
 
 Three of the six are implemented in the prototype, and merge properties only in the weak form
-[§3.1 Merge properties](#31-merge-properties) describes. Adapter conformance and the platform checklist are new work.
+[§3.1 Merge properties](#31-merge-properties) describes. Five of the six are implemented in production; the platform
+layer is a written checklist and stays one.
 
 M1 added production tests at two of the layers. `src/core/*.test.ts` runs the logic layer under Vitest — order keys, the
 fold, the T-6 repair, the T-7 tombstone walk and every edit intent — and `scripts/ui-smoke.mjs` drives the built app in
 Chromium for the keyboard model, a reload through the op log and a cold start with the network off. Neither mocks
 anything below itself: the UI run uses the real `local-folder` adapter, seeded by writing the device file it would have
 written.
+
+M2 added the other three that can run on this machine. `src/core/merge.test.ts` is the scenario layer and the
+merge-property layer at once — every case in [§3.2 Scenario](#32-scenario), then the three laws over a seeded generator;
+`src/app/folder-sync.test.ts` drives one cycle against a folder adapter, including the half-synced file of S-7; and
+`src/adapters/conformance.test.ts` is [§3.3 Adapter conformance](#33-adapter-conformance), one suite over four of the
+six adapters. The smoke run gained a peer: a second device's file is written into the same folder while the page is
+open, and the check is that the row appears without a reload.
 
 ## 3. What each layer owes
 
@@ -54,6 +62,11 @@ state. Property-based generation matters here — hand-written cases find the bu
 
 Vector arithmetic — `join`, `bump`, `dominates`, `equal`, `concurrent` — is exhaustively testable over small vectors and
 should be.
+
+`src/core/merge.test.ts` asserts the three laws directly, over op sets from a seeded generator: the fold of a shuffled
+set equals the fold of the original (commutative), folding in two groups equals folding at once (associative), and
+folding a set twice changes nothing (idempotent). `SEED` in the environment reproduces a failure exactly. What keeps
+S-12 open is shrinking — a failure arrives as the whole generated set rather than as the two ops that caused it.
 
 The prototype gets part of the way. `test/e2e/scenario.mjs` check 10 runs four devices through 300 randomised edits,
 deliveries and syncs drawn from a seeded PRNG, then asserts that all four agree on the text and on the vector; `SEED` in
@@ -86,10 +99,18 @@ Production adds the tree cases, and these are the ones that will find bugs:
 
 ### 3.3 Adapter conformance
 
-One suite, run against all five adapters, asserting the contract rather than the implementation: `list` returns names
-and not paths, `read` of an absent name returns `null` rather than throwing, `write` followed by `read` round-trips
-exactly, a write is never observable in a partial state, and names with awkward characters survive. The prototype has no
-such suite; each adapter is exercised only by the test that happens to use it, which is how the five drift apart.
+One suite, run against every adapter, asserting the contract rather than the implementation: `list` returns names and
+not paths, `read` of an absent name returns `null` rather than throwing, `write` followed by `read` round-trips exactly,
+a write is never observable in a partial state, and names with awkward characters survive. The prototype has no such
+suite; each adapter is exercised only by the test that happens to use it, which is how adapters drift apart.
+
+`src/adapters/conformance.ts` is that suite, and `conformance.test.ts` runs it over four of the six: `memory-folder`,
+`local-folder` against a fake `Storage`, `android-folder` against a stubbed bridge, and `http-folder` against a loopback
+server the test starts and stops itself. Two are not in it, for different reasons. `fsaa-folder` needs a directory
+handle, which needs a picker and a real user gesture, so no headless run can hold one — it is on
+[§3.6 Platform](#36-platform)'s checklist instead. `node-folder` has no production caller at all. The partial-write
+clause is the one the suite cannot assert from inside a page either: a writer cannot observe its own write being
+partial, and the property belongs to the provider's client — S-8.
 
 ### 3.4 Integration
 
@@ -157,10 +178,10 @@ choice is the stack changing, not the test suite growing.
 
 ## 6. Commands
 
-Production, as of M1:
+Production, as of M2:
 
 ```bash
-npm test              # Vitest over src/**/*.test.ts — the logic layer and the row-action parity
+npm test              # Vitest over src/**/*.test.ts — the logic layer, the merge, the adapters, the row-action parity
 npm run check         # svelte-check, in strict TypeScript
 npm run ui-smoke      # builds, serves dist/ on 38531, drives Chromium, screenshots to ui-smoke/
 npm run seed          # the same app with a small tree in it, in a window, to look at

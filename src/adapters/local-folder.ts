@@ -21,6 +21,19 @@ export class LocalFolderError extends Error {
   }
 }
 
+/**
+ * Whether this browser is already holding an op log. It is what lets startup
+ * treat an M1 device as having chosen `local` — architecture.md §4 — without
+ * opening the folder or knowing which device wrote it.
+ */
+export function localFolderHasData(storage: Storage = window.localStorage): boolean {
+  for (let i = 0; i < storage.length; i++) {
+    const key = storage.key(i);
+    if (key?.startsWith(PREFIX) && key.endsWith('.ops.jsonl')) return true;
+  }
+  return false;
+}
+
 export function localFolder(storage: Storage = window.localStorage): FolderAdapter {
   return {
     async list() {

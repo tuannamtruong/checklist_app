@@ -2,15 +2,15 @@
 
 Requirement docs and its current state.
 
-**Milestone M1 is built** — the production tree is `src/`, and every ✅ row below names the file that implements it. Rows
-marked `pt.` are proven by running code in `prototype/`, which does not share code with production and is not on the way
-to it — the design crosses over, the source does not.
+**Milestones M1 and M2 are built** — the production tree is `src/`, and every ✅ row below names the file that implements
+it. A `pt.` note marks a row the prototype proved first; `prototype/` does not share code with production and is not on
+the way to it — the design crosses over, the source does not.
 
 Two commands verify the ✅ rows:
 
 ```bash
-npm test          # the logic layer, in Node
-npm run ui-smoke  # the built app in Chromium: the keyboard model, a reload, a cold start offline
+npm test          # the logic layer and the merge, in Node
+npm run ui-smoke  # the built app in Chromium: the keyboard model, a peer device arriving, a reload, a cold start offline
 ```
 
 Legend:
@@ -32,7 +32,7 @@ still to be decided.
 | # | Stated requirement | State | Note |
 | --- | --- | --- | --- |
 | 1 | Folder structure: a tree | ✅ | `src/core/tree.ts`, `src/ui/TreeView.svelte` |
-| 2 | Sync between PCs and phones via a cloud file service | pt. | Transport proven for one text field; the tree payload is an append-only op log per device — [sync-flow.md §4.6 The decision](sync-flow.md#46-the-decision) |
+| 2 | Sync between PCs and phones via a cloud file service | ◐ | Built and tested against a folder — `src/app/folder-sync.ts`, `src/core/merge.ts`. What is untested is a real provider's client under it, which needs the Windows and Android builds — [§7.3 Fixed constraints](#73-fixed-constraints) |
 | 3 | Lists and sub-lists | ✅ | Nesting is the tree; indent/outdent, drag-free reorder — `src/core/edit.ts` |
 | 4 | Either a checklist or a text note | ✅ | `src/ui/NodePage.svelte`, `src/ui/NoteBody.svelte` |
 
@@ -81,8 +81,13 @@ is told rather than asked. `parentSetAt` is that rule's timestamp for `parent`, 
 ### 2.3 What is never in the Sync Folder
 
 Device-local state, held in `localStorage` and never written to a shared file: the device id, collapse/expand state
-(T-8), the sync cadence setting (S-19), dismissed conflict notices, and any filter the Done view grows (T-12). Anything
-the user would not want to converge across devices belongs here rather than in the tree.
+(T-8), the sync cadence (S-19), which folder this device reaches the tree through
+([architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter)), dismissed conflict notices (C-6), and
+any filter the Done view grows (T-12). Anything the user would not want to converge across devices belongs here rather
+than in the tree.
+
+The folder handle itself is the one piece that cannot live in `localStorage` — a File System Access handle is an object
+rather than a string — so it sits in IndexedDB, which changes where it is stored and nothing about the rule.
 
 The Done view itself is not state. It is a read-time filter over `done` and the T-7 tombstone — derived, so it needs no
 sync and no writes.
@@ -96,7 +101,7 @@ sync and no writes.
 | T-3 | Indent (become child of sibling above) / outdent (become parent's next sibling) | ✅ | `src/core/edit.ts` `indent`/`outdent`; `edit.test.ts`, `scripts/ui-smoke.mjs` |
 | T-4 | Move up/down among siblings | ✅ | `src/core/edit.ts` `moveUp`/`moveDown`; `edit.test.ts` |
 | T-5 | A move that would create a loop is refused | ◐ | `src/core/edit.ts` `canMoveTo`; `edit.test.ts`. M1 has no drag and no move-to picker, so no UI path can attempt one yet. Local check only — it catches one device dragging a folder into its own child, never the merge case, which is T-6: [sync-flow.md §6.1 T-5 is not the loop defence](sync-flow.md#61-t-5-is-not-the-loop-defence) |
-| T-6 | A Cyclic tree state (concurrent A→B, B→A) is repaired at _read_ time by re-rooting, never by writing | ✅ | Drop the cycle edge with the oldest `(parentSetAt, device id)` — [sync-flow.md §6.2 The repair](sync-flow.md#62-the-repair) — `src/core/tree.ts` `resolveTree`; `tree.test.ts`. Cannot arise on one device — the tests are the proof until M2 |
+| T-6 | A Cyclic tree state (concurrent A→B, B→A) is repaired at _read_ time by re-rooting, never by writing | ✅ | Drop the cycle edge with the oldest `(parentSetAt, device id)` — [sync-flow.md §6.2 The repair](sync-flow.md#62-the-repair) — `src/core/tree.ts` `resolveTree`; `tree.test.ts`, and `merge.test.ts` builds the cycle the way it actually happens — two devices, two concurrent moves, folded from two files. The repair names the node it re-rooted, which is C-2 |
 | T-7 | Deleting a node tombstones its whole subtree, not just the node | ✅ | The ancestor walk must climb the T-6-resolved parent, or a tombstoned subtree containing a cycle hangs — [sync-flow.md §6.2 The repair](sync-flow.md#62-the-repair) — `src/core/tree.ts`; `tree.test.ts` covers the tombstoned subtree that contains a cycle |
 | T-8 | Collapse/expand state is per-device and never synced | ✅ | `src/app/view-state.svelte.ts` — `localStorage`, never a file |
 | T-9 | Breadcrumbs show the path back up from any node | ✅ | `src/ui/Breadcrumbs.svelte`, over `ancestorsOf` |
@@ -156,6 +161,7 @@ helper and to the Android WebView unchanged. `src/app/router.svelte.ts` holds th
 | `#/` | The root: every top-level row | `src/ui/NodePage.svelte` with no node |
 | `#/n/<node-id>` | One node's page — its path, its title, its body if it is a note, and its children | `src/ui/NodePage.svelte` |
 | `#/done` | The Done view of T-12: every finished row, then every deleted one | `src/ui/DonePage.svelte` |
+| `#/conflicts` | What the merge decided without asking — [§9 Conflict presentation](#9-conflict-presentation) | `src/ui/ConflictsPage.svelte` |
 | anything else | The recovery page, per X-11 | `src/ui/RecoveryPage.svelte` |
 
 A node id that no longer resolves is not an error state: `#/n/<id>` of a deleted or unknown node renders the recovery
@@ -167,46 +173,54 @@ and breadcrumbs (T-9). Both climb the T-6-resolved parent, never the stored one.
 sidebar's nav and is always present, because a view that appeared only when it had something in it would be a view the
 user could not learn.
 
+`#/conflicts` is the exception to that rule, and deliberately: its entry appears only when there is something in it,
+because a permanent one would be empty almost always — [§9 Conflict presentation](#9-conflict-presentation). It is
+reachable by typing the fragment even then, and answers "nothing to report" rather than the recovery page.
+
 ## 6. Search
 
 _Not written yet._
 
 ## 7. Sync
 
-The transport is proven and the payload is chosen — an append-only op log per device,
-[sync-flow.md §4.6 The decision](sync-flow.md#46-the-decision). The design reasoning lives in
-[sync-flow.md](sync-flow.md); this section records only requirement state.
+The transport is proven, the payload is chosen — an append-only op log per device,
+[sync-flow.md §4.6 The decision](sync-flow.md#46-the-decision) — and **M2 is built**: every device's file in the folder
+is read, folded and written back. The design reasoning lives in [sync-flow.md](sync-flow.md); this section records only
+requirement state.
 
-### 7.1 Proven in the prototype
+### 7.1 Built
+
+A row marked `pt.` in the last column was proven in `prototype/` first, over a single text field. The production code
+shares none of that source — the design crossed over, not the file.
 
 | ID | Requirement | State | Where |
 | --- | --- | --- | --- |
-| S-1 | Every mutation goes through one write path | pt. | `prototype/core/folder-sync.mjs` |
-| S-3 | A device writes only paths carrying its own device id, so no two devices write one path | pt. | `prototype/core/device.mjs` |
-| S-4 | Merge is commutative, associative and idempotent | pt. | `prototype/core/merge.mjs`; scenario-tested, not property-tested |
-| S-5 | Concurrent edits are detected by version vector, never prevented | pt. | `prototype/core/merge.mjs` |
-| S-6 | Any device can settle any race, with no leader, quorum or membership | pt. | `prototype/core/device.mjs` |
-| S-7 | A half-synced file is skipped and picked up whole on the next cycle | pt. | `prototype/core/folder-sync.mjs` |
-| S-8 | A write is never observable in a partial state (temp file plus atomic rename) | pt. | `prototype/adapters/node-folder.mjs` |
-| S-9 | A new device joins by writing a file — no registration, no coordination | pt. | `prototype/core/merge.mjs` |
-| S-10 | No-op edits are dropped before they reach the log | pt. | `prototype/public/app.js`, and see [prototype/README.md §6.1 Stale state](../prototype/README.md#61-stale-state) |
-| S-17 | Multi-device convergence simulator | pt. | `prototype/test/e2e/scenario.mjs` |
+| S-1 | Every mutation goes through one write path | ✅ | `src/app/device-log.ts` — the only writer of this device's file. `pt.` `prototype/core/folder-sync.mjs` |
+| S-2 | A mutation shape that merges at field granularity rather than whole-document | ✅ | The op of [§2.2 The op](#22-the-op): a `set` carries only the fields that changed, so disjoint fields never interact — `src/core/materialise.ts` |
+| S-3 | A device writes only paths carrying its own device id, so no two devices write one path | ✅ | `deviceFileName` in `src/core/op-log.ts` is the only name the write path can spell, and `src/app/folder-sync.ts` reads peers without ever writing one. `pt.` `prototype/core/device.mjs` |
+| S-4 | Merge is commutative, associative and idempotent | ✅ | `src/core/merge.ts`; `merge.test.ts` asserts all three laws over op sets from a seeded generator — the shrinking S-12 still owes is what keeps that row open. `pt.` `prototype/core/merge.mjs` |
+| S-5 | Concurrent edits are detected by version vector, never prevented | ✅ | `opVectors` in `src/core/merge.ts` replays each file's `seen` receipts into a vector per op; `src/core/conflicts.ts` classifies the pair. `pt.` `prototype/core/merge.mjs` |
+| S-6 | Any device can settle any race, with no leader, quorum or membership | ✅ | Settling one is an ordinary op — `src/ui/ConflictsPage.svelte` writes a `set` like any other edit, and it dominates both sides because it has read both. `pt.` `prototype/core/device.mjs` |
+| S-7 | A half-synced file is skipped and picked up whole on the next cycle | ✅ | `src/app/folder-sync.ts`, over `decodeLog`'s `null`; a decode that came back shorter than what is already held is treated the same way, since the file is append-only. `folder-sync.test.ts`. `pt.` `prototype/core/folder-sync.mjs` |
+| S-9 | A new device joins by writing a file — no registration, no coordination | ✅ | `src/app/folder-sync.ts` reads whatever `list()` returns; a device absent from a vector counts as zero — `src/core/sclock.ts`. `pt.` `prototype/core/merge.mjs` |
+| S-10 | No-op edits are dropped before they reach the log | ✅ | `src/core/edit.ts` returns no ops at all, so `Session.run` writes nothing — `edit.test.ts`. `pt.` `prototype/public/app.js`, and see [prototype/README.md §6.1 Stale state](../prototype/README.md#61-stale-state) |
+| S-13 | Tree-aware merge: concurrent moves, subtree tombstones, sibling order | ✅ | The three are read-time, not merge-time: `resolveTree` re-roots a cycle (T-6) and inherits a tombstone (T-7), `compareSiblings` orders on `(order, orderBy, id)` (T-2). `merge.test.ts` runs every case in [test.md §3.2 Scenario](test.md#32-scenario) |
+| S-15 | An on-disk encoding that is appendable and diff-readable | ✅ | JSON Lines, one op per line, after a header line carrying the full vector — `src/core/op-log.ts`, [sync-flow.md §4.2 B — Append-only op log per device](sync-flow.md#42-b--append-only-op-log-per-device) |
+| S-17 | Multi-device convergence simulator | ✅ | `src/core/merge.test.ts` — four devices, a seeded PRNG, edits and deliveries interleaved, then every device asserted to hold one tree. `pt.` `prototype/test/e2e/scenario.mjs` |
+| S-18 | Adapter conformance suite covering every adapter | ◐ | `src/adapters/conformance.ts` is one suite asserting the contract rather than the implementation, run by `conformance.test.ts` over `memory`, `local`, `android` (bridge stubbed) and `http` (against a loopback server the test starts). `fsaa` needs a real folder picker and a user gesture, so it stays a device check — [test.md §3.3 Adapter conformance](test.md#33-adapter-conformance) |
+| S-19 | The sync cycle runs on activity: the write path *is* the cycle, decaying to window focus and a manual refresh when idle | ✅ | `src/app/sync-cadence.ts` — a local edit resets the cadence, which then decays 5 s → 15 s → 60 s and stops. Focus and the shell's refresh button are the idle triggers. The cadence is device-local and never synced |
+| S-20 | A note body is emitted as an op on blur, on navigating away, or after 60 s of continuous editing | ✅ | `src/ui/NoteBody.svelte` and `Session.commitBody`; navigating away is `src/ui/App.svelte`. Not on K-7's 1 s store debounce. Whole-body ops are the dominant growth term, so the emission trigger is what bounds the log |
+| S-21 | The device's own op log persists through a folder adapter backed by `localStorage` | ✅ | `src/adapters/local-folder.ts`. It was M1's only storage; M2 keeps it as the no-sync fallback for a browser that can reach no folder, and it is what `?uitest` and the smoke run drive — [architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter) |
 
 ### 7.2 Not built
 
 | ID | Requirement | State | Note |
 | --- | --- | --- | --- |
-| S-2 | A mutation shape that merges at field granularity rather than whole-document | ✗ | Decided — an append-only op log per device: [sync-flow.md §4.6 The decision](sync-flow.md#46-the-decision) |
-| S-11 | Upload queue, resumable after interruption | ✗ | May be unnecessary — the folder write is the queue |
-| S-12 | Property-based tests for S-4 | ✗ | [test.md §3.1 Merge properties](test.md#31-merge-properties) |
-| S-13 | Tree-aware merge: concurrent moves, subtree tombstones, sibling order | ✗ | T-2, T-5, T-6, T-7. Analysed in [sync-flow.md §5 Sibling ordering](sync-flow.md#5-sibling-ordering) and [sync-flow.md §6 Concurrent moves and cycle repair](sync-flow.md#6-concurrent-moves-and-cycle-repair) |
+| S-8 | A write is never observable in a partial state (temp file plus atomic rename) | ◐ | Each adapter owns it and none of them is ours: `localStorage` is atomic per key, the File System Access API commits a writable on `close()`, and the helper and the Android bridge write-then-rename in the prototype's own code. The conformance suite cannot assert it — a page cannot observe its own provider mid-write — so it is [test.md §3.6 Platform](test.md#36-platform)'s |
+| S-11 | Upload queue, resumable after interruption | ✗ | Still unnecessary: the whole file is rewritten on every flush, so a failed write is retried by the next one rather than replayed. `DeviceLog` keeps the ops queued and the failure visible |
+| S-12 | Property-based tests for S-4 | ◐ | The three laws are asserted, over a seeded generator, in `src/core/merge.test.ts` — `SEED` in the environment reproduces a failure exactly. What is missing is shrinking: a failure still arrives as the whole generated set — [test.md §3.1 Merge properties](test.md#31-merge-properties) |
 | S-14 | Compaction, so history does not grow without bound | ✗ | Deferred, not blocking. Add the snapshot when total log bytes exceed device count × serialised tree bytes — [sync-flow.md §4.6 The decision](sync-flow.md#46-the-decision). Milestone M3 |
-| S-15 | An on-disk encoding that is appendable and diff-readable | ✗ | Decided — JSON Lines, one op per line, after a header line carrying the full vector |
 | S-16 | Retiring a device, so a dead replica stops contributing a counter | ✗ | Cosmetic, not correctness: a dead device is dominated and drops out of the maximal set as an ancestor. Advisory `lastSeen` only — [§8 Device management](#8-device-management) |
-| S-18 | Adapter conformance suite covering all five adapters | ✗ | [test.md §3.3 Adapter conformance](test.md#33-adapter-conformance) |
-| S-19 | The sync cycle runs on activity: the write path *is* the cycle, decaying to window focus and a manual refresh when idle | ✗ | Cadence is device-local and never synced — [sync-flow.md §4.6 The decision](sync-flow.md#46-the-decision) |
-| S-20 | A note body is emitted as an op on blur, on navigating away, or after 60 s of continuous editing | ✅ | `src/ui/NoteBody.svelte` and `Session.commitBody`; navigating away is `src/ui/App.svelte`. Not on K-7's 1 s store debounce. Whole-body ops are the dominant growth term, so the emission trigger is what bounds the log |
-| S-21 | M1 persists this device's own op log through a folder adapter backed by `localStorage` | ✅ | `src/adapters/local-folder.ts`. M1 has one device and no Sync Folder, but the payload is already decided, so M1 writes the real `checklist.<device-id>.ops.jsonl` and reloads by folding it. M2 swaps the adapter, not the write path — [architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter) |
 
 ### 7.3 Fixed constraints
 
@@ -248,14 +262,26 @@ time the user sees them.
 
 | ID | Requirement | State | Row type | Where |
 | --- | --- | --- | --- | --- |
-| C-1 | A genuine race — differing content in the maximal set — asks the user to choose | ✗ | Decision | [sync-flow.md §2.2 The maximal set reduces the whole folder at once](sync-flow.md#22-the-maximal-set-reduces-the-whole-folder-at-once) |
-| C-2 | A T-6 repair names the node it re-rooted and offers to jump to it | ✗ | Notice | [sync-flow.md §6.3 The user has to see it](sync-flow.md#63-the-user-has-to-see-it) |
-| C-3 | A tiebreak that landed two concurrently inserted rows in device-id order says so | ✗ | Notice | [sync-flow.md §5.3 The tiebreak](sync-flow.md#53-the-tiebreak) |
-| C-4 | A field resolved by last-writer-wins — a title, a tick, a "Turn into", a note body — says so | ✗ | Notice | [sync-flow.md §4.6 The decision](sync-flow.md#46-the-decision) |
-| C-5 | Nothing here blocks: no modal, no interruption of an edit in progress | ✗ | | A re-rooted node reads as data loss, and a blocking prompt would make it read as worse |
-| C-6 | Rows are derived from merged state each cycle, never stored; only dismissals persist, per device | ✗ | | Storing them would mean writing a file to acknowledge a notice, which is a fresh concurrent edit |
+| C-1 | A genuine race asks the user to choose | ✅ | Decision | `src/core/conflicts.ts`, rendered by `src/ui/ConflictsPage.svelte`. The op log moved where this lives — see below |
+| C-2 | A T-6 repair names the node it re-rooted and offers to jump to it | ✅ | Notice | `resolveTree`'s `repairs` become rows in `src/core/conflicts.ts`; the row links to the node — [sync-flow.md §6.3 The user has to see it](sync-flow.md#63-the-user-has-to-see-it) |
+| C-3 | A tiebreak that landed two concurrently inserted rows in device-id order says so | ✅ | Notice | Two visible siblings holding one `order` with different `orderBy` — `src/core/conflicts.ts` — [sync-flow.md §5.3 The tiebreak](sync-flow.md#53-the-tiebreak) |
+| C-4 | A field resolved by last-writer-wins — a title, a tick, a "Turn into", a note body — says so | ✅ | Notice | The same row as C-1, carrying what was kept, what was not, and which device wrote each |
+| C-5 | Nothing here blocks: no modal, no interruption of an edit in progress | ✅ | | One nav entry, present only when there is something in it. A re-rooted node reads as data loss, and a blocking prompt would make it read as worse |
+| C-6 | Rows are derived from merged state each cycle, never stored; only dismissals persist, per device | ✅ | | `conflictsOf` is a pure function of the merged ops and the resolved tree; dismissals are ids in `localStorage` — `src/app/dismissals.ts`. Storing the rows would mean writing a file to acknowledge a notice, which is a fresh concurrent edit |
+
+**C-1 and C-4 are one row, and the payload is why.** The maximal set of
+[sync-flow.md §2.2 The maximal set reduces the whole folder at once](sync-flow.md#22-the-maximal-set-reduces-the-whole-folder-at-once)
+offers whole *files* to choose between, which is what a snapshot payload makes of a race. Under the op log there is no
+such moment: two concurrent writes to one field are both kept on disk, and the fold picks the newer by `(at, device
+id)`. So the decision C-1 asks for is not "which of these two states" but "the older value was dropped — did you want
+it?", and answering it is an ordinary `set` op. That makes one row that states the resolution (C-4) and offers to
+reverse it (C-1), and it is why nothing in the app ever asks before merging.
 
 C-2 and C-3 need no resolution path — the user drags the node back, and that corrective move is an ordinary edit.
+
+A row survives until the field is written again by a device that has read both sides, which any of the buttons does and
+which an ordinary later edit does too. That is what keeps the list from accumulating: nothing has to be dismissed for it
+to empty, and a dismissal is only for a row the user is content to leave as it landed.
 
 ## 10. Application shell, PWA, offline
 
@@ -296,17 +322,20 @@ _Not written yet._ Expected to cover: the no-server rule, the three-method adapt
 
 ## 15. Deviations and defects found during verification
 
-What M1 leaves standing, in the order it matters. Every row here is a deliberate gap rather than a discovered bug — `npm
-test` and `npm run ui-smoke` both pass.
+What M1 and M2 leave standing, in the order it matters. Every row here is a deliberate gap rather than a discovered bug
+— `npm test` and `npm run ui-smoke` both pass.
 
 | # | Deviation | Why it stands |
 | --- | --- | --- |
-| 1 | T-5's refusal has no UI that can provoke it | M1 moves rows with the keyboard and the row menu, and neither can express "into my own child". The check and its test exist; a drag or a move-to picker is what will reach them |
-| 2 | X-3 and X-4 are verified in a browser, not on a device | An install and a launcher icon cannot be asserted from WSL — [test.md §3.6 Platform](test.md#36-platform) carries them as a written checklist |
-| 3 | T-6 cannot arise on one device | The repair is implemented and tested against hand-built cycles. Nothing writes a second device's file until M2 |
-| 4 | The op log is never compacted | S-14, and it is M3's. On one device a checklist's log grows by kilobytes a month — [sync-flow.md §4.6 The decision](sync-flow.md#46-the-decision) |
-| 5 | `local-folder` has no quota story | A `localStorage` quota failure is reported and the ops stay queued, so nothing is lost in the session. It is the same growth problem as row 4, arriving early |
-| 6 | The Done view cannot undelete | T-13. Deleted rows are listed and openable, and that is the whole of it: the op that reverses a `delete` does not exist, and minting one is a change to the payload M0 closed. Un-ticking a finished row does work, because that is an ordinary field write |
+| 1 | No provider's client has ever been under the folder | Every merge case is exercised against a folder adapter, and the `fsaa`, `http` and `android` adapters are the same three methods as the ones that are. What is unobserved is latency, partial files and a client's opinion of the folder — and it stays unobserved until the Windows and Android builds exist, which is [sync-flow.md §7 What is still open](sync-flow.md#7-what-is-still-open) item 5 |
+| 2 | T-5's refusal has no UI that can provoke it | Rows move with the keyboard and the row menu, and neither can express "into my own child". The check and its test exist; a drag or a move-to picker is what will reach them |
+| 3 | X-3 and X-4 are verified in a browser, not on a device | An install and a launcher icon cannot be asserted from WSL — [test.md §3.6 Platform](test.md#36-platform) carries them as a written checklist |
+| 4 | The `fsaa` adapter is outside the conformance suite | S-18. A directory handle needs a picker and a real user gesture, so no headless run can hold one. Its three methods are the thinnest of the six, and the folder grant is on [test.md §3.6 Platform](test.md#36-platform)'s checklist |
+| 5 | The op log is never compacted | S-14, and it is M3's. On one device a checklist's log grows by kilobytes a month — [sync-flow.md §4.6 The decision](sync-flow.md#46-the-decision) |
+| 6 | `local-folder` has no quota story | A `localStorage` quota failure is reported and the ops stay queued, so nothing is lost in the session. It is the same growth problem as row 5, arriving early |
+| 7 | The Done view cannot undelete | T-13. Deleted rows are listed and openable, and that is the whole of it: the op that reverses a `delete` does not exist, and minting one is a change to the payload M0 closed. Un-ticking a finished row does work, because that is an ordinary field write |
+| 8 | Two tabs on one origin are one device with two writers | The device id is per-origin, so both tabs write `checklist.<same-id>.ops.jsonl` from separate in-memory logs, and the one that flushes second replaces the other's file. Nothing is lost while both tabs live — the next write from either restores its own ops — but a tab closed without flushing loses what only it had. It is one-writer-per-file (S-3) broken by the browser rather than by the code, it predates M2, and the fix is a lock between tabs rather than anything in the merge |
+| 9 | A conflict row names a device by its id | D-1 is what gives a device a name, and it is not built. Eight hex characters is what the row can honestly show until then |
 
 ## 16. Explicitly out of scope
 
@@ -320,11 +349,12 @@ form of application server or hosted database.
 | --- | --- | --- |
 | M0 | Decisions | **Closed.** The payload is an append-only op log per device — [sync-flow.md §4.6 The decision](sync-flow.md#46-the-decision) — and [§2 Data model](#2-data-model), [§8 Device management](#8-device-management) and [§9 Conflict presentation](#9-conflict-presentation) are written. The stack, the packaging and the application shape were already settled — [architecture.md §6 Technology stack](architecture.md#6-technology-stack), [architecture.md §7 Packaging](architecture.md#7-packaging), [past_decision.md §3 State Management](past_decision.md#3-state-management) |
 | M1 | Local-first core | **Closed.** The tree, the item kinds, the keyboard model, the shell — [§3 Tree structure and editing](#3-tree-structure-and-editing), [§4 Item kinds](#4-item-kinds) and [§10 Application shell, PWA, offline](#10-application-shell-pwa-offline), on one device. The store is `src/app/Session.svelte.ts`, the payload is already the real op log (S-21), and what it left standing is [§15 Deviations and defects found during verification](#15-deviations-and-defects-found-during-verification) |
-| M2 | Sync | The op log, tree-aware merge, the activity-driven cycle (S-19), the conflict nav of [§9 Conflict presentation](#9-conflict-presentation), and the adapter set proven against a real provider folder |
-| M3 | Compaction and polish | Snapshots once S-14's trigger fires, note-body diffing, search, and the restore path T-13 owes the Done view |
+| M2 | Sync | **Closed.** Every device's file read and folded together (`src/core/merge.ts`, `src/app/folder-sync.ts`), the activity-driven cycle (S-19), the conflict nav of [§9 Conflict presentation](#9-conflict-presentation), and the adapter set — `fsaa`, `http`, `android` beside the two M1 shipped, chosen by [architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter)'s flowchart. What it left standing is rows 1 and 4 of [§15 Deviations and defects found during verification](#15-deviations-and-defects-found-during-verification) |
+| M3 | Compaction and polish | Snapshots once S-14's trigger fires, note-body diffing, search, device management ([§8 Device management](#8-device-management)), and the restore path T-13 owes the Done view |
 
-M1 is closed, so M2 can start, and it starts from a write path that already emits the op log M2 has to merge: what M2
-adds is reading every device's file rather than this one's, folding them together, the activity-driven cycle (S-19) and
-the conflict nav. What M0 deliberately did **not** settle is listed in
-[sync-flow.md §7 What is still open](sync-flow.md#7-what-is-still-open); none of it blocked M1, and the compaction cut
-rule is the only item that blocks M3.
+M2 is closed against a folder, not against a provider. The three adapters it added are the three methods every other
+adapter already offers, so what remains untested is the client underneath them, and observing that needs a Windows and
+an Android build —
+[§15 Deviations and defects found during verification](#15-deviations-and-defects-found-during-verification) row 1. What
+M0 deliberately did **not** settle is listed in [sync-flow.md §7 What is still open](sync-flow.md#7-what-is-still-open);
+none of it blocked M1 or M2, and the compaction cut rule is the only item that blocks M3.

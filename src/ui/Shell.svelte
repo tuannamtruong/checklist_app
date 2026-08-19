@@ -4,26 +4,40 @@
   // narrower desktop rather than a second application.
   import type { Snippet } from 'svelte';
   import type { Session } from '../app/Session.svelte';
+  import type { Dismissals } from '../app/dismissals.svelte';
   import type { ViewState } from '../app/view-state.svelte';
   import SidebarBranch from './SidebarBranch.svelte';
-  import { DONE_HREF } from '../app/router.svelte';
+  import { CONFLICTS_HREF, DONE_HREF } from '../app/router.svelte';
   import { ROOT } from '../core/types';
 
   let {
     session,
     view,
+    dismissals,
     currentId,
     doneOpen,
+    conflictsOpen,
     folderLabel,
+    synced,
+    onrefresh,
     children,
   }: {
     session: Session;
     view: ViewState;
+    dismissals: Dismissals;
     currentId: string | null;
     doneOpen: boolean;
+    conflictsOpen: boolean;
     folderLabel: string;
+    synced: boolean;
+    onrefresh: () => void;
     children: Snippet;
   } = $props();
+
+  // §9: the entry appears when there is something in it and is absent
+  // otherwise. A permanent one would be empty almost always, which is how a nav
+  // entry teaches a user to stop reading it.
+  const pending = $derived(session.conflicts.filter((row) => !dismissals.has(row.id)).length);
 </script>
 
 <div class="flex min-h-dvh bg-surface text-ink">
@@ -77,11 +91,52 @@
         <span class="size-4 shrink-0 text-center" aria-hidden="true">☑</span>
         <span class="truncate">Done</span>
       </a>
+
+      {#if pending > 0 || conflictsOpen}
+        <a
+          href={CONFLICTS_HREF}
+          class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-surface-sunken"
+          class:text-accent={conflictsOpen}
+          class:text-ink-muted={!conflictsOpen}
+          data-testid="conflicts-link"
+          onclick={() => view.setDrawer(false)}
+        >
+          <span class="size-4 shrink-0 text-center" aria-hidden="true">⚡</span>
+          <span class="truncate">Merged</span>
+          {#if pending > 0}
+            <span class="ml-auto rounded-full bg-accent-soft px-1.5 text-xs text-accent">
+              {pending}
+            </span>
+          {/if}
+        </a>
+      {/if}
     </nav>
 
     <footer class="border-t border-line px-3 py-2 text-xs text-ink-faint">
       <p data-testid="device-id">Device {session.deviceId}</p>
-      <p>{folderLabel}</p>
+      <p class="flex items-center gap-1">
+        <span class="min-w-0 truncate" data-testid="folder-label">{folderLabel}</span>
+        {#if synced}
+          <!-- S-19: the idle triggers are focus and this button, because a timer
+               in a hidden tab is throttled and a backgrounded PWA's is frozen. -->
+          <button
+            type="button"
+            class="row-control ml-auto shrink-0 rounded px-1 hover:text-ink"
+            aria-label="Sync now"
+            title="Sync now"
+            data-testid="sync-now"
+            data-syncing={session.syncing}
+            onclick={onrefresh}
+          >
+            {session.syncing ? '…' : '↻'}
+          </button>
+        {/if}
+      </p>
+      {#if synced || session.peers > 0}
+        <p data-testid="peer-count">
+          {session.peers === 0 ? 'No other device yet' : `${session.peers} other device${session.peers === 1 ? '' : 's'}`}
+        </p>
+      {/if}
     </footer>
   </aside>
 

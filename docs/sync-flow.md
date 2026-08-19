@@ -40,10 +40,10 @@ question lives.
 ## 2. What the prototype settled
 
 Proven by `prototype/core/` and its tests, and carried as the `pt.` rows of
-[requirements.md §7.1 Proven in the prototype](requirements.md#71-proven-in-the-prototype). These results hold whichever
-payload is chosen, so they are stated over the *device file* — whatever a device writes under its own id. The
-prototype's device file happened to be a snapshot, because its whole payload was one; the chosen payload's is a log
-([§4.6 The decision](#46-the-decision)). Nothing below depends on which.
+[requirements.md §7.1 Built](requirements.md#71-built). These results hold whichever payload is chosen, so they are
+stated over the *device file* — whatever a device writes under its own id. The prototype's device file happened to be a
+snapshot, because its whole payload was one; the chosen payload's is a log ([§4.6 The decision](#46-the-decision)).
+Nothing below depends on which.
 
 ### 2.1 Version vectors detect races; nothing prevents them
 
@@ -152,14 +152,28 @@ was.
 counter, and a receipt for a peer only when that receipt changes. State is the fold of every device's log.
 
 ```
-{"v":1,"dev":"1111aaaa","clock":{"1111aaaa":13,"2222bbbb":4}}
+{"v":1,"dev":"1111aaaa","clock":{"1111aaaa":16,"2222bbbb":5}}
 {"op":"create","id":"n_7f3a","parent":"root","kind":"task","order":"a3","c":14,"at":1755500000}
 {"op":"set","id":"n_7f3a","title":"Buy milk","c":15,"at":1755500042}
 {"op":"move","id":"n_7f3a","parent":"n_2ab1","order":"a3f","c":16,"at":1755500310,"seen":{"2222bbbb":5}}
 ```
 
-Every intermediate vector is reconstructible by replaying forward from the header, so carrying a full vector per line
-would cost bytes and buy nothing — [§4.6 The decision](#46-the-decision).
+The header states what the device had seen **as of its last write** — its own counter, plus a receipt for every peer
+whose ops it has folded in. That is the vector
+[§2.2 The maximal set reduces the whole folder at once](#22-the-maximal-set-reduces-the-whole-folder-at-once) compares,
+and it is the one line that has to be rewritten when nothing else changed: adopting a peer's edit without recording the
+receipt is what [§2.4 The cycle](#24-the-cycle) warns of.
+
+Every op's own vector is then reconstructible by replaying the file forward from the first op — accumulate each `seen`,
+raise this device's counter to each `c` — so carrying a full vector per line would cost bytes and buy nothing. Those
+per-op vectors are what classifies two writes to one field as concurrent rather than ordered, which is the whole of
+[requirements.md §9 Conflict presentation](requirements.md#9-conflict-presentation).
+
+**A receipt is only ever earned from the peer's own file.** One writer per file means a device's ops arrive from exactly
+one place, so a receipt for peer A is the highest counter of A's ops this device actually holds — never a receipt copied
+out of peer B's header. Copying B's would claim to have seen edits that are not here, and the claim would silence a race
+that really happened. The cost of not copying is the opposite and harmless: a device can read as further behind than it
+is, which raises a notice rather than losing a write.
 
 | | |
 | --- | --- |
@@ -289,6 +303,30 @@ the Sync Folder.
    versioned snapshot filenames would accumulate with nothing able to reap them.
 6. A tail is never truncated below what the *previous* published snapshot covers. Snapshot and tail sync independently,
    and the ordering "old snapshot, new tail" silently loses ops.
+
+### 4.7 Reading the folder
+
+What [§2.4 The cycle](#24-the-cycle) becomes once the payload is a log rather than a snapshot. One cycle, in order:
+
+1. `list()` the folder and keep the names matching `checklist.<device-id>.ops.jsonl`. Anything else in the folder
+   belongs to somebody else and is not read.
+2. `read()` every peer's file. Our own is never read back — this device is its only writer, and what is in memory is
+   ahead of what is on disk by exactly the debounce.
+3. A file that does not decode is skipped and the previous read of that peer stands, which is S-7. A file that decodes
+   to fewer of its own ops than we already hold is a stale read of an append-only file and is skipped the same way.
+4. If the union of ops changed, **re-fold from scratch**. See below.
+5. Write our own file back if the fold changed anything, so the header records the receipt.
+
+**Why the whole fold, rather than applying the new ops onto the tree.** The fold is correct because it applies ops in
+one total order, and a peer's op that arrives late is usually *older* than ops already applied. Laying it on top would
+let a title written last week overwrite one written yesterday — last-writer-wins would become last-*arriving*-wins,
+which converges to a different tree on every device depending on delivery order. Sorting the union and folding it again
+is the only thing that keeps [§4.6 The decision](#46-the-decision)'s per-field rule true, and it is what makes the merge
+idempotent, commutative and associative for free (S-4).
+
+This does not reopen the projection-per-read design [§4 Sync data model](#4-sync-data-model) closed. The re-fold happens
+once per cycle that actually delivered something, not once per read: between cycles the store holds the materialised
+tree, and a local edit still goes on through `applyOp` alone.
 
 ## 5. Sibling ordering
 

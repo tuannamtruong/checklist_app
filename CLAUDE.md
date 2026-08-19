@@ -5,8 +5,8 @@
 A checklist and notes app for one person across several devices. Local-first, no application server: devices synchronise
 through a folder that a cloud provider's own client keeps in sync.
 
-**Status: milestone M1 is built** — the local-first core on one device. The production tree is `src/`, driven by
-`package.json`. M2 (sync) has not started: nothing reads another device's file yet.
+**Status: milestones M1 and M2 are built** — the local-first core, and sync through the folder. The production tree is
+`src/`, driven by `package.json`. M3 (compaction, search, device names, undelete) has not started.
 
 `prototype/` is separate prototype that proves folder-based sync between Windows and Android. It does not share code
 with a production tree. Ignore it when developing the project.
@@ -72,8 +72,9 @@ The prototype's own bundles are unchanged: `make proto_all`, `make proto_exe_win
 proto_clean`, and `python3 prototype/install/serve.py --folder <path>`.
 
 **Port 38531 belongs to this project.** The dev server, the preview server and the prototype's loopback helper all bind
-it on 127.0.0.1; do not pick another one. `strictPort` is set, so a leftover server — usually a preview one that
-outlived a `seed` or `ui-smoke` run — fails the next launch outright. `make dev`, `make preview`, `make seed` and `make
+it on 127.0.0.1; do not pick another one. `strictPort` is set, so a leftover server fails the next launch outright.
+`startPreview` puts the preview in its own process group and kills the group, because `npx` does not pass a signal on to
+the vite it spawned — that was the usual source of a leftover. `make dev`, `make preview`, `make seed` and `make
 ui-smoke` name the holding process instead of failing bare, and `make stop` frees the port. Any `npm run` line in
 `prototype/README.md` is still aspirational — that `package.json` was never written, and this one is not it.
 
@@ -90,10 +91,17 @@ then one op per line — `create`, `set`, `move`, `delete`. The device id is imp
 every line. `src/core/op-log.ts` is the only module that spells the format; the adapter has no append, so every write is
 the whole file.
 
-In M1 that file lives in `localStorage` behind `src/adapters/local-folder.ts` (requirement S-21). M2 swaps the adapter,
-not the write path.
+A device writes that one file and reads every other. `src/app/device-log.ts` is the only writer;
+`src/app/folder-sync.ts` is the only reader of peers, and the header written back carries a receipt for every peer
+folded in — a write that happens even when nothing else changed, because a receipt nobody recorded is a race nobody had.
 
-Never in a file, always `localStorage`: the device id, collapse state, the drawer's state.
+Which folder holds the files is decided at startup by `src/app/folder-choice.ts`, over the adapters in `src/adapters/`.
+A browser that can reach no folder falls back to `local-folder`, which is `localStorage` and syncs with nothing; the
+footer says so for as long as it is in use.
+
+Never in a file, always `localStorage`: the device id, collapse state, the drawer's state, which folder this device
+chose, and dismissed conflict rows. The File System Access handle is the exception, and only because it is an object:
+IndexedDB.
 
 ### Component catalog
 
@@ -114,6 +122,18 @@ key or menu -> ui/actions.ts -> core/edit.ts -> Op[]
 Reading is the same path backwards, once, at startup: `adapter.read` -> `decodeLog` -> `foldOps` -> `resolveTree`. The
 store materialises the tree once and keeps it; nothing replays the log per read.
 
+A peer's edit arrives on the sync cycle, which is the same path with more files in it:
+
+```
+SyncCadence (edit +5s, +15s, +60s; focus; ↻) -> Session.cycle
+    -> FolderSync.cycle -> adapter.list/read -> decodeLog        (a file that will not parse is skipped)
+    -> mergeTree(every device's ops) -> store                    (a full re-fold, never ops laid on top)
+    -> DeviceLog.noteReceipts -> the header records what was read
+```
+
+The re-fold is not optional. A peer's op usually has an *older* `at` than ops already applied, so laying it on top would
+turn last-writer-wins into last-arriving-wins and every device would converge somewhere different.
+
 Two edits do not follow the straight path, and both are deliberate: a title is a draft in its input until it is
 committed, and a note body updates the store on a 1 s debounce but only becomes an op on blur, on navigation, or after
 60 s (K-7, S-20).
@@ -124,6 +144,13 @@ committed, and a note body updates the store on a 1 s debounce but only becomes 
 subtree (T-7, inherited) and a row whose own `done` is set (T-11, **not** inherited). Both are still in `tree.nodes`.
 `src/core/done.ts` reads them back out for the Done view at `#/done` (T-12), which is where a finished row is un-ticked
 and where a deleted one can be found. Nothing un-deletes — T-13 is not built.
+
+### What the merge decided without asking
+
+`src/core/conflicts.ts` derives three kinds of row from merged state and stores none of them: a field two devices wrote
+concurrently (the row offers the value that lost, and taking it is an ordinary `set`), a T-6 re-rooting, and a sibling
+order settled by device id. `#/conflicts` renders them, and its nav entry exists only while there are any. Dismissals
+are the only thing that persists, per device, in `localStorage`.
 
 ## Testing
 

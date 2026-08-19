@@ -16,7 +16,15 @@
 
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { BASE_URL, ROOT_DIR, buildIfNeeded, playwright, seedInto, startPreview } from './lib/harness.mjs';
+import {
+  BASE_URL,
+  ROOT_DIR,
+  buildIfNeeded,
+  peerLog,
+  playwright,
+  seedInto,
+  startPreview,
+} from './lib/harness.mjs';
 
 const headed = process.argv.includes('--headed');
 const shots = join(ROOT_DIR, 'ui-smoke');
@@ -315,6 +323,118 @@ async function main() {
       offlineTitles.join('|'),
     );
     await context.setOffline(false);
+
+    // --- a second device arrives in the folder — M2 --------------------------
+    // Written straight into the folder while the page is open, which is what
+    // the provider's client does. Nothing reloads: the cycle picks it up.
+    const peer = peerLog();
+    await page.evaluate(
+      ([name, content]) => localStorage.setItem(`checklist:folder:${name}`, content),
+      [peer.name, peer.text],
+    );
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await page.waitForSelector('[data-testid="conflicts-link"]', { timeout: 5_000 });
+    const withPeer = await titlesUnder(page, 'Shopping');
+    check(
+      'a peer’s row appears without a reload — S-19',
+      withPeer.includes('Tea'),
+      withPeer.join('|'),
+    );
+    check(
+      'and its concurrent title write won on both, by (at, device id)',
+      withPeer.includes('Coffee') && !withPeer.includes('Coffee beans'),
+      withPeer.join('|'),
+    );
+    check(
+      'the folder now shows two devices',
+      (await page.locator('[data-testid="peer-count"]').innerText()).includes('1 other device'),
+      await page.locator('[data-testid="peer-count"]').innerText(),
+    );
+    // The receipt is a write of our own file, so it lands on the write debounce
+    // rather than with the fold — sync-flow.md §2.4.
+    await page.waitForTimeout(WRITE_SETTLE_MS);
+    check(
+      'our own file records the receipt, so the next edit is not a phantom race',
+      await page.evaluate(
+        (device) =>
+          (localStorage.getItem('checklist:folder:checklist.5eed0001.ops.jsonl') ?? '')
+            .split('\n')[0]
+            .includes(device),
+        peer.device,
+      ),
+    );
+
+    // --- the conflict nav — §9 ----------------------------------------------
+    check(
+      'a race raises the nav entry, which is absent otherwise — C-5',
+      (await page.locator('[data-testid="conflicts-link"]').innerText()).includes('1'),
+    );
+    await page.locator('[data-testid="conflicts-link"]').click();
+    await page.waitForSelector('[data-testid="conflicts-page"]');
+    const detail = await page.locator('[data-testid="conflict-detail"]').first().innerText();
+    check(
+      'the row says what was kept, what was not, and by which device — C-4',
+      detail.includes('Coffee') && detail.includes('Coffee beans') && detail.includes('5eed0002'),
+      detail.replace(/\s+/g, ' '),
+    );
+    await page.screenshot({ path: join(shots, 'conflicts.png'), fullPage: true });
+
+    // C-6: only the dismissal persists, and only on this device.
+    await page.locator('[data-testid="conflict-dismiss"]').first().click();
+    await page.waitForSelector('[data-testid="conflicts-empty"]');
+    check(
+      'dismissing takes the row out of the list and the nav',
+      (await page.locator('[data-testid="conflicts-hidden"]').innerText()).includes('1 dismissed'),
+      await page.locator('[data-testid="conflicts-hidden"]').innerText(),
+    );
+    await page.locator('[data-testid="conflicts-hidden"] button').click();
+    await page.waitForSelector('[data-testid="conflict-row"]');
+    check('and it can be brought back', true);
+
+    await page.locator('[data-testid="conflict-restore"]').first().click();
+    await page.waitForSelector('[data-testid="conflicts-empty"]');
+    check('taking the dropped value back settles it, as an ordinary edit — C-1', true);
+    await page.waitForTimeout(WRITE_SETTLE_MS);
+    await page.goto(BASE_URL);
+    await page.waitForSelector('[data-testid="tree"]');
+    const settled = await titlesUnder(page, 'Shopping');
+    check(
+      'and it survives the reload, with the peer’s row still there',
+      settled.includes('Coffee beans') && settled.includes('Tea'),
+      settled.join('|'),
+    );
+    check(
+      'the nav entry is gone once nothing is unresolved',
+      (await page.locator('[data-testid="conflicts-link"]').count()) === 0,
+    );
+
+    // --- first run, in a browser with nothing in it — architecture.md §4 -----
+    // Its own context, because the question is what a device with no folder and
+    // no op log does, and the seeded one has both.
+    const fresh = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    try {
+      const firstRun = await fresh.newPage();
+      await firstRun.goto(BASE_URL);
+      await firstRun.waitForSelector('[data-testid="folder-setup"]');
+      check('a device with no folder is asked for one, once — X-3', true);
+      await firstRun.screenshot({ path: join(shots, 'folder-setup.png'), fullPage: true });
+
+      await firstRun.locator('[data-testid="setup-local"]').click();
+      await firstRun.waitForSelector('[data-testid="tree"]', { state: 'attached' });
+      check(
+        'and declining still gets a working app, which says it is not synced',
+        (await firstRun.locator('[data-testid="folder-label"]').innerText()).includes('not synced'),
+        await firstRun.locator('[data-testid="folder-label"]').innerText(),
+      );
+      await firstRun.reload();
+      await firstRun.waitForSelector('[data-testid="tree"]', { state: 'attached' });
+      check(
+        'and is not asked again on the next launch',
+        (await firstRun.locator('[data-testid="folder-setup"]').count()) === 0,
+      );
+    } finally {
+      await fresh.close();
+    }
 
     check('no console errors', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '));
   } finally {
