@@ -13,6 +13,7 @@ History of project's decision. The situation, its options and resolution.
 | [Compaction](#6-compaction) | Drop a device's own superseded ops, in place | -  snapshot plus tail (option C)<br>-  note-body diffing against a checkpoint<br>-  reaping tombstones<br>-  a retention window in days |
 | [Undelete](#7-undelete) | A `restore` op, making `deleted` an ordinary contested field | -  a `set` carrying `deleted: false`<br>-  copying the subtree to a new id<br>-  delete-always-wins precedence |
 | [Device naming](#8-device-naming) | Each device names itself, in its own file's header line | -  a shared `devices.json`<br>-  a `device` op in the log<br>-  names kept only in `localStorage` |
+| [Theming](#9-theming) | Swap the semantic tokens under `data-theme` on the document root | -  a stylesheet per theme, loaded at runtime<br>-  Tailwind's `dark:` variant on every component<br>-  `prefers-color-scheme` and no choice at all |
 
 ---
 
@@ -220,3 +221,25 @@ devices with a name the user can set, and the only real question was where the n
 Option C is the one to revisit if renaming a lost phone from the laptop ever matters. It is additive: a `device` op
 would override the header name for the device it names, and a folder holding neither is a folder of unnamed devices,
 which is what one looks like today.
+
+## 9. Theming
+
+**Swap the ten semantic tokens under a `data-theme` attribute on the document root.** Themes were out of scope until M4
+— [requirements.md §16 Explicitly out of scope](requirements.md#16-explicitly-out-of-scope) — and what reopened them was
+noticing the cost had already been paid: `src/app.css` had named roles rather than colours since M1, so the whole
+feature is a block of custom properties per theme.
+
+| Option | The idea | Its cost | Would have won if |
+| --- | --- | --- | --- |
+| **A — token swap under `data-theme` (chosen)** | One `[data-theme='x']` block per theme, overriding the same ten properties | The palette lives in CSS and the id list in TypeScript, so two files can drift — closed by a test that reads both | — |
+| B — a stylesheet per theme, fetched on change | Each theme its own file, loaded when picked | A network request to change colour, which X-5's cold-start-offline rule then has to precache six of; and a flash while it loads | The palettes were large enough that shipping all six mattered — they are ten lines each |
+| C — Tailwind's `dark:` variant | The framework's own answer | It is a *pair*, not a set: six themes under it means five variants hand-registered and every component carrying six class lists. It also puts colour back into components, which is the thing that made A cheap | The requirement had been dark mode alone, and permanently so |
+| D — follow `prefers-color-scheme`, offer nothing | The OS decides | Answers only two of the six themes, and answers them for a user who wanted the green one. Worth adding *beside* A as a seventh "System" choice; not worth having instead of it | The request had been "respect my OS setting" rather than "let me pick" |
+
+**The id is applied in `index.html` before the module loads.** A theme read after the bundle boots is a theme applied
+after the first paint, and a dark theme that flashes white is worse than no dark theme — X-14. The boot line is three
+statements and duplicates nothing: it reads the same `localStorage` key the class does and sets the same attribute.
+
+**What reopens it.** A seventh theme costs a CSS block and a catalog line, so growth is not a reason. What would reopen
+it is a theme that changes more than colour — a compact density, a larger type scale — because that is no longer a
+palette and A has nothing to say about it.

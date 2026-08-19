@@ -323,31 +323,94 @@ async function main() {
     );
     await page.screenshot({ path: join(shots, 'search.png'), fullPage: true });
 
-    // --- §8: device management --------------------------------------------
-    await page.locator('[data-testid="devices-link"]').click();
-    await page.waitForSelector('[data-testid="devices-page"]');
+    // --- §10 X-12: the settings screen --------------------------------------
+    await page.locator('[data-testid="settings-link"]').click();
+    await page.waitForSelector('[data-testid="settings-page"]');
     check(
-      'the device list holds this device — D-1',
-      (await page.locator('[data-testid="device-row"]').count()) >= 1 &&
-        (await page.locator('[data-testid="device-row"]').first().getAttribute('data-self')) === 'true',
+      'settings gathers appearance, the name and the log — X-12',
+      (await page.locator('[data-testid="settings-appearance"]').isVisible()) &&
+        (await page.locator('[data-testid="device-name"]').isVisible()) &&
+        (await page.locator('[data-testid="log-link"]').isVisible()),
     );
+
+    // --- X-13, X-14: themes -------------------------------------------------
+    const themeIds = await page
+      .locator('[data-testid="theme-option"]')
+      .evaluateAll((buttons) => buttons.map((button) => button.dataset.themeId));
+    check(
+      'every theme in the catalog is offered — X-13',
+      themeIds.join('|') === 'light|dark|green|teal|orange|yellow',
+      themeIds.join('|'),
+    );
+    // One theme is driven all the way — picked, seen on the tree, and still
+    // there after a reload, which is the half a unit test cannot reach.
+    await page.locator('[data-theme-id="dark"]').click();
+    check(
+      'picking a theme sets it on the document root — X-13',
+      (await page.evaluate(() => document.documentElement.dataset.theme)) === 'dark',
+    );
+    await page.screenshot({ path: join(shots, 'settings-dark.png'), fullPage: true });
+    await page.goto(`${BASE_URL}#/settings`);
+    await page.waitForSelector('[data-testid="settings-page"]');
+    check(
+      'the theme survives a reload, and is set before the first paint — X-14',
+      (await page.evaluate(() => document.documentElement.dataset.theme)) === 'dark' &&
+        (await page.locator('[data-theme-id="dark"]').getAttribute('aria-pressed')) === 'true',
+    );
+    // The rest are a screenshot each: contrast is what a person checks and a
+    // script cannot — test.md §3.5. What the script does assert is that no
+    // theme moves anything, which is the claim §10.1 makes about all six.
+    const themeShapes = [];
+    for (const id of themeIds) {
+      await page.locator(`[data-theme-id="${id}"]`).click();
+      await page.waitForTimeout(100);
+      themeShapes.push(
+        await page.evaluate(() => {
+          const box = document.querySelector('[data-testid="settings-page"]').getBoundingClientRect();
+          return `${Math.round(box.width)}x${Math.round(box.height)}:${document.body.scrollWidth - window.innerWidth}`;
+        }),
+      );
+      await page.screenshot({ path: join(shots, `theme-${id}.png`), fullPage: true });
+    }
+    check(
+      'no theme changes a layout, a size or an overflow — §10.1',
+      new Set(themeShapes).size === 1 && themeShapes[0].endsWith(':0'),
+      themeShapes.join(' '),
+    );
+    await page.locator('[data-theme-id="light"]').click();
+
+    // --- D-1: this device's name -------------------------------------------
     await page.locator('[data-testid="device-name"]').fill('the laptop');
     await page.waitForTimeout(WRITE_SETTLE_MS);
-    await page.screenshot({ path: join(shots, 'devices.png'), fullPage: true });
-    await page.goto(`${BASE_URL}#/devices`);
-    await page.waitForSelector('[data-testid="devices-page"]');
+    await page.screenshot({ path: join(shots, 'settings.png'), fullPage: true });
+    await page.goto(`${BASE_URL}#/settings`);
+    await page.waitForSelector('[data-testid="settings-page"]');
     check(
       'a name survives a reload, so it reached the file rather than the page — D-1',
       (await page.locator('[data-testid="device-name"]').inputValue()) === 'the laptop',
       await page.locator('[data-testid="device-name"]').inputValue(),
     );
 
+    // --- §8: the device list ------------------------------------------------
+    await page.locator('[data-testid="devices-link"]').click();
+    await page.waitForSelector('[data-testid="devices-page"]');
+    check(
+      'the device list holds this device, under the name it was given — D-1',
+      (await page.locator('[data-testid="device-row"]').count()) >= 1 &&
+        (await page.locator('[data-testid="device-row"]').first().getAttribute('data-self')) === 'true' &&
+        (await page.locator('[data-testid="device-label"]').first().innerText()).trim() === 'the laptop',
+      await page.locator('[data-testid="device-label"]').first().innerText(),
+    );
+    await page.screenshot({ path: join(shots, 'devices.png'), fullPage: true });
+    await page.goto(`${BASE_URL}#/settings`);
+    await page.waitForSelector('[data-testid="settings-page"]');
+
     // --- D-4: this device's own log ---------------------------------------
     await page.locator('[data-testid="log-link"]').click();
     await page.waitForSelector('[data-testid="logs-page"]');
     const logRows = page.locator('[data-testid="log-entry"]');
     check(
-      'the device screen leads to this device’s log — D-4',
+      'the settings screen leads to this device’s log — D-4',
       (await logRows.count()) > 0,
       `${await logRows.count()} entries`,
     );
@@ -393,6 +456,48 @@ async function main() {
     await page.waitForTimeout(300);
     check('the drawer opens', await page.locator('[data-testid="drawer-backdrop"]').isVisible());
     await page.screenshot({ path: join(shots, 'phone-drawer.png') });
+
+    // The scrim is a token of its own rather than `ink` at 20%, because under a
+    // dark palette that veil brightens what it is meant to dim — §10.1. The
+    // claim is per theme, so it is asserted per theme: composite the scrim over
+    // the surface and it must come out darker than the surface alone.
+    const dimmed = [];
+    for (const id of themeIds) {
+      await page.evaluate((theme) => document.documentElement.setAttribute('data-theme', theme), id);
+      await page.waitForTimeout(50);
+      dimmed.push(
+        await page.evaluate((theme) => {
+          const backdrop = document.querySelector('[data-testid="drawer-backdrop"]');
+          const scrim = getComputedStyle(backdrop).backgroundColor;
+          const surface = getComputedStyle(document.documentElement).backgroundColor;
+          const canvas = document.createElement('canvas');
+          canvas.width = canvas.height = 1;
+          const ctx = canvas.getContext('2d');
+          const luma = (over) => {
+            ctx.clearRect(0, 0, 1, 1);
+            ctx.fillStyle = surface;
+            ctx.fillRect(0, 0, 1, 1);
+            if (over) {
+              ctx.fillStyle = scrim;
+              ctx.fillRect(0, 0, 1, 1);
+            }
+            const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+            return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+          };
+          return { theme, bare: Math.round(luma(false)), veiled: Math.round(luma(true)) };
+        }, id),
+      );
+    }
+    const brightening = dimmed.filter((row) => row.veiled >= row.bare);
+    check(
+      'the drawer scrim darkens the page in every theme — §10.1',
+      brightening.length === 0,
+      brightening.map((row) => `${row.theme} ${row.bare}→${row.veiled}`).join(', ') ||
+        dimmed.map((row) => `${row.theme} ${row.bare}→${row.veiled}`).join(', '),
+    );
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
+    await page.screenshot({ path: join(shots, 'phone-drawer-dark.png') });
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'));
     // Away from the drawer itself, which sits above the backdrop on purpose.
     await page.locator('[data-testid="drawer-backdrop"]').click({ position: { x: 340, y: 500 } });
     await page.waitForTimeout(300);

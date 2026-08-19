@@ -7,7 +7,7 @@
   import type { Dismissals } from '../app/dismissals.svelte';
   import type { ViewState } from '../app/view-state.svelte';
   import SidebarBranch from './SidebarBranch.svelte';
-  import { CONFLICTS_HREF, DEVICES_HREF, DONE_HREF, SEARCH_HREF } from '../app/router.svelte';
+  import { CONFLICTS_HREF, DONE_HREF, SEARCH_HREF, SETTINGS_HREF } from '../app/router.svelte';
   import { ROOT } from '../core/types';
 
   let {
@@ -18,7 +18,7 @@
     doneOpen,
     conflictsOpen,
     searchOpen,
-    devicesOpen,
+    settingsOpen,
     folderLabel,
     synced,
     onrefresh,
@@ -31,7 +31,7 @@
     doneOpen: boolean;
     conflictsOpen: boolean;
     searchOpen: boolean;
-    devicesOpen: boolean;
+    settingsOpen: boolean;
     folderLabel: string;
     synced: boolean;
     onrefresh: () => void;
@@ -53,7 +53,7 @@
   {#if view.drawerOpen}
     <button
       type="button"
-      class="fixed inset-0 z-30 bg-ink/20 md:hidden"
+      class="fixed inset-0 z-30 bg-scrim md:hidden"
       aria-label="Close navigation"
       data-testid="drawer-backdrop"
       onclick={() => view.setDrawer(false)}
@@ -86,9 +86,10 @@
         onNavigate={() => view.setDrawer(false)}
       />
 
-      <!-- T-12, F-5 and D-1. All three are always here, even when empty: a view
-           that appeared only once it had something in it is a view the user
-           never learns exists — requirements.md §5. -->
+      <!-- T-12, F-5 and X-12. All three are always here, even when empty: a
+           view that appeared only once it had something in it is a view the user
+           never learns exists — requirements.md §5. The device list and the log
+           hang off Settings rather than taking entries of their own. -->
       <a
         href={SEARCH_HREF}
         class="mt-2 flex items-center gap-2 rounded-md border-t border-line px-2 pt-3 pb-1.5 text-sm hover:bg-surface-sunken"
@@ -115,15 +116,15 @@
       </a>
 
       <a
-        href={DEVICES_HREF}
+        href={SETTINGS_HREF}
         class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-surface-sunken"
-        class:text-accent={devicesOpen}
-        class:text-ink-muted={!devicesOpen}
-        data-testid="devices-link"
+        class:text-accent={settingsOpen}
+        class:text-ink-muted={!settingsOpen}
+        data-testid="settings-link"
         onclick={() => view.setDrawer(false)}
       >
-        <span class="size-4 shrink-0 text-center" aria-hidden="true">▤</span>
-        <span class="truncate">Devices</span>
+        <span class="size-4 shrink-0 text-center" aria-hidden="true">⚙</span>
+        <span class="truncate">Settings</span>
       </a>
 
       {#if pending > 0 || conflictsOpen}
@@ -148,9 +149,9 @@
 
     <footer class="border-t border-line px-3 py-2 text-xs text-ink-faint">
       <!-- D-1: the name once there is one, and the id until then — which is all
-           an unnamed device has to show. -->
+           an unnamed device has to show. It leads to where the name is typed. -->
       <p data-testid="device-id">
-        <a href={DEVICES_HREF} class="hover:text-ink" onclick={() => view.setDrawer(false)}>
+        <a href={SETTINGS_HREF} class="hover:text-ink" onclick={() => view.setDrawer(false)}>
           Device {selfName}
         </a>
       </p>

@@ -15,7 +15,7 @@
   import { nameOf } from '../core/devices';
   import { deviceFileName } from '../core/op-log';
   import type { Session } from '../app/Session.svelte';
-  import { DEVICES_HREF, nodeHref } from '../app/router.svelte';
+  import { SETTINGS_HREF, nodeHref } from '../app/router.svelte';
 
   let { session }: { session: Session } = $props();
 
@@ -56,8 +56,8 @@
 
 <div class="mx-auto flex max-w-3xl flex-col gap-4 px-4 py-6" data-testid="logs-page">
   <header class="flex flex-col gap-1">
-    <a href={DEVICES_HREF} class="text-xs text-ink-muted hover:text-accent" data-testid="back-link">
-      ← Devices
+    <a href={SETTINGS_HREF} class="text-xs text-ink-muted hover:text-accent" data-testid="back-link">
+      ← Settings
     </a>
     <h1 class="text-2xl font-semibold" data-testid="page-title">Log</h1>
     <p class="text-sm text-ink-muted">

@@ -11,6 +11,7 @@ export type Route =
   | { name: 'done' }
   | { name: 'conflicts' }
   | { name: 'search'; query: string }
+  | { name: 'settings' }
   | { name: 'devices' }
   | { name: 'logs' }
   | { name: 'unknown'; hash: string };
@@ -20,6 +21,7 @@ export function routeOf(hash: string): Route {
   if (path === '' || path === '/') return { name: 'root' };
   if (path === '/done') return { name: 'done' };
   if (path === '/conflicts') return { name: 'conflicts' };
+  if (path === '/settings') return { name: 'settings' };
   if (path === '/devices') return { name: 'devices' };
   if (path === '/logs') return { name: 'logs' };
   // F-5. The query is a path segment rather than a query string, for the reason
@@ -45,6 +47,8 @@ export function hrefOf(route: Route): string {
       return '#/conflicts';
     case 'search':
       return route.query === '' ? '#/search' : `#/search/${encodeURIComponent(route.query)}`;
+    case 'settings':
+      return '#/settings';
     case 'devices':
       return '#/devices';
     case 'logs':
@@ -63,15 +67,16 @@ export const DONE_HREF = hrefOf({ name: 'done' });
  */
 export const CONFLICTS_HREF = hrefOf({ name: 'conflicts' });
 
-/** §6's view and §8's, both permanent in the nav — see requirements.md §5. */
+/** §6's view and X-12's, both permanent in the nav — see requirements.md §5. */
 export const SEARCH_HREF = hrefOf({ name: 'search', query: '' });
-export const DEVICES_HREF = hrefOf({ name: 'devices' });
+export const SETTINGS_HREF = hrefOf({ name: 'settings' });
 
 /**
- * D-4's view. Deliberately not in the nav: it says something about one device,
- * and `#/devices` is where that device is already the subject — requirements.md
- * §5.
+ * §8's view and D-4's. Neither is in the nav: both say something about *this*
+ * device rather than about the tree, and `#/settings` is where this device is
+ * already the subject — requirements.md §5.
  */
+export const DEVICES_HREF = hrefOf({ name: 'devices' });
 export const LOGS_HREF = hrefOf({ name: 'logs' });
 
 export function nodeHref(id: NodeId): string {
