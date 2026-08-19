@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Hard-wrap Markdown prose at a fixed width, leaving everything else alone.
 
-    python3 scripts/md-reflow.py docs/*.md prototype/README.md
+    python3 scripts/md-reflow.py docs/*.md README.md
     python3 scripts/md-reflow.py --check docs/*.md     # exit 1 if anything would change
 
 The house style is 120 columns for prose. Tables and code blocks are never
 touched: a wrapped table row stops being a table, and a wrapped code line stops
 being the code it documents. Both are allowed to run past the limit.
 
-Stdlib only, so it runs anywhere python3 does — same rule as install/serve.py.
+Stdlib only, so it runs anywhere python3 does and needs nothing installed.
 """
 
 import argparse

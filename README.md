@@ -3,8 +3,10 @@
 A personal checklist and notes app for one person and several devices. Local-first, no application server: devices
 synchronise through a folder that a cloud provider's own client keeps in sync.
 
-Milestone M1 — the local-first core, on one device — is built. `docs/` is the source of truth for what the app is;
-`prototype/` is the separate experiment that proved folder-based sync between Windows and Android.
+Milestone M1 — the local-first core, on one device — is built. `docs/` is the source of truth for what the app is.
+
+The sync prototype that proved folder-based sync between Windows and Android is a separate project, at
+`/home/nam/check-list-prototype`. It shares no code with this one and nothing here depends on it.
 
 ```bash
 npm install
@@ -30,7 +32,6 @@ make stop          # free port 38531 when a leftover server holds it
 | `src/app/` | The store, the op log, the device id, routing |
 | `src/ui/` | Svelte components, the keyboard model, the row menu |
 | `docs/` | Requirements, architecture, the sync design, the test plan, past decisions |
-| `prototype/` | The sync prototype. Shares no code with `src/` |
 
 Start with [docs/requirements.md](./docs/requirements.md) for what is built and what is not, and
 [docs/architecture.md](./docs/architecture.md) for why it is shaped this way.

@@ -7,11 +7,11 @@ follows the stack rather than leading it, and is settled in [§5 Runner and driv
 
 ## 1. Principles inherited from the prototype
 
-Four rules that `prototype/test/` follows and that are worth keeping regardless of tooling.
+Four rules the prototype's tests follow and that are worth keeping regardless of tooling.
 
-**Nothing in the logic layer is mocked.** What runs in a test is the code that ships. `prototype/core/folder-sync.mjs`
-takes its folder, its clock and its change callback as arguments, so a headless scenario drives the same module the
-browser does. A test that passes is then a statement about the application rather than about a test double.
+**Nothing in the logic layer is mocked.** What runs in a test is the code that ships. The sync cycle takes its folder,
+its clock and its change callback as arguments, so a headless scenario drives the same module the browser does. A test
+that passes is then a statement about the application rather than about a test double.
 
 **A stand-in appears only where the real collaborator cannot run on this machine.** The Android Java bridge is stubbed
 in-page because there is no JVM in the test process. The cloud provider's client is modelled because installing one in
@@ -28,11 +28,11 @@ vectors rather than approximations.
 
 | Layer | Runs against | Answers | In the prototype |
 | --- | --- | --- | --- |
-| Merge properties | the logic layer, generated inputs | is the merge commutative, associative, idempotent | partly — `test/e2e/scenario.mjs` check 10 |
-| Scenario | the logic layer plus an in-memory folder | do N devices converge across a scripted sequence of edits, races and joins | `test/e2e/scenario.mjs` checks 1–9, against temp directories rather than memory |
+| Merge properties | the logic layer, generated inputs | is the merge commutative, associative, idempotent | partly — `scenario.mjs` check 10 |
+| Scenario | the logic layer plus an in-memory folder | do N devices converge across a scripted sequence of edits, races and joins | `scenario.mjs` checks 1–9, against temp directories rather than memory |
 | Adapter conformance | each adapter in turn | does every adapter honour the same three-method contract | — |
-| Integration | real files, real processes | does a device reach a real folder through the path its platform forces on it | `test/e2e/bridge.mjs` |
-| UI | the page in a browser | does an edit produce exactly one write, does a race raise the panel, does the keyboard model work | `test/ui.mjs`, and `test/android-bridge.mjs` for the Android startup path |
+| Integration | real files, real processes | does a device reach a real folder through the path its platform forces on it | `bridge.mjs` |
+| UI | the page in a browser | does an edit produce exactly one write, does a race raise the panel, does the keyboard model work | `ui.mjs`, and `android-bridge.mjs` for the Android startup path |
 | Platform | the WebView shell, the installed PWA | does startup, the folder grant, and a cold offline launch work on the device | — |
 
 Three of the six are implemented in the prototype, and merge properties only in the weak form
@@ -68,7 +68,7 @@ set equals the fold of the original (commutative), folding in two groups equals 
 folding a set twice changes nothing (idempotent). `SEED` in the environment reproduces a failure exactly. What keeps
 S-12 open is shrinking — a failure arrives as the whole generated set rather than as the two ops that caused it.
 
-The prototype gets part of the way. `test/e2e/scenario.mjs` check 10 runs four devices through 300 randomised edits,
+The prototype gets part of the way. Its `scenario.mjs` check 10 runs four devices through 300 randomised edits,
 deliveries and syncs drawn from a seeded PRNG, then asserts that all four agree on the text and on the vector; `SEED` in
 the environment reproduces any failure exactly. What is missing is what makes S-12 a separate requirement in
 [requirements.md §7.2 Not built](requirements.md#72-not-built): the three laws are never asserted, only their
@@ -76,12 +76,12 @@ consequence, and a failure arrives as 300 steps rather than shrunk to the two th
 
 ### 3.2 Scenario
 
-The prototype's `test/e2e/scenario.mjs` walks two devices through equal, ahead, behind and concurrent in its first nine
-checks, then through all three resolution styles, asserting the exact vector at each step. Its tenth check is the
-randomised run in [§3.1 Merge properties](#31-merge-properties).
+The prototype's `scenario.mjs` walks two devices through equal, ahead, behind and concurrent in its first nine checks,
+then through all three resolution styles, asserting the exact vector at each step. Its tenth check is the randomised run
+in [§3.1 Merge properties](#31-merge-properties).
 
-[prototype/README.md §5.2.7 Sync between two devices](../prototype/README.md#527-sync-between-two-devices) tabulates the
-same sequence, so the document and the test are checkable against each other.
+Its README tabulates the same sequence under *Sync between two devices*, so that document and that test are checkable
+against each other.
 
 Production adds the tree cases, and these are the ones that will find bugs:
 
@@ -115,8 +115,8 @@ partial, and the property belongs to the provider's client — S-8.
 ### 3.4 Integration
 
 Real folder on disk, real helper process, real browser, and a modelled cloud client that only copies files between two
-directories. The prototype's `test/e2e/bridge.mjs` runs the whole loopback-helper path with `showDirectoryPicker`
-deleted from the page, which is the only honest way to prove the Firefox path works.
+directories. The prototype's `bridge.mjs` runs the whole loopback-helper path with `showDirectoryPicker` deleted from
+the page, which is the only honest way to prove the Firefox path works.
 
 Each run builds its own temp folder, so runs do not contaminate each other.
 
@@ -131,9 +131,10 @@ Two of the checks are about what is *not* on screen, which a unit test cannot se
 and the sidebar (T-11), and the Done view at `#/done` then holds it beside every deleted row, with the path each sat on
 (T-12). Un-ticking there returns the row to the tree it came from; the deleted ones stay put, because T-13 is not built.
 
-`test/android-bridge.mjs` drives the same page in the same browser with `window.AndroidFolder` replaced by an in-page
-stub, which is how the Android startup path — first-run folder pick, edit, conflict, resolution — is exercised without a
-JVM. It is a UI test wearing the phone's clothes, not a platform test; the platform layer starts where the stub stops.
+The prototype's `android-bridge.mjs` drives the same page in the same browser with `window.AndroidFolder` replaced by an
+in-page stub, which is how the Android startup path — first-run folder pick, edit, conflict, resolution — is exercised
+without a JVM. It is a UI test wearing the phone's clothes, not a platform test; the platform layer starts where the
+stub stops.
 
 A UI test needs a folder that is not a real one. The prototype's `?uitest` mode swaps in the in-memory adapter, with no
 disk and no network; production wants the same escape hatch and the same rule that it is reachable only by explicit
@@ -194,26 +195,10 @@ npm run make-icons    # re-render the PWA PNGs from public/icons/*.svg
 NODE_PATH=/home/nam/.npm/_npx/e41f203b7505f1fb/node_modules npm run ui-smoke
 ```
 
-The prototype's own `npm run` lines in [prototype/README.md §7.2 Test](../prototype/README.md#72-test) still name
-scripts that do not exist — that `package.json` was never written, and this one is not it.
-
-The prototype's tests need no runner, so `node` runs them directly, and does today:
-
-```bash
-node prototype/test/e2e/scenario.mjs      # merge rules and randomised convergence, no browser — start here
-node prototype/test/e2e/bridge.mjs        # the helper path, on a helper and a temp folder it starts itself
-node prototype/test/ui.mjs                # the page in Chromium
-node prototype/test/android-bridge.mjs    # the Android startup path, Java bridge stubbed
-```
-
-Only the first runs unaided. The other three need Playwright on `NODE_PATH`, and the last two need the helper already
-serving on `BASE`, which defaults to `http://localhost:38531`.
+The prototype's tests are its own project's and do not run from this tree.
 
 The rest of what works today:
 
 ```bash
-make proto_all           # both prototype bundles
-make proto_exe_win       # Windows launcher + desktop shortcut
-make proto_android       # Android APK, inside Docker
 python3 scripts/md-reflow.py docs/*.md --check
 ```

@@ -8,9 +8,6 @@ through a folder that a cloud provider's own client keeps in sync.
 **Status: milestones M1 and M2 are built** — the local-first core, and sync through the folder. The production tree is
 `src/`, driven by `package.json`. M3 (compaction, search, device names, undelete) has not started.
 
-`prototype/` is separate prototype that proves folder-based sync between Windows and Android. It does not share code
-with a production tree. Ignore it when developing the project.
-
 ## Development
 
 ### The docs
@@ -22,10 +19,9 @@ with a production tree. Ignore it when developing the project.
 | `docs/requirements.md` | Every requirement, its ID, and its state |
 | `docs/architecture.md` | Layers, the folder adapter contract, the stack, and the open design options |
 | `docs/past_decision.md` | Options considered and not taken, with the condition that would reopen each |
-| `docs/sync-flow.md` | What the prototype proved about sync, and the payload chosen for the real app |
+| `docs/sync-flow.md` | What is settled about sync, and the payload chosen for the real app |
 | `docs/test.md` | What gets tested, at which layer |
 | `docs/code-standard.md` | Naming, module boundaries, error handling, comments |
-| `prototype/README.md` | The prototype only — its build, its findings, its known issues |
 
 Do not write production code that presumes an answer to these docs. Document must always precedes any permanent
 development and changes.
@@ -66,17 +62,13 @@ NODE_PATH=/home/nam/.npm/_npx/e41f203b7505f1fb/node_modules npm run ui-smoke
 
 The Makefile wraps these as `make dev`, `make build`, `make preview`, `make test`, `make check`, `make seed`, `make
 ui-smoke`, `make docs`, `make clean`, plus `make verify` for check + test + ui-smoke + docs. The Playwright targets set
-`NODE_PATH` themselves. `make help` lists them alongside the prototype's targets.
+`NODE_PATH` themselves. `make help` lists them.
 
-The prototype's own bundles are unchanged: `make proto_all`, `make proto_exe_win`, `make proto_android`, `make
-proto_clean`, and `python3 prototype/install/serve.py --folder <path>`.
-
-**Port 38531 belongs to this project.** The dev server, the preview server and the prototype's loopback helper all bind
-it on 127.0.0.1; do not pick another one. `strictPort` is set, so a leftover server fails the next launch outright.
-`startPreview` puts the preview in its own process group and kills the group, because `npx` does not pass a signal on to
-the vite it spawned — that was the usual source of a leftover. `make dev`, `make preview`, `make seed` and `make
-ui-smoke` name the holding process instead of failing bare, and `make stop` frees the port. Any `npm run` line in
-`prototype/README.md` is still aspirational — that `package.json` was never written, and this one is not it.
+**Port 38531 belongs to this project.** The dev server and the preview server both bind it on 127.0.0.1; do not pick
+another one. `strictPort` is set, so a leftover server fails the next launch outright. `startPreview` puts the preview
+in its own process group and kills the group, because `npx` does not pass a signal on to the vite it spawned — that was
+the usual source of a leftover. `make dev`, `make preview`, `make seed` and `make ui-smoke` name the holding process
+instead of failing bare, and `make stop` frees the port.
 
 
 

@@ -13,7 +13,7 @@ The sync process and what a device actually writes into the folder in [sync-flow
 
 | Area | State | Where |
 | --- | --- | --- |
-| Folder-based transport between Windows and Android | Proven | `prototype/core/`, `prototype/adapters/` |
+| Folder-based transport between Windows and Android | Proven | [§2 What the prototype settled](#2-what-the-prototype-settled) |
 | Browser reach to a local folder, per browser | Proven | [§4 The folder adapter](#4-the-folder-adapter) |
 | Convergence of a single text field | Proven | [sync-flow.md §2 What the prototype settled](sync-flow.md#2-what-the-prototype-settled) |
 | Convergence of a tree | Decided | [sync-flow.md §4.6 The decision](sync-flow.md#46-the-decision) |
@@ -21,9 +21,9 @@ The sync process and what a device actually writes into the folder in [sync-flow
 | Technology stack | Decided | [§6 Technology stack](#6-technology-stack) |
 | Packaging per platform | Decided | [§7 Packaging](#7-packaging) |
 
-The prototype does not share code with the production tree. The prototype is a stepping stone for the design: the
-adapter contract, the one-writer-per-file rule, the version vector and, where it survives review, the source of
-`core/merge.mjs`.
+The prototype does not share code with the production tree, and now lives in a project of its own. It was a stepping
+stone for the design — the adapter contract, the one-writer-per-file rule, the version vector — and the design is all
+that crossed over. Every file it proved was rewritten under `src/`.
 
 ## 2. What the prototype settled
 
@@ -42,7 +42,7 @@ app polls — every 3 s and on window focus in the prototype. Any production des
 
 **A half-synced file is normal.** The provider client can be mid-download when `read` lands on a file. The prototype
 skips a file that fails to parse and picks it up whole on the next cycle, and writes through a temp file plus atomic
-rename so it never publishes a partial file itself (`prototype/adapters/node-folder.mjs`).
+rename so it never publishes a partial file itself.
 
 **Firefox cannot hold a folder handle.** Mozilla declined the File System Access API, so on Firefox the page reaches the
 folder only through a loopback helper on this device. On Android the folder arrives through a WebView bridge over the
@@ -64,8 +64,8 @@ Storage       Local Folder ──▶ provider's client ──▶ Sync Folder
 ```
 
 The logic layer has no I/O, no clock and no `window`. Time enters as a `now()` parameter, the folder enters as an
-adapter object, and the UI enters as an `onChange` callback. `prototype/core/folder-sync.mjs` takes all three as
-constructor arguments, which is why the headless scenario test and the browser run the same code.
+adapter object, and the UI enters as an `onChange` callback. `src/app/folder-sync.ts` takes all three the same way,
+which is why a headless test and the browser run the same code.
 
 ## 4. The folder adapter
 
@@ -186,8 +186,8 @@ the page a folder when the browser can't reach one by themself.
 | Target | Reaches the folder by | Ships as | Shell |
 | --- | --- | --- | --- |
 | Windows, Chrome or Edge | File System Access handle, kept in IndexedDB | a URL on any static host, installed as a PWA | x |
-| Windows, Firefox | the loopback helper on `127.0.0.1:38531` | a zip: web assets, embeddable Python, a shortcut | prototype/install/serve.py |
-| Android | a Storage Access Framework grant over a Java bridge | an APK | `prototype/android/app/src/main/java/dev/checklist/proto/*.java` |
+| Windows, Firefox | the loopback helper on `127.0.0.1:38531` | a zip: web assets, embeddable Python, a shortcut | a stdlib-only Python helper |
+| Android | a Storage Access Framework grant over a Java bridge | an APK | a WebView activity, four Java files |
 
 Chrome and Edge can hold a File System Access handle across restarts. Firefox cannot. No browser on Android can pick a
 folder. The phone needs a wrapper app holding a Storage Access Framework grant.
@@ -221,7 +221,7 @@ Chromium installs it properly.
 
 ### 7.2 Android — the WebView shell
 
-Already written and tested in `prototype/android/`, four Java files and no framework:
+Already written and tested in the prototype, four Java files and no framework:
 
 - `MainActivity.java` serves the bundled web assets through a `WebViewAssetLoader`, so the page is local rather than
   fetched, and exposes `FolderBridge` to it as `window.AndroidFolder`.
@@ -229,10 +229,10 @@ Already written and tested in `prototype/android/`, four Java files and no frame
 - `FolderStore.java` calls `takePersistableUriPermission` on the granted tree and keeps the URI in `SharedPreferences`.
   A plain SAF grant dies with the process; the persistable one survives reboots, which is why later launches go straight
   to the folder.
-- `prototype/adapters/android-folder.mjs` wraps the bridge in the same three methods every other adapter offers.
+- The `android-folder` adapter wraps the bridge in the same three methods every other adapter offers.
 
-Built inside Docker (`make proto_android`), with the web assets copied in at build time so the phone cannot drift from
-the laptop. Nothing is installed on the host.
+Built inside Docker, with the web assets copied in at build time so the phone cannot drift from the laptop. Nothing is
+installed on the host.
 
 ### 7.3 Accepted limits
 

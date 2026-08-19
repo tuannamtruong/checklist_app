@@ -39,7 +39,7 @@ question lives.
 
 ## 2. What the prototype settled
 
-Proven by `prototype/core/` and its tests, and carried as the `pt.` rows of
+Proven by the prototype and its tests, and carried into the S-rows of
 [requirements.md §7.1 Built](requirements.md#71-built). These results hold whichever payload is chosen, so they are
 stated over the *device file* — whatever a device writes under its own id. The prototype's device file happened to be a
 snapshot, because its whole payload was one; the chosen payload's is a log ([§4.6 The decision](#46-the-decision)).

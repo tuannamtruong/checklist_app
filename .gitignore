@@ -26,9 +26,6 @@ dist-ssr
 # Playwright dev profile used by scripts/seed.mjs
 .dev-profile/
 
-# Downloaded embeddable Python for `make proto_exe_win`
-prototype/.build-cache/
-
 # Screenshots from scripts/ui-smoke.mjs
 ui-smoke/
 

@@ -1,15 +1,12 @@
-# The app, and the bundles for the sync prototype.
+# The app.
 #
 #   make dev               the app on 127.0.0.1:38531, hot reload
 #   make build             production bundle -> dist/
-#   make proto_all         both prototype bundles, in one command
 #
-# `make help` lists the rest. The prototype targets install no toolchain on this
-# machine: the Windows one downloads an embeddable Python and stages it on the
-# Windows side, and the Android one does everything inside Docker.
+# `make help` lists the rest.
 
 .PHONY: help install dev build preview test check verify seed ui-smoke docs clean \
-        stop port-check proto_all proto_exe_win proto_android proto_clean
+        stop port-check
 .DEFAULT_GOAL := help
 
 # Port 38531 is this project's, pinned in vite.config.ts for dev and preview
@@ -27,18 +24,9 @@ PORT_PIDS = $$(lsof -ti tcp:$(PORT) -sTCP:LISTEN 2>/dev/null || \
 # need it on NODE_PATH. Override if it moves.
 PLAYWRIGHT_MODULES ?= /home/nam/.npm/_npx/e41f203b7505f1fb/node_modules
 
-# The folder your cloud client already syncs. Baked into the Windows shortcut,
-# so the app starts pointed at it and never asks.
-FOLDER ?= D:\MEGA\Checklist
-# Where the staged Python runtime and the icon go on the Windows side.
-TARGET ?= C:\Tools\ChecklistProto
-
-# printf, not echo: /bin/sh here is dash, whose echo eats backslash escapes --
-# and every Windows path below is one. `\c` in particular means "stop printing",
-# which silently truncates the line at C:\...\checklist.
+# printf, not echo: /bin/sh here is dash, whose echo eats backslash escapes.
 help:
 	@printf '%s\n' \
-	  "the app" \
 	  "  make dev           - dev server on 127.0.0.1:$(PORT), hot reload" \
 	  "  make build         - production bundle -> dist/" \
 	  "  make preview       - build, then serve dist/ on 127.0.0.1:$(PORT)" \
@@ -50,18 +38,7 @@ help:
 	  "  make docs          - docs reflowed to 120 columns (--check)" \
 	  "  make stop          - free port $(PORT): kill whatever is listening on it" \
 	  "  make install       - npm ci" \
-	  "  make clean         - remove dist/ and ui-smoke/" \
-	  "" \
-	  "the prototype" \
-	  "  make proto_all     - both bundles, one command" \
-	  "  make proto_exe_win - Windows launcher + desktop shortcut" \
-	  "                       FOLDER=$(FOLDER)" \
-	  "                       TARGET=$(TARGET)" \
-	  "  make proto_android - Android APK -> prototype/android/out/" \
-	  "  make proto_clean   - remove build output and caches" \
-	  "" \
-	  "override a path like:" \
-	  "  make proto_exe_win FOLDER='C:\\Users\\XXX\\OneDrive\\checklist'"
+	  "  make clean         - remove dist/ and ui-smoke/"
 
 # Deliberately not a prerequisite of anything: `npm ci` throws node_modules away
 # and takes a minute, which is not what `make dev` should do to a working tree.
@@ -135,19 +112,3 @@ verify: check test ui-smoke docs
 
 clean:
 	rm -rf dist ui-smoke
-
-# Windows first: it is the fast half, and the Android image can take minutes on
-# a cold cache. A failure there should not come after a long wait.
-proto_all: proto_exe_win proto_android
-
-proto_exe_win:
-	python3 prototype/install/make_windows_bundle.py --folder '$(FOLDER)' --target '$(TARGET)'
-
-proto_android:
-	prototype/android/build.sh
-
-proto_clean:
-	prototype/android/build.sh clean
-	rm -rf prototype/.build-cache
-	@echo "note: the staged runtime on the Windows side is left alone."
-	@echo "      remove it by hand: $(TARGET)"
