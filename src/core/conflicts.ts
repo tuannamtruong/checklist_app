@@ -21,9 +21,22 @@ import type { ResolvedTree } from './tree';
 import { ROOT, type DeviceId, type NodeId, type Op, type ParentId } from './types';
 
 /** The fields two devices can write independently. */
-export type ConflictField = 'title' | 'done' | 'body' | 'kind' | 'parent' | 'deleted';
+export type ConflictField =
+  | 'title'
+  | 'done'
+  | 'body'
+  | 'kind'
+  | 'parent'
+  | 'deleted'
+  | 'tags'
+  | 'priority';
 
-export type FieldValue = string | boolean | null;
+/**
+ * A-3 widened this: a tag set is one value, so the value a race dropped can be
+ * a list — past_decision.md §10. It is compared by identity nowhere; `sameValue`
+ * is what asks whether two writes agreed.
+ */
+export type FieldValue = string | boolean | null | readonly string[];
 
 interface ConflictBase {
   /** Stable across cycles, because it is derived from the ops — the dismissal key. */
@@ -77,7 +90,21 @@ function writesOf(op: Op): readonly (readonly [ConflictField, FieldValue])[] {
   if (op.done !== undefined) writes.push(['done', op.done]);
   if (op.body !== undefined) writes.push(['body', op.body]);
   if (op.kind !== undefined) writes.push(['kind', op.kind]);
+  if (op.tags !== undefined) writes.push(['tags', op.tags]);
+  if (op.priority !== undefined) writes.push(['priority', op.priority]);
   return writes;
+}
+
+/**
+ * Whether two writes said the same thing. Every field but one is a scalar; a
+ * tag set is a sorted array, so two devices that wrote the same tags in
+ * different orders hold the same value and have no race to report.
+ */
+function sameValue(a: FieldValue, b: FieldValue): boolean {
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return a.length === b.length && a.every((tag, index) => tag === b[index]);
+  }
+  return a === b;
 }
 
 interface Write {
@@ -127,7 +154,7 @@ function fieldConflicts(tree: ResolvedTree, logs: readonly DeviceOps[]): FieldCo
     const lastByDevice = new Map<DeviceId, Write>();
     for (const write of writes) {
       if (write === winner || write.op.dev === winner.op.dev) continue;
-      if (write.value === winner.value) continue;
+      if (sameValue(write.value, winner.value)) continue;
       if (!concurrent(vectors.get(write.op)!, winnerClock)) continue;
       lastByDevice.set(write.op.dev, write);
     }
@@ -215,12 +242,22 @@ export function describeField(field: ConflictField): string {
       return 'parent';
     case 'deleted':
       return 'deletion';
+    case 'tags':
+      return 'tags';
+    case 'priority':
+      return 'priority';
   }
 }
 
 export function describeValue(field: ConflictField, value: FieldValue, tree: ResolvedTree): string {
   if (field === 'done') return value === true ? 'ticked' : 'not ticked';
   if (field === 'deleted') return value === true ? 'deleted' : 'restored';
+  // A-3. The whole set is the value, so the whole set is what the row shows —
+  // "kept a, b over a, c" is what a last-writer-wins tag field actually did.
+  if (field === 'tags') {
+    if (!Array.isArray(value) || value.length === 0) return 'no tags';
+    return value.join(', ');
+  }
   if (field === 'parent') {
     if (value === ROOT || typeof value !== 'string') return 'the top level';
     return tree.nodes[value]?.title || 'an untitled row';

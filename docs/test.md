@@ -157,6 +157,14 @@ asserted — it is a screenshot per theme, which is what a person can check and 
 assert about the rest of the palette is that no theme changes the layout: the app is measured for horizontal overflow
 under the widest one, and every theme renders the same DOM.
 
+M5's other three features are driven end to end, because each of them is a claim about what is on screen rather than
+about a value. The drag (T-14) is driven with the pointer, not with a synthesised drag event: down on the grip, move, up
+— and once with a drop into the dragged row's own child, which asserts the refusal T-5 has carried since M1 with no UI
+able to provoke it. Tags and the flag (A-1, A-2) are typed and clicked the way a person does, including the hash and the
+capital that `cleanTag` folds away, and the filter (A-4, A-6) is checked for the two things a unit test cannot see: that
+the tree shows a match *and the path to it*, and that a row created while the filter is on carries the filter's tags
+rather than vanishing as it is typed.
+
 M5 adds the sync folder section, and what the smoke run can assert about it is narrow on purpose: the section names the
 same folder the footer does, and a shell that cannot open a folder or start an app offers no button for either
 ([requirements.md §10.2 The sync folder, on the settings screen](requirements.md#102-the-sync-folder-on-the-settings-screen)).

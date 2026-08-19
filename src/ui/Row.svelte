@@ -12,7 +12,10 @@
   import { handleRowKey } from './keyboard';
   import { rowAbove, rowBelow } from './rows';
   import KindIcon from './KindIcon.svelte';
+  import PriorityFlag from './PriorityFlag.svelte';
   import RowMenu from './RowMenu.svelte';
+  import TagChips from './TagChips.svelte';
+  import TagEditor from './TagEditor.svelte';
   import { nodeHref } from '../app/router.svelte';
   import type { RowDrag } from './drag.svelte';
 
@@ -30,6 +33,8 @@
   let input = $state<HTMLInputElement | null>(null);
   let editing = $state(false);
   let draft = $state('');
+  /** A-1. The row's tag editor, opened from the menu and closed by Escape. */
+  let taggingOpen = $state(false);
 
   // A rename that arrives from outside — a peer's, in M2 — must show without
   // stealing what this device is halfway through typing. X-10 with a caret.
@@ -183,6 +188,19 @@
       onkeydown={onKeyDown}
     />
 
-    <RowMenu {ctx} />
+    <!-- A-1 and A-2, right of the title: what the row is for, after what it is. -->
+    <TagChips tags={node.tags} {view} />
+    <PriorityFlag {session} {id} priority={node.priority} />
+
+    <RowMenu ctx={{ ...ctx, editTags: () => (taggingOpen = true) }} />
   </div>
+
+  <!-- Under the row rather than inside it: the row is what a drop is measured
+       against — T-14 — and a row that grew when its tags opened would move the
+       target out from under the pointer. -->
+  {#if taggingOpen}
+    <div class="pb-1" style="padding-left: {depth * 1.25 + 2.5}rem">
+      <TagEditor {session} {id} autofocus onclose={() => (taggingOpen = false)} />
+    </div>
+  {/if}
 {/if}

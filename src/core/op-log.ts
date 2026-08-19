@@ -9,7 +9,17 @@
 // three methods — so a write is always the whole file, and this module is the
 // only thing that spells one.
 
-import { KINDS, type DeviceId, type Kind, type Op, type SClock, type SetOp } from './types';
+import { cleanTags } from './tags';
+import {
+  KINDS,
+  PRIORITIES,
+  type DeviceId,
+  type Kind,
+  type Op,
+  type Priority,
+  type SClock,
+  type SetOp,
+} from './types';
 
 export const LOG_VERSION = 1;
 
@@ -69,6 +79,10 @@ function isKind(value: unknown): value is Kind {
   return typeof value === 'string' && (KINDS as readonly string[]).includes(value);
 }
 
+function isPriority(value: unknown): value is Priority {
+  return typeof value === 'string' && (PRIORITIES as readonly string[]).includes(value);
+}
+
 function isClock(value: unknown): value is SClock {
   return isRecord(value) && Object.values(value).every((counter) => typeof counter === 'number');
 }
@@ -123,6 +137,11 @@ function parseOp(line: string, dev: DeviceId): Op | null {
         op.body = value['body'] as string | null;
       }
       if (isKind(value['kind'])) op.kind = value['kind'];
+      // A-1. Normalised on the way in as well as on the way out: a tag from an
+      // older build or a hand-edited line is put in the same form as one this
+      // device typed, or two spellings of one tag would be two tags.
+      if (Array.isArray(value['tags'])) op.tags = cleanTags(value['tags']);
+      if (isPriority(value['priority'])) op.priority = value['priority'];
       return op;
     }
     case 'move': {

@@ -9,9 +9,11 @@
 
 import type { ConflictField, FieldValue } from './conflicts';
 import { keyBetween } from './order';
+import { cleanTags, sameTags } from './tags';
 import { childrenOf, isAncestorOrSelf, parentOf, siblingsOf, type ResolvedTree } from './tree';
 import {
   KINDS,
+  PRIORITIES,
   ROOT,
   type EditContext,
   type Kind,
@@ -19,6 +21,7 @@ import {
   type NodeId,
   type Op,
   type ParentId,
+  type Priority,
 } from './types';
 
 function stamp(ctx: EditContext): { c: number; at: number; dev: string } {
@@ -65,6 +68,8 @@ function keyAtStart(siblings: readonly Node[]): string {
 export interface CreateOptions {
   kind?: Kind;
   title?: string;
+  /** A-6. What the tree is filtered by, so a new row does not vanish as it is typed. */
+  tags?: readonly string[];
 }
 
 /** A new row directly below `id`, among its siblings — `Enter` on a leaf row. */
@@ -104,7 +109,13 @@ function createAt(ctx: EditContext, parent: ParentId, order: string, options: Cr
   const id = ctx.mintId();
   const kind = options.kind ?? 'task';
   const ops: Op[] = [{ op: 'create', id, parent, kind, order, ...stamp(ctx) }];
-  if (options.title) ops.push({ op: 'set', id, title: options.title, ...stamp(ctx) });
+  const tags = cleanTags(options.tags ?? []);
+  if (options.title || tags.length > 0) {
+    const set: Op = { op: 'set', id, ...stamp(ctx) };
+    if (options.title) set.title = options.title;
+    if (tags.length > 0) set.tags = tags;
+    ops.push(set);
+  }
   return ops;
 }
 
@@ -138,6 +149,61 @@ export function setBody(tree: ResolvedTree, ctx: EditContext, id: NodeId, body: 
   const node = tree.nodes[id];
   if (!isWritable(node) || node.body === body) return [];
   return [{ op: 'set', id, body, ...stamp(ctx) }];
+}
+
+/**
+ * A-1. The whole set, every time: `tags` is one field, so an add and a remove
+ * are both "these are the tags now" — past_decision.md §10.
+ */
+export function setTags(
+  tree: ResolvedTree,
+  ctx: EditContext,
+  id: NodeId,
+  tags: readonly string[],
+): Op[] {
+  const node = tree.nodes[id];
+  const next = cleanTags(tags);
+  if (!isWritable(node) || sameTags(node.tags, next)) return [];
+  return [{ op: 'set', id, tags: next, ...stamp(ctx) }];
+}
+
+export function addTag(tree: ResolvedTree, ctx: EditContext, id: NodeId, tag: string): Op[] {
+  const node = tree.nodes[id];
+  if (!isWritable(node)) return [];
+  return setTags(tree, ctx, id, [...node.tags, tag]);
+}
+
+export function removeTag(tree: ResolvedTree, ctx: EditContext, id: NodeId, tag: string): Op[] {
+  const node = tree.nodes[id];
+  if (!isWritable(node)) return [];
+  return setTags(
+    tree,
+    ctx,
+    id,
+    node.tags.filter((held) => held !== tag),
+  );
+}
+
+/** A-2. `none` is a value, so clearing a flag is a write like setting one. */
+export function setPriority(
+  tree: ResolvedTree,
+  ctx: EditContext,
+  id: NodeId,
+  priority: Priority,
+): Op[] {
+  const node = tree.nodes[id];
+  if (!isWritable(node) || node.priority === priority) return [];
+  return [{ op: 'set', id, priority, ...stamp(ctx) }];
+}
+
+/**
+ * What the flag on the row does: one control, four states, highest first —
+ * requirements.md §4.1. A menu of four entries would teach nothing this does not.
+ */
+export function nextPriority(current: Priority): Priority {
+  const cycle: readonly Priority[] = ['none', 'high', 'medium', 'low'];
+  const index = cycle.indexOf(current);
+  return cycle[(index + 1) % cycle.length]!;
 }
 
 /** K-5 "Turn into", and K-6's promotion of a note to a checklist. */
@@ -187,9 +253,17 @@ export function restoreValue(
       if (typeof value !== 'boolean' || !node || node.deleted === value) return [];
       return value ? remove(tree, ctx, id) : restore(tree, ctx, id);
     }
+    case 'tags':
+      return Array.isArray(value) ? setTags(tree, ctx, id, value) : [];
+    case 'priority':
+      return isPriority(value) ? setPriority(tree, ctx, id, value) : [];
     case 'parent':
       return [];
   }
+}
+
+function isPriority(value: FieldValue): value is Priority {
+  return typeof value === 'string' && (PRIORITIES as readonly string[]).includes(value);
 }
 
 function isKind(value: FieldValue): value is Kind {

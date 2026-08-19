@@ -9,6 +9,9 @@
   import type { RowFocus } from './focus.svelte';
   import Breadcrumbs from './Breadcrumbs.svelte';
   import NoteBody from './NoteBody.svelte';
+  import PriorityFlag from './PriorityFlag.svelte';
+  import TagEditor from './TagEditor.svelte';
+  import TagFilter from './TagFilter.svelte';
   import TreeView from './TreeView.svelte';
   import { kindLabel } from './actions';
 
@@ -47,10 +50,15 @@
           session.run((tree, ctx) => setTitle(tree, ctx, id, titleDraft));
         }}
       />
+      <!-- A-1 and A-2 for the row this page *is*, since its own row is one
+           level up and a task's row has no page link — requirements.md §4.1. -->
+      <PriorityFlag {session} {id} priority={node.priority} />
       <span class="rounded-full bg-surface-sunken px-2.5 py-1 text-xs text-ink-muted" data-testid="page-kind">
         {kindLabel(node.kind)}
       </span>
     </div>
+
+    <TagEditor {session} {id} />
 
     {#if node.kind === 'note'}
       <NoteBody {session} {id} />
@@ -74,6 +82,9 @@
   {:else}
     <h1 class="text-2xl font-semibold" data-testid="page-title">All lists</h1>
   {/if}
+
+  <!-- A-4. The bar is the tree's, and it sits with the tree — §4.2. -->
+  <TagFilter {session} {view} />
 
   <TreeView {session} {view} {focus} {parent} />
 </div>

@@ -8,11 +8,14 @@
 import { describe, expect, it } from 'vitest';
 import { conflictsOf, describeValue, type FieldConflict } from './conflicts';
 import {
+  addTag,
   createLastChild,
   moveTo,
   remove,
   restoreValue,
   setBody,
+  setPriority,
+  setTags,
   setTitle,
   toggleDone,
   turnInto,
@@ -31,6 +34,56 @@ function add(replica: Replica, title: string, kind: Kind = 'task'): NodeId {
 function rowsOf(replica: Replica) {
   return conflictsOf(replica.tree, replica.logs);
 }
+
+describe('tags and priority — A-3, past_decision.md §10', () => {
+  it('reports a concurrent tag add, and offers the set that lost', () => {
+    const { a, b } = pair();
+    const milk = add(a, 'Milk');
+    b.pull(a);
+    a.at(2_000).run((tree, ctx) => addTag(tree, ctx, milk, 'town'));
+    b.at(2_001).run((tree, ctx) => addTag(tree, ctx, milk, 'errand'));
+    settle([a, b]);
+
+    // One field, one winner: b wrote later, so the row holds b's set and the
+    // conflict row offers a's back — which is one click, not a merge rule.
+    expect(a.tree.nodes[milk]!.tags).toEqual(['errand']);
+    const rows = rowsOf(a).filter((row): row is FieldConflict => row.kind === 'field');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.field).toBe('tags');
+    expect(rows[0]!.dropped).toEqual(['town']);
+    expect(describeValue('tags', rows[0]!.dropped, a.tree)).toBe('town');
+
+    a.at(3_000).run((tree, ctx) => restoreValue(tree, ctx, milk, 'tags', rows[0]!.dropped));
+    settle([a, b]);
+    expect(b.tree.nodes[milk]!.tags).toEqual(['town']);
+    expect(rowsOf(b)).toEqual([]);
+  });
+
+  // Two devices that wrote the same tags in a different order wrote the same
+  // value, because `cleanTags` sorts — there is no race to report.
+  it('says nothing when both devices ended with the same set', () => {
+    const { a, b } = pair();
+    const milk = add(a, 'Milk');
+    b.pull(a);
+    a.at(2_000).run((tree, ctx) => setTags(tree, ctx, milk, ['town', 'errand']));
+    b.at(2_001).run((tree, ctx) => setTags(tree, ctx, milk, ['Errand', '#town']));
+    settle([a, b]);
+    expect(rowsOf(a)).toEqual([]);
+  });
+
+  it('reports a concurrent flag, naming both values', () => {
+    const { a, b } = pair();
+    const milk = add(a, 'Milk');
+    b.pull(a);
+    a.at(2_000).run((tree, ctx) => setPriority(tree, ctx, milk, 'high'));
+    b.at(2_001).run((tree, ctx) => setPriority(tree, ctx, milk, 'low'));
+    settle([a, b]);
+
+    const rows = rowsOf(a).filter((row): row is FieldConflict => row.kind === 'field');
+    expect(rows).toHaveLength(1);
+    expect([rows[0]!.kept, rows[0]!.dropped]).toEqual(['low', 'high']);
+  });
+});
 
 describe('which fields raise a row', () => {
   it('a tick two devices disagreed about', () => {

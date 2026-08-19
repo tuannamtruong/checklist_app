@@ -42,6 +42,8 @@ function keysOf(op: Op): string[] {
       if (op.done !== undefined) keys.push(`${op.id}:done`);
       if (op.body !== undefined) keys.push(`${op.id}:body`);
       if (op.kind !== undefined) keys.push(`${op.id}:kind`);
+      if (op.tags !== undefined) keys.push(`${op.id}:tags`);
+      if (op.priority !== undefined) keys.push(`${op.id}:priority`);
       return keys;
     }
   }
@@ -65,6 +67,14 @@ function trimmedSet(op: SetOp, keeps: (key: string) => boolean): SetOp | null {
   }
   if (op.kind !== undefined && keeps(`${op.id}:kind`)) {
     kept.kind = op.kind;
+    any = true;
+  }
+  if (op.tags !== undefined && keeps(`${op.id}:tags`)) {
+    kept.tags = op.tags;
+    any = true;
+  }
+  if (op.priority !== undefined && keeps(`${op.id}:priority`)) {
+    kept.priority = op.priority;
     any = true;
   }
   return any ? kept : null;

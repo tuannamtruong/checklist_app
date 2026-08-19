@@ -178,7 +178,61 @@ async function main() {
       `depth ${await depthOf(page, 'Oat milk')}`,
     );
 
+    // --- A-1 to A-6: tags, the flag and the filter -------------------------
+    const milkRow2 = await rowByTitle(page, 'Milk');
+    const flag = milkRow2.locator('[data-testid="priority"]');
+    await flag.click();
+    check(
+      'the flag cycles highest first — A-2',
+      (await flag.getAttribute('data-priority')) === 'high',
+      String(await flag.getAttribute('data-priority')),
+    );
+
+    await milkRow2.locator('[data-testid="row-menu-button"]').click();
+    await page.locator('[data-testid="row-menu"] [data-action="tags"]').click();
+    await page.locator('[data-testid="tag-input"]').fill('#Town');
+    await page.keyboard.press('Enter');
+    check(
+      'a tag typed with a hash and a capital is stored as one tag — A-1',
+      (await milkRow2.locator('[data-testid="tag-chip"]').innerText()).trim() === 'town',
+      (await milkRow2.locator('[data-testid="tag-chip"]').innerText()).trim(),
+    );
+
+    await page.locator('[data-testid="filter-tag"][data-tag="town"]').click();
+    const filteredTitles = await page
+      .locator('[data-testid="row"] [data-testid="title"]')
+      .evaluateAll((inputs) => inputs.map((input) => input.value));
+    check(
+      'filtering shows the matching row and the path to it, and nothing else — A-4',
+      filteredTitles.join('|') === 'Shopping|Milk',
+      filteredTitles.join('|'),
+    );
+    check(
+      'and says how many rows carry the tags it is ANDing — §4.2',
+      (await page.locator('[data-testid="filter-summary"]').innerText()).includes('1 row with town'),
+      await page.locator('[data-testid="filter-summary"]').innerText(),
+    );
+
+    // A-6: a row created under a filter carries it, or it would vanish as it
+    // was typed.
+    await page.locator('[data-testid="add-task"]').click();
+    await page.keyboard.type('Errand run');
+    await page.locator('[data-testid="filter-clear"]').click();
+    const errand = await rowByTitle(page, 'Errand run');
+    check(
+      'a row created while filtering carries the filter’s tags — A-6',
+      (await errand.locator('[data-testid="tag-chip"][data-tag="town"]').count()) === 1,
+    );
+    check(
+      'clearing the filter puts the whole tree back',
+      (await titlesUnder(page, 'Shopping')).join('|') === 'Milk|Coffee beans|Oat milk',
+      (await titlesUnder(page, 'Shopping')).join('|'),
+    );
+
     // --- ↑ / ↓ move the caret --------------------------------------------
+    // The caret goes back where the keyboard checks left it: the tag block above
+    // was driven with a mouse, and a button does not hold a caret.
+    await (await rowByTitle(page, 'Oat milk')).locator('[data-testid="title"]').click();
     await page.keyboard.press('ArrowUp');
     const focusedTitle = await page.evaluate(() => document.activeElement?.value ?? null);
     check('↑ moves the caret to the row above', focusedTitle === 'Coffee beans', String(focusedTitle));

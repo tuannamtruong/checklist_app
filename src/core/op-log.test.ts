@@ -28,6 +28,32 @@ describe('the device file', () => {
   });
 });
 
+describe('tags and priority on the wire — A-3', () => {
+  const tagged: Op[] = [
+    { op: 'create', id: 'n_1', parent: ROOT, kind: 'task', order: 'a1', c: 1, at: 100, dev: DEV },
+    { op: 'set', id: 'n_1', tags: ['errand', 'town'], priority: 'high', c: 2, at: 200, dev: DEV },
+  ];
+
+  it('survives a round trip', () => {
+    const back = decodeLog(encodeLog(header, tagged))!;
+    expect(back.ops).toEqual(tagged);
+  });
+
+  // A-1: the normal form is what is stored, wherever the line came from — an
+  // older build, another device, or a hand-edited file.
+  it('normalises a tag it reads, and drops one that is not a tag', () => {
+    const line = JSON.stringify({ op: 'set', id: 'n_1', tags: ['#Town', ' town ', 7], c: 2, at: 200 });
+    const back = decodeLog(`${JSON.stringify(header)}\n${line}\n`)!;
+    expect(back.ops[0]).toMatchObject({ tags: ['town'] });
+  });
+
+  it('ignores a priority it does not know', () => {
+    const line = JSON.stringify({ op: 'set', id: 'n_1', priority: 'urgent', c: 2, at: 200 });
+    const back = decodeLog(`${JSON.stringify(header)}\n${line}\n`)!;
+    expect(back.ops[0]).not.toHaveProperty('priority');
+  });
+});
+
 describe('encodeLog', () => {
   it('writes a header line and one line per op', () => {
     const lines = encodeLog(header, ops).trim().split('\n');
