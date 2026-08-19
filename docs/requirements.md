@@ -183,6 +183,7 @@ helper and to the Android WebView unchanged. `src/app/router.svelte.ts` holds th
 | `#/conflicts` | What the merge decided without asking — [§9 Conflict presentation](#9-conflict-presentation) | `src/ui/ConflictsPage.svelte` |
 | `#/search` and `#/search/<query>` | The search results of [§6 Search](#6-search) | `src/ui/SearchPage.svelte` |
 | `#/devices` | The device list of [§8 Device management](#8-device-management) | `src/ui/DevicesPage.svelte` |
+| `#/logs` | This device's own op log, newest first — D-4 in [§8 Device management](#8-device-management) | `src/ui/LogPage.svelte` |
 | anything else | The recovery page, per X-11 | `src/ui/RecoveryPage.svelte` |
 
 The query lives in the fragment rather than in a query string, for the reason X-7 already gives: `#/search/milk` is one
@@ -200,6 +201,11 @@ view the user could not learn.
 `#/conflicts` is the exception to that rule, and deliberately: its entry appears only when there is something in it,
 because a permanent one would be empty almost always — [§9 Conflict presentation](#9-conflict-presentation). It is
 reachable by typing the fragment even then, and answers "nothing to report" rather than the recovery page.
+
+`#/logs` is not in the sidebar either, and for the opposite reason: it is always there to be found, but it is reached
+from `#/devices` rather than from the nav, because it says something about *one* device and the device screen is where
+that device is already the subject. A fifth permanent nav entry for a diagnostic would cost every user of the tree a
+line of nav for a page opened when something looks wrong.
 
 ## 6. Search
 
@@ -288,6 +294,17 @@ presentation.
 | D-1 | A settings screen lists known devices by id, with a name the user can set | ✅ | `src/core/devices.ts` reads the list out of the header lines; `src/ui/DevicesPage.svelte` at `#/devices`. The name is data and syncs; the id is minted locally |
 | D-2 | Each device carries an advisory `lastSeen`, so a dormant one is visible as dormant | ✅ | The `at` on the header line, stamped by the writing device on every write. Advisory only — the merge never reads it |
 | D-3 | Nothing in the merge path depends on the device list being complete or current | ✅ | Structural: `src/core/devices.ts` is the only reader of `name` and `at`, and neither `merge.ts` nor `materialise.ts` imports it. A header with neither field is a device that has not been named, not an error |
+| D-4 | The op log this device has written is readable inside the app, newest first, each op naming the row it touched | ✅ | `src/core/log-view.ts` turns ops into rows; `src/ui/LogPage.svelte` at `#/logs`, reached from the "this device" row of `#/devices`. Read-only — nothing on the page writes an op |
+
+**D-4 shows the file as it stands, not the history.** The rows are this device's own ops in the order it wrote them,
+which after S-14 has run is the ops that survived the cut rather than everything ever written —
+[sync-flow.md §4.8 The compaction cut](sync-flow.md#48-the-compaction-cut). The page says so, because a log with a hole
+in it that does not admit to the hole is worse than no log.
+
+**It is this device's file and no peer's.** A peer's log is read on every cycle and could be listed the same way, but
+what the ops of a peer explain is that peer's counters and receipts, not this one's — and this device's is the file the
+question "what did I just write" is about. The header line is on the page for the same reason: the counter and the
+receipts are what turn an op into a position in the vector.
 
 **A device names itself, and only itself.** The name rides the header line of the file the device already owns, so
 naming stays inside the one-writer-per-file rule (S-3) that the whole design rests on and needs no merge rule of its

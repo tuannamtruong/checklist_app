@@ -15,7 +15,7 @@ import { applyOp, foldOps } from '../core/materialise';
 import { mergeTree, receiptsOf, type DeviceOps } from '../core/merge';
 import { resolveTree, type ResolvedTree } from '../core/tree';
 import type { FolderAdapter } from '../core/folder';
-import type { DeviceId, EditContext, NodeId, NodeMap, Op } from '../core/types';
+import type { DeviceId, EditContext, NodeId, NodeMap, Op, SClock } from '../core/types';
 import { DeviceLog } from './device-log';
 import { FolderSync, type SyncResult } from './folder-sync';
 import { mintNodeId } from './device';
@@ -72,6 +72,22 @@ export class Session {
     );
   });
 
+  /**
+   * D-4. This device's own ops, newest last, exactly as its file holds them —
+   * requirements.md §8. Copied rather than handed out: the log appends in place,
+   * so a derived value that returned the same array would never look changed.
+   */
+  readonly ownOps: readonly Op[] = $derived.by(() => {
+    void this.revision;
+    return [...this.log.ops];
+  });
+
+  /** D-4. The vector this device's header line carries, as of now. */
+  readonly ownClock: SClock = $derived.by(() => {
+    void this.revision;
+    return this.log.clock;
+  });
+
   private constructor(log: DeviceLog, folderSync: FolderSync, ops: readonly Op[]) {
     this.log = log;
     this.folderSync = folderSync;
@@ -103,6 +119,15 @@ export class Session {
 
   get nodes(): NodeMap {
     return this.nodeMap;
+  }
+
+  /**
+   * D-4. What this device's file cost the last time it was written or read — a
+   * plain getter, since the number changes on the debounced write rather than on
+   * an edit, and the page that reads it re-renders off `ownOps` anyway.
+   */
+  get logBytes(): number {
+    return this.log.byteLength;
   }
 
   /** This device's file and every peer's, which is what the fold takes. */

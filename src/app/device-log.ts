@@ -104,6 +104,16 @@ export class DeviceLog {
     return this.bytes;
   }
 
+  /**
+   * D-4. The vector this file's header carries — this device's own counter
+   * joined with every receipt it has recorded. Derived here rather than held,
+   * because `flush` derives the same line the same way, and two spellings of one
+   * header is how a display and a file drift apart.
+   */
+  get clock(): SClock {
+    return join(clockOf(this.entries), this.receipts);
+  }
+
   /** D-1. Empty until somebody names this device on this device. */
   get name(): string {
     return this.label;

@@ -146,6 +146,10 @@ M3 adds two more views to drive: `#/search` for [requirements.md §6 Search](req
 finds a title, a note body, and a row T-11 has hidden — and `#/devices` for D-1, that a name typed there survives a
 reload, which is the only way to see that it reached the file rather than the page.
 
+`#/logs` is driven from the device screen it hangs off, for D-4: that the link is on the "this device" row, and that the
+newest entry names the edit the run has just made. What the unit test cannot see is the ordering the page exists for —
+the log reads from the end, and every other list in the app reads from the start.
+
 The prototype's `android-bridge.mjs` drives the same page in the same browser with `window.AndroidFolder` replaced by an
 in-page stub, which is how the Android startup path — first-run folder pick, edit, conflict, resolution — is exercised
 without a JVM. It is a UI test wearing the phone's clothes, not a platform test; the platform layer starts where the
@@ -169,7 +173,8 @@ row 10. In the order that finds the most:
 | --- | --- | --- |
 | 1 | Install `bundles/checklist.apk`, grant a folder in the provider's synced directory, add a row | The SAF grant and the Android adapter against a real client |
 | 2 | Force-stop the app, reopen it | `takePersistableUriPermission` survived, so there is no second prompt |
-| 3 | Unzip `checklist-windows.zip` on Windows, run `Checklist.bat`, point Firefox at it | The loopback helper path, which no headless run can hold |
+| 3 | Unzip `checklist-windows.zip` on Windows, double-click `Setup.vbs`, pick the folder, point Firefox at it | The loopback helper path, which no headless run can hold |
+| 3a | Launch it again from the desktop icon | No console window appears at any point, and the folder is not asked for twice — [architecture.md §7.1 The two Windows bundles](architecture.md#71-the-two-windows-bundles) |
 | 4 | Edit on the phone, wait for the provider's client, refresh on Windows | Provider latency and partial files — [sync-flow.md §7 What is still open](sync-flow.md#7-what-is-still-open) item 5 |
 | 5 | Edit both while both are offline, then reconnect | A real race with a real clock skew between two real devices |
 | 6 | Leave it running for long enough for the compaction trigger to fire | S-14 against a provider's client, which re-uploads the whole file when it shrinks |
@@ -224,7 +229,7 @@ The two bundles are built rather than tested, and what they produce is on [§3.6
 rather than in any script:
 
 ```bash
-make windows          # bundles/checklist-windows.zip — web assets, the helper, a shortcut
+make windows          # bundles/checklist-windows.zip — web assets, the helper, Setup.vbs
 make apk              # bundles/checklist.apk, built in Docker
 ```
 

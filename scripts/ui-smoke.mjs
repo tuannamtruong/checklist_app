@@ -342,6 +342,34 @@ async function main() {
       await page.locator('[data-testid="device-name"]').inputValue(),
     );
 
+    // --- D-4: this device's own log ---------------------------------------
+    await page.locator('[data-testid="log-link"]').click();
+    await page.waitForSelector('[data-testid="logs-page"]');
+    const logRows = page.locator('[data-testid="log-entry"]');
+    check(
+      'the device screen leads to this device’s log — D-4',
+      (await logRows.count()) > 0,
+      `${await logRows.count()} entries`,
+    );
+    // The log reads from the end, so the newest entry is the run's last edit —
+    // restoring “Old receipts” a few checks up.
+    const newest = logRows.first();
+    check(
+      'the newest entry is the last edit made, which is what newest-first means — D-4',
+      (await newest.getAttribute('data-op')) === 'restore' &&
+        (await newest.locator('[data-testid="log-title"]').innerText()).trim() === 'Old receipts',
+      `${await newest.getAttribute('data-op')} ${(await newest.locator('[data-testid="log-title"]').innerText()).trim()}`,
+    );
+    check(
+      'the header line is on the page: the file, the op count and the vector — D-4',
+      (await page.locator('[data-testid="log-file"]').innerText()).endsWith('.ops.jsonl') &&
+        Number(await page.locator('[data-testid="log-count"]').innerText()) >=
+          (await logRows.count()) &&
+        (await page.locator('[data-testid="log-clock"]').innerText()).includes('the laptop'),
+      await page.locator('[data-testid="log-file"]').innerText(),
+    );
+    await page.screenshot({ path: join(shots, 'logs.png'), fullPage: true });
+
     await page.goto(BASE_URL);
     await page.waitForSelector('[data-testid="tree"]');
 
@@ -376,6 +404,18 @@ async function main() {
       const overflow = await page.evaluate(() => document.body.scrollWidth - window.innerWidth);
       check(`no horizontal scroll at ${width}px`, overflow <= 0, `${overflow}px over`);
     }
+
+    // The log's row is the widest thing the app renders — a counter, a clock, an
+    // op name and a title on one line — so it gets the phone width of its own.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${BASE_URL}#/logs`);
+    await page.waitForSelector('[data-testid="logs-page"]');
+    // The drawer's transform is still settling on a fresh load, and it is what
+    // the width is measured against.
+    await page.waitForTimeout(300);
+    const logOverflow = await page.evaluate(() => document.body.scrollWidth - window.innerWidth);
+    check('the log holds at a phone width — D-4, X-1', logOverflow <= 0, `${logOverflow}px over`);
+    await page.screenshot({ path: join(shots, 'phone-logs.png'), fullPage: true });
 
     // --- X-5: a cold start with no network at all -------------------------
     await page.setViewportSize({ width: 1280, height: 900 });
