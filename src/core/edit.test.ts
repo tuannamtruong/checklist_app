@@ -4,6 +4,7 @@ import {
   canIndent,
   canMoveTo,
   canOutdent,
+  canRestore,
   createFirstChild,
   createSiblingBelow,
   indent,
@@ -12,6 +13,7 @@ import {
   moveUp,
   outdent,
   remove,
+  restore,
   setBody,
   setTitle,
   toggleDone,
@@ -238,6 +240,58 @@ describe('deleting — T-7 and §3.1', () => {
     ctx.tick();
     session.apply(remove(session.tree, ctx, a));
     expect(remove(session.tree, ctx, a)).toEqual([]);
+  });
+
+  it('restores a tombstoned row, and what it held comes with it — T-13', () => {
+    // One op, because T-7 never tombstoned the children individually: it
+    // inherits at read time, so clearing the top of the run is the whole
+    // operation — sync-flow.md §4.9.
+    const [a] = threeRows();
+    ctx.tick();
+    const born = createFirstChild(session.tree, ctx, a);
+    session.apply(born);
+    const child = born[0]!.id;
+    ctx.tick();
+    session.apply(remove(session.tree, ctx, a));
+    expect(session.tree.deleted.has(child)).toBe(true);
+
+    ctx.tick();
+    const ops = restore(session.tree, ctx, a);
+    expect(ops.map((op) => op.op)).toEqual(['restore']);
+    session.apply(ops);
+    expect(childrenOf(session.tree, ROOT)).toContain(a);
+    expect(childrenOf(session.tree, a)).toContain(child);
+  });
+
+  it('returns the row to the order key it kept', () => {
+    const [a, b, c] = threeRows();
+    ctx.tick();
+    session.apply(remove(session.tree, ctx, b));
+    ctx.tick();
+    session.apply(restore(session.tree, ctx, b));
+    expect(childrenOf(session.tree, ROOT)).toEqual([a, b, c]);
+  });
+
+  it('refuses a restore that would change nothing', () => {
+    const [a] = threeRows();
+    // Never deleted, so there is no tombstone to clear — S-10.
+    expect(restore(session.tree, ctx, a)).toEqual([]);
+    expect(restore(session.tree, ctx, 'n_missing')).toEqual([]);
+  });
+
+  it('will not raise a row out of an ancestor’s tombstone — canRestore', () => {
+    const [a] = threeRows();
+    ctx.tick();
+    const born = createFirstChild(session.tree, ctx, a);
+    session.apply(born);
+    const child = born[0]!.id;
+    ctx.tick();
+    session.apply(remove(session.tree, ctx, a));
+    // The child carries no tombstone of its own, so restoring it would write an
+    // op that clears nothing and leaves the row exactly as gone as it was.
+    expect(canRestore(session.tree, child)).toBe(false);
+    expect(restore(session.tree, ctx, child)).toEqual([]);
+    expect(canRestore(session.tree, a)).toBe(true);
   });
 
   it('refuses every field write to a tombstoned row', () => {

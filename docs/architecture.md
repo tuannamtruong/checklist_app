@@ -183,11 +183,16 @@ a maskable Android icon (X-4).
 The UI is a web page, so "who hands that page a folder" gets a different answer per target. A shell is needed to hand
 the page a folder when the browser can't reach one by themself.
 
-| Target | Reaches the folder by | Ships as | Shell |
-| --- | --- | --- | --- |
-| Windows, Chrome or Edge | File System Access handle, kept in IndexedDB | a URL on any static host, installed as a PWA | x |
-| Windows, Firefox | the loopback helper on `127.0.0.1:38531` | a zip: web assets, embeddable Python, a shortcut | a stdlib-only Python helper |
-| Android | a Storage Access Framework grant over a Java bridge | an APK | a WebView activity, four Java files |
+| Target | Reaches the folder by | Ships as | Shell | Built by |
+| --- | --- | --- | --- | --- |
+| Windows, Chrome or Edge | File System Access handle, kept in IndexedDB | a URL on any static host, installed as a PWA | x | `make build` |
+| Windows, Firefox | the loopback helper on `127.0.0.1:38531` | a zip: web assets, embeddable Python, a shortcut | a stdlib-only Python helper | `make windows` |
+| Android | a Storage Access Framework grant over a Java bridge | an APK | a WebView activity, four Java files | `make apk` |
+
+Both shells live under `packaging/`, and neither is part of the web build: `packaging/windows/` is the helper and the
+zip's loose files, `packaging/android/` is the Gradle project and its Dockerfile. Both take `dist/` as input, so `make
+windows` and `make apk` build the web bundle first and copy it in — the phone and the laptop cannot drift from each
+other, because there is one build and it is copied rather than rebuilt.
 
 Chrome and Edge can hold a File System Access handle across restarts. Firefox cannot. No browser on Android can pick a
 folder. The phone needs a wrapper app holding a Storage Access Framework grant.
@@ -209,6 +214,16 @@ Same web build, two distributions, differing only in what is wrapped around it:
 - **Firefox.** An official embeddable Python staged on the Windows side plus a shortcut to Microsoft's own signed
   `pythonw.exe`. No `.exe` is produced deliberately, SmartScreen never fires, and it needs no installer, no pip and no
   admin rights. It needs no static host and no network at all.
+
+`make windows` produces `bundles/checklist-windows.zip`: `web/` (the `dist/` build), `serve.py`, `Checklist.bat`,
+`make-shortcut.ps1` and a `README.txt`. The embeddable Python runtime is fetched once into `.build-cache/` and staged
+into the zip under `python/`; `make windows PYTHON_EMBED=skip` omits it, for a machine that already has Python and only
+wants the assets. Unzipping anywhere and running `Checklist.bat` once is the whole installation, and the `.ps1` is what
+puts it on the taskbar — Firefox on the desktop does not install PWAs, so the shortcut is the taskbar entry there.
+
+The helper serves `web/` and exposes `/folder/info`, `/folder/list` and `/folder/file/<name>` — exactly the three
+methods `src/adapters/http-folder.ts` calls, and nothing more. It is stdlib-only, which is what lets an embeddable
+Python run it with no pip.
 
 Two costs come with running both:
 
@@ -232,7 +247,11 @@ Already written and tested in the prototype, four Java files and no framework:
 - The `android-folder` adapter wraps the bridge in the same three methods every other adapter offers.
 
 Built inside Docker, with the web assets copied in at build time so the phone cannot drift from the laptop. Nothing is
-installed on the host.
+installed on the host: `make apk` builds the image, runs one `gradle assembleDebug` in it as the invoking user, and
+copies the result to `bundles/checklist.apk`. `make apk-clean` drops the Gradle cache and the build output.
+
+Docker is the one host dependency, and it is checked for by name rather than reached as a missing binary — a build that
+fails with `docker: not found` after ten minutes of Gradle is worse than one that refuses in a second.
 
 ### 7.3 Accepted limits
 

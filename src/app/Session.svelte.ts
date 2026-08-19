@@ -8,7 +8,9 @@
 // It is also the only place the logic layer's three injected collaborators are
 // supplied: the clock, the id and the counter. Everything below it is pure.
 
+import { compactionDue } from '../core/compact';
 import { conflictsOf, type Conflict } from '../core/conflicts';
+import { devicesOf, type DeviceRecord } from '../core/devices';
 import { applyOp, foldOps } from '../core/materialise';
 import { mergeTree, receiptsOf, type DeviceOps } from '../core/merge';
 import { resolveTree, type ResolvedTree } from '../core/tree';
@@ -53,6 +55,21 @@ export class Session {
   readonly conflicts: readonly Conflict[] = $derived.by(() => {
     void this.revision;
     return conflictsOf(this.tree, this.logs);
+  });
+
+  /**
+   * D-1. Derived from the header lines and the vector, never from the fold —
+   * `core/devices.ts` is the only reader of a name, which is what makes D-3
+   * structural rather than a promise.
+   */
+  readonly devices: readonly DeviceRecord[] = $derived.by(() => {
+    void this.revision;
+    const own = { dev: this.deviceId, name: this.log.name, at: Date.now() };
+    return devicesOf(
+      [own, ...this.folderSync.peerHeaders],
+      receiptsOf(this.logs),
+      this.deviceId,
+    );
   });
 
   private constructor(log: DeviceLog, folderSync: FolderSync, ops: readonly Op[]) {
@@ -135,9 +152,34 @@ export class Session {
     if (result.changed) {
       this.log.noteReceipts(receiptsOf(this.folderSync.logs));
       this.adopt(mergeTree(this.logs));
-      this.revision++;
     }
+    // A rename moves nothing the merge reads, so it must not re-fold — but the
+    // device list is derived off the same revision, so it has to be told.
+    if (result.changed || result.described) this.revision++;
+    this.maybeCompact();
     return result;
+  }
+
+  /**
+   * S-14, fired here because here is where both of its numbers are current: the
+   * folder was just listed and read, and the tree was just folded —
+   * sync-flow.md §4.8.3.
+   *
+   * Only this device's own file is ever compacted. A peer's log is not this
+   * device's to rewrite, which is one writer per file (S-3) and is also why the
+   * cut needs no agreement with anyone.
+   */
+  private maybeCompact(): void {
+    const bytes = this.log.byteLength + this.folderSync.peerBytes;
+    if (!compactionDue(bytes, this.peers + 1, this.nodeMap)) return;
+    if (this.log.compact()) this.revision++;
+  }
+
+  /** D-1. A device names itself; the name reaches the folder in its own header. */
+  rename(name: string): void {
+    this.log.rename(name);
+    this.revision++;
+    this.onWrote?.();
   }
 
   /**

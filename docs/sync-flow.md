@@ -304,6 +304,11 @@ the Sync Folder.
 6. A tail is never truncated below what the *previous* published snapshot covers. Snapshot and tail sync independently,
    and the ordering "old snapshot, new tail" silently loses ops.
 
+Rules 5 and 6 were written against option C's snapshot, and M3 built compaction without one —
+[§4.8 The compaction cut](#48-the-compaction-cut). Rule 5 holds and is now trivial, since the file overwritten in place
+is the only file the device has ever had. Rule 6 describes a hazard that no longer exists, and is kept here as the
+reason the shape that would have created it was not taken.
+
 ### 4.7 Reading the folder
 
 What [§2.4 The cycle](#24-the-cycle) becomes once the payload is a log rather than a snapshot. One cycle, in order:
@@ -327,6 +332,116 @@ idempotent, commutative and associative for free (S-4).
 This does not reopen the projection-per-read design [§4 Sync data model](#4-sync-data-model) closed. The re-fold happens
 once per cycle that actually delivered something, not once per read: between cycles the store holds the materialised
 tree, and a local edit still goes on through `applyOp` alone.
+
+### 4.8 The compaction cut
+
+[§7 What is still open](#7-what-is-still-open) carried this as its first item, and [§4.6 The decision](#46-the-decision)
+deferred it as the one genuinely hard part of option B. It is now closed, and the answer is smaller than the question:
+**a device drops those of its own ops that a later op of its own already overwrites.** Nothing else is dropped, no
+snapshot is written, and no peer is consulted.
+
+#### 4.8.1 Why it is safe
+
+The fold applies every device's ops in one total order, `(at, device id, counter)`, and the last write to a field wins.
+Take two ops of one device, `E` and `L`, writing the same field of the same node, with `E < L` in that order. `E` is
+unreachable — not usually, but under every possible interleaving of every peer's ops:
+
+| Where a peer's op `P` falls | Winner with `E` kept | Winner with `E` dropped |
+| --- | --- | --- |
+| `P < E < L` | `L` | `L` |
+| `E < P < L` | `L` | `L` |
+| `E < L < P` | `P` | `P` |
+
+`E` never wins a row of that table, because `L` sits between it and everything above it. This holds whatever peers
+arrive later, in whatever order, because it is a property of the order rather than of the delivery — which is the same
+property [§4.7 Reading the folder](#47-reading-the-folder) relies on when it re-folds from scratch.
+
+The argument needs `E < L` in the **fold's** order, not in counter order. A device whose clock steps backwards can write
+`c=6` with an `at` earlier than `c=5`, and then `c=5` is the later op. Comparing by the fold's own comparator rather
+than by the counter is what keeps the rule true across a clock correction.
+
+#### 4.8.2 What is dropped, and what is not
+
+| Op | Cut |
+| --- | --- |
+| `create` | **Never.** It is the node's existence, not a write to a field, and `applyOp` ignores a second one |
+| `set` | Per field. A `set` carrying three fields keeps the ones it is still the last writer of, and is dropped only when it is the last writer of none |
+| `move` | Per node. `parent` and `order` are written together, so the last `move` of a node carries both |
+| `delete` / `restore` | Per node. They are the two writers of one field — [§4.9 The restore op](#49-the-restore-op) — so the last of them stands and the rest go |
+
+Two ops are retained regardless, and each for a reason that would otherwise be a bug:
+
+**The op with the highest counter, always.** [§4.7 Reading the folder](#47-reading-the-folder) step 3 treats a peer file
+carrying fewer of that peer's own ops than are already held as a partial download and skips it. If compaction could
+lower the highest counter in a file — which a clock correction makes possible, since the highest counter need not be the
+last op in the fold's order — every peer would skip the compacted file forever, and the device would silently stop
+syncing.
+
+**The receipts.** An op carries a `seen` delta only when its receipt changes, and `opVectors` reconstructs each op's
+vector by replaying the file forward. Dropping an op drops its delta, so the deltas of dropped ops are merged onto the
+next op that survives. Every retained op then reconstructs to exactly the vector it had before, which is what keeps
+[requirements.md §9 Conflict presentation](requirements.md#9-conflict-presentation) honest across a compaction.
+
+#### 4.8.3 When it runs
+
+The trigger is [§4.6 The decision](#46-the-decision)'s, unchanged: **total log bytes across the folder exceed device
+count × serialised tree bytes.** Both numbers are already in hand at the end of a cycle — the files were just read, and
+the tree was just folded — so measuring it costs nothing and predicting it is unnecessary.
+
+Every device evaluates the same condition against roughly the same numbers, so they compact at roughly the same time,
+each on its own file, with no message passing. A device that is offline compacts when it next runs. A device that never
+runs again never compacts, and its file stays the size it was — the accepted limit in
+[requirements.md §15 Deviations and defects found during verification](requirements.md#15-deviations-and-defects-found-during-verification)
+row 5.
+
+#### 4.8.4 What it cost
+
+**History.** Undo, per-device attribution and "what did this note say last week" were listed among option B's
+attractions in [§4.2 B — Append-only op log per device](#42-b--append-only-op-log-per-device), and compaction is what
+spends them. None was ever a requirement; the retention that would have kept them is what unbounded growth means.
+
+**A conflict row that nobody read.** A dropped op cannot be offered back, so a race the user had not yet looked at stops
+being reportable — [requirements.md §9 Conflict presentation](requirements.md#9-conflict-presentation).
+
+**Not option C, and option C is now unnecessary.** The planned evolution in
+[§4.3 C — Snapshot plus op tail](#43-c--snapshot-plus-op-tail) bought bounded growth at the price of two formats that
+must mean the same thing, and a truncation ordering that can lose ops outright. This rule buys the same bound with one
+format, no cut point to get wrong, and no interaction with a peer that is months behind — that peer's ops are not this
+device's to drop, so the case that made C hard does not arise. Rules 5 and 6 of [§4.6 The decision](#46-the-decision)'s
+day-one list were written against C's snapshot; under this rule rule 5 is satisfied trivially, because the file that is
+overwritten in place is the only file there has ever been, and rule 6 does not apply at all, because there is no tail
+and no snapshot to order against each other.
+
+**Note-body diffing goes with it.** [§4.6 The decision](#46-the-decision) names whole-body ops as the dominant growth
+term and offers diffing against a checkpoint as the answer, waiting on the same trigger. It is no longer worth building:
+a note edited fifty times leaves fifty whole bodies in one device's log, and forty-nine of them are that device's own
+superseded writes. The cut takes all forty-nine.
+
+### 4.9 The restore op
+
+T-13 asks that a deleted row can be brought back, and [§7 What is still open](#7-what-is-still-open) item 3 recorded the
+cost: the payload had `delete` and nothing that reverses it.
+
+`restore` is that op, and it carries only an id. It is deliberately not a `set` field: `delete` is not one either, and
+making the pair symmetric keeps the folder readable — a line saying `"op":"restore"` says what happened, where
+`"deleted":false` would need the reader to know what deletion meant here.
+
+**It clears one node's own tombstone, never an inherited one.** T-7 tombstones a subtree at read time by climbing the
+resolved parent, so a restored node under a still-deleted ancestor stays out of the tree. That is the correct behaviour
+and it is also what makes the op cheap: restoring a subtree is one op, because the subtree was never individually
+tombstoned in the first place.
+
+**`deleted` becomes an ordinary contested field.** Two devices, one deleting and one restoring, resolve by `(at, device
+id)` like a title or a tick. There is no rule that a delete beats a restore or the reverse, and inventing one would be a
+second merge rule for one field — the thing [§4.6 The decision](#46-the-decision)'s per-field rule exists to avoid.
+`deletedAt` is that field's timestamp in the same way `parentSetAt` is `parent`'s.
+
+**Contesting it takes three devices, which is worth knowing before looking for the two-device case.** A `delete` is only
+writable from a view where the row is alive and a `restore` only from one where it is dead, and S-10 drops the other as
+a no-op before it reaches the log. Two devices therefore cannot write opposite values concurrently: to hold the opposite
+view, one of them must already have seen the other's op, which orders them. The race needs two devices deleting
+concurrently and a third that has seen only one of those deletes and puts the row back — `src/core/merge.test.ts` builds
+exactly that, and it is the only shape in which this conflict row appears.
 
 ## 5. Sibling ordering
 
@@ -556,9 +671,10 @@ rather than a defect.
 
 Questions the payload decision does not answer, listed so they are not mistaken for settled:
 
-1. **The compaction cut rule.** Deferred rather than solved: [§4.6 The decision](#46-the-decision) gives the trigger and
-   S-14 stays at milestone M3. What is open is the rule itself when it arrives — which ops become redundant, and how far
-   a tail must overlap the previous snapshot to stay safe for a peer that is months behind.
+1. ~~**The compaction cut rule.**~~ **Closed by M3** — [§4.8 The compaction cut](#48-the-compaction-cut). A device drops
+   those of its own ops that a later op of its own overwrites, which needs no tail, no snapshot and no overlap, so the
+   question of how far a tail must reach for a peer months behind does not arise: a peer's ops were never this device's
+   to drop.
 2. **Sibling-order rebalancing.** [§5.5 What this points to](#55-what-this-points-to) owes two details: the key length
    at which a sibling list is reissued, and whether one device may rebalance a list another is editing. Allocating a
    fresh digit beyond the end keeps appends and prepends O(1) in key length, so the interior split that grows keys is
@@ -566,12 +682,17 @@ Questions the payload decision does not answer, listed so they are not mistaken 
 3. **Tombstone retention.** T-7 tombstones are the majority of the node count after a year of use, and dropping one
    safely needs the same cross-device floor that vector pruning needed. Keeping them is the same trade
    [§4.6 The decision](#46-the-decision) makes: bytes in exchange for no coordination problem. The view side of this is
-   now settled and built: the Done view of
+   settled and built: the Done view of
    [requirements.md §3 Tree structure and editing](requirements.md#3-tree-structure-and-editing) T-12 is a read-time
-   filter over `done` and the tombstone — derived rather than stored, so it needs no sync and no writes. What stays open
-   is retention itself, and one thing the view makes visible: a tombstone the user can now see is a tombstone the user
-   will eventually ask to reverse, which is T-13 and needs an op this payload does not have.
-4. **Retiring a device.** No longer a correctness question. A dead device's file is dominated by every live one, so
+   filter over `done` and the tombstone — derived rather than stored, so it needs no sync and no writes. M3 closed the
+   half this item predicted — a tombstone the user can see is one they will ask to reverse — with
+   [§4.9 The restore op](#49-the-restore-op). **Retention itself stays open**, and reversibility is now an argument for
+   keeping tombstones rather than a reason to drop them: a node whose tombstone was reaped is a node no `restore` can
+   name. [§4.8 The compaction cut](#48-the-compaction-cut) does not touch it — it drops superseded *ops*, never nodes.
+4. **Retiring a device.** No longer a correctness question, and M3 built the presentation
+   [requirements.md §8 Device management](requirements.md#8-device-management) owed: a device names itself in its own
+   header line and stamps an advisory `lastSeen` there, so a dormant device reads as dormant. What stays open is the
+   per-origin subtlety below. A dead device's file is dominated by every live one, so
    [§2.2 The maximal set reduces the whole folder at once](#22-the-maximal-set-reduces-the-whole-folder-at-once) drops
    it from the maximal set as an ancestor and it never joins a resolution again. What remains is presentation, and one
    real subtlety: the device id lives in `localStorage`, so it is per-origin, and

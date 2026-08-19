@@ -83,6 +83,21 @@ describe('deletedRows — T-12', () => {
     expect(deletedRows(tree).map((row) => row.id)).toEqual(['n_house']);
   });
 
+  it('drops a row from the list once it is restored — T-13', () => {
+    const restore = (id: string, at: number): Op => ({
+      op: 'restore',
+      id,
+      c: ++counter,
+      at,
+      dev: 'aaaa0001',
+    });
+    const tree = treeOf([...shop, remove('n_house', 900), restore('n_house', 950)]);
+    expect(deletedRows(tree)).toEqual([]);
+    // And what the tombstone covered comes back with it, because T-7 never
+    // marked the descendants in the first place.
+    expect(tree.deleted.has('n_kettle')).toBe(false);
+  });
+
   it('gives a row deleted at the root an empty path', () => {
     const tree = treeOf([...shop, remove('n_shop', 900)]);
     expect(deletedRows(tree)).toEqual([{ id: 'n_shop', path: [] }]);

@@ -10,6 +10,9 @@ History of project's decision. The situation, its options and resolution.
 | [T-6 Cyclic tree state](sync-flow.md#62-the-repair) | Drop the cycle edge with the oldest `(parentSetAt, device id)` at read time, never written | - non-temporal tiebreak (node id)<br>- Prevention by limitting hierarchy level (flat groups)<br> -pre-defined hierarchy folder->list->item |
 | [Sync data model](#4-sync-data-model) | append-only op log per device | -  whole-tree snapshot per device<br>-  snapshot plus op tail<br>-  one file per node |  
 | [State Management](#3-state-management) | Materialised State Store, reactive views | -  prototype logic, scaled up<br>-  local database, folder as a sync target<br>-  event-driven<br>-  CRDT document | 
+| [Compaction](#6-compaction) | Drop a device's own superseded ops, in place | -  snapshot plus tail (option C)<br>-  note-body diffing against a checkpoint<br>-  reaping tombstones<br>-  a retention window in days |
+| [Undelete](#7-undelete) | A `restore` op, making `deleted` an ordinary contested field | -  a `set` carrying `deleted: false`<br>-  copying the subtree to a new id<br>-  delete-always-wins precedence |
+| [Device naming](#8-device-naming) | Each device names itself, in its own file's header line | -  a shared `devices.json`<br>-  a `device` op in the log<br>-  names kept only in `localStorage` |
 
 ---
 
@@ -148,3 +151,72 @@ by `(at, device id)`. Asking the user to choose would mean either blocking the m
 that may not be opened for a week — or asking about a decision already taken. Stating it and offering to reverse it is
 the same information with none of the waiting, and the reversal is an ordinary `set` that dominates both sides, so there
 is no resolution protocol to write, test or converge.
+
+## 6. Compaction
+
+**Drop those of a device's own ops that a later op of its own overwrites, rewriting its own file in place.** The rule
+and its safety argument are [sync-flow.md §4.8 The compaction cut](sync-flow.md#48-the-compaction-cut); what follows is
+only the record of what was not taken.
+
+S-14 was the one requirement milestone M0 deferred as genuinely hard, and it was hard because the question was assumed
+to be "how does a device summarise the folder". It is not. A device may only write its own file, so the only ops it can
+ever drop are its own, and its own ops are exactly the ops it can reason about without talking to anyone.
+
+### 6.1 The options
+
+| Option | The idea | Its cost | Would have won if |
+| --- | --- | --- | --- |
+| **A — drop own superseded ops (chosen)** | For each node and field, keep only this device's last write | Loses history, so undo and per-device attribution stop being free. A conflict row nobody has read yet stops being offerable | — |
+| B — snapshot plus tail, option C | A periodic full snapshot per device plus the ops since it | Two formats that must mean the same thing; a cut point that loses ops outright if an old snapshot syncs beside a new tail; and a snapshot is a fold *result*, so folding one device's snapshot beside another device's raw ops reintroduces last-arriving-wins | Option A did not bound growth — which it does, because superseded writes are almost all of the log |
+| C — note-body diffing against a checkpoint | Store a body as a diff against its last checkpoint | A second encoding for one field, and the diffs still accumulate. Option A already deletes forty-nine of fifty bodies outright | Bodies still dominated the log *after* option A, which is a measurement rather than a prediction |
+| D — reap tombstones | Drop nodes whose `deleted` has stood for long enough | Needs the cross-device floor that vector pruning needed, and [sync-flow.md §4.6 The decision](sync-flow.md#46-the-decision) already shows why that floor cannot be claimed. Also kills T-13 for the reaped node | A tombstone census showed nodes, not ops, were the growth term |
+| E — a retention window in days | Drop anything older than N days | The one rule that can lose a live value: a field written once two years ago and never touched again is the field most likely to still be correct | Nothing. It is the naive version of option A and it is unsound |
+
+### 6.2 Why option A is not a compromise
+
+The three that bound growth — A, B, D — do it by deleting something. B deletes ops and replaces them with a summary, so
+it must keep the summary and the ops agreeing. D deletes nodes, so it needs a floor nobody can compute. A deletes only
+what is provably unreachable, so there is nothing left to agree with and nothing to compute: the fold over the compacted
+set is *identical*, not merely equivalent, to the fold over the original.
+
+That last property is what makes it testable rather than merely arguable. `compact.test.ts` runs the same generated op
+sets S-4's laws run over, compacts each device's ops, and asserts the merged tree is unchanged —
+[test.md §3.1 Merge properties](test.md#31-merge-properties).
+
+### 6.3 What reopens it
+
+A measurement, in this order: total log bytes still growing without bound after compaction runs, which would mean
+distinct fields rather than repeated writes are the term; or note bodies still dominating, which is option C's
+condition. Neither is predictable from here, and both are visible in the byte counts the trigger already computes.
+
+## 7. Undelete
+
+**A `restore` op.** T-13 was the last requirement of milestone M1 left unbuilt, and it was left unbuilt because the
+payload had no way to reverse a `delete` — [sync-flow.md §4.9 The restore op](sync-flow.md#49-the-restore-op).
+
+| Option | The idea | Its cost | Would have won if |
+| --- | --- | --- | --- |
+| **A — a `restore` op (chosen)** | One line, one id, the mirror of `delete` | One more op kind to fold and to decode | — |
+| B — `set` with `deleted: false` | Reuse the op that already carries fields | `delete` is not a `set` either, so the pair stops being symmetric and the folder stops reading as what happened. Same merge behaviour, worse to read by hand — and the readable folder is a stated attraction of the whole design | `delete` had been a `set` from the start |
+| C — copy the subtree to fresh ids | Re-create what was deleted, as new nodes | Breaks every link to the old ids, duplicates the subtree if two devices restore concurrently, and costs one op per node instead of one | The payload could not be changed at all |
+| D — delete always beats restore | A precedence rule instead of last-writer-wins | A second merge rule for one field, which is exactly what the per-field rule exists to avoid. It also makes a restore silently fail whenever any device holds an unsynced delete | Deletion had to be irreversible once seen — which is the opposite of T-13 |
+
+Option D deserves the extra sentence, because it is the intuitive one. "A delete should win" sounds safe, and it is the
+unsafe choice: the user who restores a row and watches it disappear again on the next sync has no way to tell that from
+data loss, and no action available that would work.
+
+## 8. Device naming
+
+**Each device names itself, in the header line of the file it already owns.** D-1 asks for a settings screen listing
+devices with a name the user can set, and the only real question was where the name lives.
+
+| Option | The idea | Its cost | Would have won if |
+| --- | --- | --- | --- |
+| **A — in the device's own header (chosen)** | The name rides the line that already carries the vector | The phone can only be renamed from the phone | — |
+| B — a shared `devices.json` | One file mapping id to name | Every device writes it, which breaks one writer per file (S-3) — the entire safety argument — and invites the provider's conflict-copy behaviour, the one thing the design has never had to handle | The design had a coordination mechanism, which it deliberately does not |
+| C — a `device` op in the log | Name changes as ops, folded like everything else | Works, and buys the ability to rename any device from any device — at the price of a merge rule for a field that cannot conflict when option A is used, plus an op kind that is not about the tree | Renaming a device you are not holding turned out to matter |
+| D — `localStorage` only | Names never sync | Every device shows a different set of names, and the conflict rows that motivated D-1 still say `a3f19c02` on every device but one | Names were only ever for the local user's benefit — but a conflict row naming the *other* device is the case that exists |
+
+Option C is the one to revisit if renaming a lost phone from the laptop ever matters. It is additive: a `device` op
+would override the header name for the device it names, and a folder holding neither is a folder of unnamed devices,
+which is what one looks like today.

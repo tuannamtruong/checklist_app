@@ -274,6 +274,74 @@ async function main() {
       (await archivedTitles(page, 'finished-row')).join('|') === 'Bread' &&
         (await archivedTitles(page, 'deleted-row')).join('|') === 'Oat milk|Old receipts',
     );
+
+    // --- T-13: restoring, which M1 and M2 could not do --------------------
+    // One op, and the subtree comes with it: T-7 never tombstoned the child
+    // individually, so clearing the top of the run is the whole operation.
+    await deletedRowByTitle(page, 'Old receipts').locator('[data-testid="restore"]').click();
+    check(
+      'restoring a row takes it out of the deleted list — T-13',
+      (await archivedTitles(page, 'deleted-row')).join('|') === 'Oat milk',
+      (await archivedTitles(page, 'deleted-row')).join('|'),
+    );
+    await page.waitForTimeout(WRITE_SETTLE_MS);
+    await page.goto(BASE_URL);
+    await page.waitForSelector('[data-testid="tree"]');
+    check(
+      'and the tree has it back, after a reload through the op log',
+      (await titlesUnder(page, 'Old receipts')).join('|') === 'Fuel receipt',
+      (await titlesUnder(page, 'Old receipts')).join('|'),
+    );
+
+    // --- §6: search -------------------------------------------------------
+    await page.locator('[data-testid="title"]').first().blur();
+    await page.keyboard.press('/');
+    await page.waitForSelector('[data-testid="search-page"]');
+    check('“/” opens search from the tree — F-5', true);
+    await page.locator('[data-testid="search-input"]').fill('ferry');
+    const ferryHits = await searchHitTitles(page);
+    check(
+      'a query finds a title and a note body — F-1',
+      ferryHits.includes('Book the ferry') && ferryHits.includes('Trip notes'),
+      ferryHits.join('|'),
+    );
+    check(
+      'the query is in the route, so the list is linkable — F-5',
+      page.url().endsWith('#/search/ferry'),
+      page.url(),
+    );
+    await page.locator('[data-testid="search-input"]').fill('bread');
+    check(
+      'a row T-11 has hidden is still findable, and says so — F-3',
+      (await searchHitTitles(page)).join('|') === 'Bread' &&
+        (await page.locator('[data-testid="hit-done"]').count()) === 1,
+      (await searchHitTitles(page)).join('|'),
+    );
+    check(
+      'every hit carries the path it sits on — F-2',
+      (await page.locator('[data-testid="hit-path"]').first().innerText()).trim() === 'Shopping',
+    );
+    await page.screenshot({ path: join(shots, 'search.png'), fullPage: true });
+
+    // --- §8: device management --------------------------------------------
+    await page.locator('[data-testid="devices-link"]').click();
+    await page.waitForSelector('[data-testid="devices-page"]');
+    check(
+      'the device list holds this device — D-1',
+      (await page.locator('[data-testid="device-row"]').count()) >= 1 &&
+        (await page.locator('[data-testid="device-row"]').first().getAttribute('data-self')) === 'true',
+    );
+    await page.locator('[data-testid="device-name"]').fill('the laptop');
+    await page.waitForTimeout(WRITE_SETTLE_MS);
+    await page.screenshot({ path: join(shots, 'devices.png'), fullPage: true });
+    await page.goto(`${BASE_URL}#/devices`);
+    await page.waitForSelector('[data-testid="devices-page"]');
+    check(
+      'a name survives a reload, so it reached the file rather than the page — D-1',
+      (await page.locator('[data-testid="device-name"]').inputValue()) === 'the laptop',
+      await page.locator('[data-testid="device-name"]').inputValue(),
+    );
+
     await page.goto(BASE_URL);
     await page.waitForSelector('[data-testid="tree"]');
 
@@ -468,6 +536,13 @@ async function archivedTitles(page, testid) {
 
 function finishedRowByTitle(page, title) {
   return page.locator('[data-testid="finished-row"]').filter({ hasText: title });
+}
+function deletedRowByTitle(page, title) {
+  return page.locator('[data-testid="deleted-row"]').filter({ hasText: title });
+}
+async function searchHitTitles(page) {
+  const titles = await page.locator('[data-testid="hit-title"]').allInnerTexts();
+  return titles.map((title) => title.trim());
 }
 
 /** The titles of the rows rendered directly under the row with this title. */

@@ -17,7 +17,18 @@ export interface LogHeader {
   v: number;
   dev: DeviceId;
   clock: SClock;
+  /**
+   * D-1. The device names itself here, which is the whole of the merge story
+   * for a name: one writer per file means one writer per name, so two devices
+   * can never disagree about one — requirements.md §8.
+   */
+  name?: string;
+  /** D-2. When this device last wrote. Advisory — the merge never reads it. */
+  at?: number;
 }
+
+/** Long enough for a phone and a laptop, short enough to stay one line. */
+const MAX_NAME = 64;
 
 export interface DecodedLog {
   header: LogHeader;
@@ -72,7 +83,18 @@ function parseHeader(line: string): LogHeader | null {
   if (!isRecord(value)) return null;
   if (typeof value['v'] !== 'number' || typeof value['dev'] !== 'string') return null;
   if (!isClock(value['clock'])) return null;
-  return { v: value['v'], dev: value['dev'], clock: value['clock'] };
+  const header: LogHeader = { v: value['v'], dev: value['dev'], clock: value['clock'] };
+  // Both are advisory and both are absent from every file M2 wrote, so a
+  // missing one is an unnamed device rather than a header that failed to parse
+  // — D-3 is what makes that distinction free.
+  if (typeof value['name'] === 'string') header.name = value['name'].slice(0, MAX_NAME);
+  if (typeof value['at'] === 'number') header.at = value['at'];
+  return header;
+}
+
+/** What a device may put in its own header — the trim D-1's input owes the file. */
+export function cleanDeviceName(name: string): string {
+  return name.replace(/\s+/g, ' ').trim().slice(0, MAX_NAME);
 }
 
 function parseOp(line: string, dev: DeviceId): Op | null {
@@ -110,6 +132,8 @@ function parseOp(line: string, dev: DeviceId): Op | null {
     }
     case 'delete':
       return { op: 'delete', id, c, at, dev, ...seen };
+    case 'restore':
+      return { op: 'restore', id, c, at, dev, ...seen };
     default:
       return null;
   }

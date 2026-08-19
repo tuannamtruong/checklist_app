@@ -6,7 +6,7 @@
 # `make help` lists the rest.
 
 .PHONY: help install dev build preview test check verify seed ui-smoke docs clean \
-        stop port-check
+        stop port-check windows apk apk-clean
 .DEFAULT_GOAL := help
 
 # Port 38531 is this project's, pinned in vite.config.ts for dev and preview
@@ -36,9 +36,15 @@ help:
 	  "  make seed          - the app in a window with a small tree in it" \
 	  "  make ui-smoke      - the built app in Chromium; shots -> ui-smoke/" \
 	  "  make docs          - docs reflowed to 120 columns (--check)" \
+	  "" \
+	  "  packaging - architecture.md §7; both take dist/ as input, output -> bundles/" \
+	  "  make windows       - checklist-windows.zip: web assets, the helper, a shortcut" \
+	  "  make apk           - checklist.apk, built in Docker" \
+	  "  make apk-clean     - drop the Android build output and the Gradle cache" \
+	  "" \
 	  "  make stop          - free port $(PORT): kill whatever is listening on it" \
 	  "  make install       - npm ci" \
-	  "  make clean         - remove dist/ and ui-smoke/"
+	  "  make clean         - remove dist/, ui-smoke/ and bundles/"
 
 # Deliberately not a prerequisite of anything: `npm ci` throws node_modules away
 # and takes a minute, which is not what `make dev` should do to a working tree.
@@ -110,5 +116,28 @@ docs:
 # Cheapest first: a type error should not wait on a browser.
 verify: check test ui-smoke docs
 
+# --- packaging — architecture.md §7 ------------------------------------------
+#
+# Both bundles take dist/ as input rather than building their own, so the phone
+# and the laptop cannot drift: there is one web build and it is copied in.
+
+# The embeddable Python is downloaded once and cached in .build-cache/. Set
+# PYTHON_EMBED=skip for a machine that already has Python and wants the assets.
+PYTHON_EMBED ?= include
+
+windows: build
+ifeq ($(PYTHON_EMBED),skip)
+	python3 scripts/build-windows.py --no-python
+else
+	python3 scripts/build-windows.py
+endif
+
+# Docker holds the JDK and the Android SDK, so the host keeps neither.
+apk: build
+	scripts/build-apk.sh
+
+apk-clean:
+	scripts/build-apk.sh clean
+
 clean:
-	rm -rf dist ui-smoke
+	rm -rf dist ui-smoke bundles

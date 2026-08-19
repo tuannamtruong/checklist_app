@@ -12,6 +12,7 @@
     type Conflict,
     type FieldConflict,
   } from '../core/conflicts';
+  import { nameOf } from '../core/devices';
   import { restoreValue } from '../core/edit';
   import type { Session } from '../app/Session.svelte';
   import type { Dismissals } from '../app/dismissals.svelte';
@@ -28,6 +29,11 @@
 
   function titleOf(id: string): string {
     return session.tree.nodes[id]?.title || 'Untitled';
+  }
+
+  /** D-1 closing §15's row 9: a name where there used to be eight hex characters. */
+  function deviceLabel(id: string): string {
+    return nameOf(session.devices, id);
   }
 
   /** The one button that writes, and it writes what any other edit would. */
@@ -61,9 +67,9 @@
         </p>
         <p class="text-sm text-ink-muted" data-testid="conflict-detail">
           Kept <b class="text-ink">{describeValue(row.field, row.kept, session.tree)}</b>
-          from device {row.keptBy}, over
+          from {deviceLabel(row.keptBy)}, over
           <b class="text-ink">{describeValue(row.field, row.dropped, session.tree)}</b>
-          from device {row.droppedBy}.
+          from {deviceLabel(row.droppedBy)}.
         </p>
       {:else if row.kind === 'cycle'}
         <p class="text-sm">

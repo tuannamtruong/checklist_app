@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { conflictsOf } from './conflicts';
-import { createLastChild, moveTo, remove, setTitle } from './edit';
+import { createLastChild, moveTo, remove, restore, setTitle } from './edit';
 import { foldOps } from './materialise';
 import { allOps } from './merge';
 import { Replica, random, settle } from './test-support';
@@ -166,6 +166,83 @@ describe('a delete racing an edit inside the subtree — T-7', () => {
     // The later title did land, and the row is still gone. A conflict row about
     // a tombstoned node would be a question with no answer.
     expect(a.nodes[ferry]!.title).toBe('Ferry tickets');
+    expect(conflictsFor(a)).toEqual([]);
+  });
+});
+
+describe('restoring a deleted row — T-13', () => {
+  it('brings the whole subtree back, on every device, with one op', () => {
+    const { a, b } = pair();
+    const trip = add(a, ROOT, 'Trip', 'list');
+    const ferry = add(a, trip, 'Ferry');
+    a.at(4_000).run((tree, ctx) => remove(tree, ctx, trip));
+    settle([a, b]);
+    expect(b.tree.deleted.has(ferry)).toBe(true);
+
+    // One op, because T-7 never tombstoned the child: it inherits at read time,
+    // so clearing the top of the run is the whole operation — sync-flow.md §4.9.
+    const ops = b.at(5_000).run((tree, ctx) => restore(tree, ctx, trip));
+    expect(ops.map((op) => op.op)).toEqual(['restore']);
+    settle([a, b]);
+
+    expect(a.tree.deleted.has(trip)).toBe(false);
+    expect(a.tree.deleted.has(ferry)).toBe(false);
+    expect(a.nodes).toEqual(b.nodes);
+    expect(childrenOf(a.tree, ROOT)).toEqual([trip]);
+    expect(childrenOf(a.tree, trip)).toEqual([ferry]);
+  });
+
+  it('needs a third device before `deleted` can actually be contested', () => {
+    // Worth stating because the two-device version does not exist: a delete is
+    // only writable from a view where the row is alive and a restore only from
+    // one where it is dead, and S-10 drops the other as a no-op. So the two
+    // sides must have seen *different* deletes — which takes three devices.
+    const a = new Replica('aaaa0001', 1_000);
+    const b = new Replica('bbbb0002', 1_000);
+    const c = new Replica('cccc0003', 1_000);
+    const trip = add(a, ROOT, 'Trip', 'list');
+    b.pull(a);
+    c.pull(a);
+
+    a.at(4_000).run((tree, ctx) => remove(tree, ctx, trip));
+    b.at(4_500).run((tree, ctx) => remove(tree, ctx, trip));
+    // c has heard about a's delete and nothing about b's, so its restore is
+    // concurrent with b's delete and ordered after a's.
+    c.pull(a);
+    c.at(6_000).run((tree, ctx) => restore(tree, ctx, trip));
+    settle([a, b, c]);
+
+    expect(a.tree.deleted.has(trip)).toBe(false);
+    expect(a.nodes).toEqual(c.nodes);
+    expect(b.nodes).toEqual(c.nodes);
+
+    const conflicts = conflictsFor(a);
+    expect(conflicts.length).toBe(1);
+    expect(conflicts[0]).toMatchObject({
+      kind: 'field',
+      node: trip,
+      field: 'deleted',
+      kept: false,
+      keptBy: 'cccc0003',
+      dropped: true,
+      droppedBy: 'bbbb0002',
+    });
+    expect(conflictsFor(c)).toEqual(conflicts);
+  });
+
+  it('says nothing about the other fields of a row that is still gone', () => {
+    const { a, b } = pair();
+    const trip = add(a, ROOT, 'Trip', 'list');
+    b.pull(a);
+    a.at(5_000).run((tree, ctx) => setTitle(tree, ctx, trip, 'Holiday'));
+    b.at(5_001).run((tree, ctx) => setTitle(tree, ctx, trip, 'Weekend'));
+    settle([a, b]);
+    expect(conflictsFor(a).length).toBe(1);
+
+    // Once it is tombstoned, what it was called is not a question worth asking
+    // — but whether it should be tombstoned still is.
+    a.at(6_000).run((tree, ctx) => remove(tree, ctx, trip));
+    settle([a, b]);
     expect(conflictsFor(a)).toEqual([]);
   });
 });

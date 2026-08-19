@@ -15,11 +15,14 @@
   import { SyncCadence } from '../app/sync-cadence';
   import { ViewState } from '../app/view-state.svelte';
   import { RowFocus } from './focus.svelte';
+  import { searchHref } from '../app/router.svelte';
   import ConflictsPage from './ConflictsPage.svelte';
+  import DevicesPage from './DevicesPage.svelte';
   import DonePage from './DonePage.svelte';
   import FolderSetup from './FolderSetup.svelte';
   import NodePage from './NodePage.svelte';
   import RecoveryPage from './RecoveryPage.svelte';
+  import SearchPage from './SearchPage.svelte';
   import Shell from './Shell.svelte';
 
   const router = new Router();
@@ -50,6 +53,32 @@
   const currentId = $derived(router.route.name === 'node' ? router.route.id : null);
   const doneOpen = $derived(router.route.name === 'done');
   const conflictsOpen = $derived(router.route.name === 'conflicts');
+  const searchOpen = $derived(router.route.name === 'search');
+  const devicesOpen = $derived(router.route.name === 'devices');
+  const query = $derived(router.route.name === 'search' ? router.route.query : '');
+
+  /**
+   * F-5. Typing replaces the fragment rather than pushing it, or every keystroke
+   * would be a history entry and Back would walk the query backwards one letter
+   * at a time.
+   */
+  function setQuery(next: string): void {
+    history.replaceState(null, '', searchHref(next));
+  }
+
+  /**
+   * `/` is the one key that is not a row action — it acts on the application
+   * rather than on the row under the caret, so it lives here and not in
+   * `actions.ts` — requirements.md §3.1.
+   */
+  function globalKey(event: KeyboardEvent): void {
+    if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) return;
+    const target = event.target;
+    if (target instanceof HTMLElement && target.isContentEditable) return;
+    if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return;
+    event.preventDefault();
+    router.go({ name: 'search', query: '' });
+  }
 
   // S-20's "on navigating away": leaving a note's page emits its body, and so
   // does leaving the page altogether.
@@ -70,6 +99,7 @@
 <svelte:window
   onpagehide={flush}
   onfocus={refresh}
+  onkeydown={globalKey}
   onvisibilitychange={() => (document.visibilityState === 'hidden' ? flush() : refresh())}
 />
 
@@ -81,6 +111,8 @@
     {currentId}
     {doneOpen}
     {conflictsOpen}
+    {searchOpen}
+    {devicesOpen}
     folderLabel={folder.label}
     synced={folder.synced}
     onrefresh={refresh}
@@ -89,6 +121,10 @@
       <ConflictsPage {session} {dismissals} />
     {:else if router.route.name === 'unknown'}
       <RecoveryPage {session} id={null} />
+    {:else if searchOpen}
+      <SearchPage {session} {query} onquery={setQuery} />
+    {:else if devicesOpen}
+      <DevicesPage {session} />
     {:else if doneOpen}
       <DonePage {session} />
     {:else if currentId !== null && !isVisible(session.tree, currentId)}

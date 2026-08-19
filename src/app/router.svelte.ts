@@ -10,6 +10,8 @@ export type Route =
   | { name: 'node'; id: NodeId }
   | { name: 'done' }
   | { name: 'conflicts' }
+  | { name: 'search'; query: string }
+  | { name: 'devices' }
   | { name: 'unknown'; hash: string };
 
 export function routeOf(hash: string): Route {
@@ -17,6 +19,13 @@ export function routeOf(hash: string): Route {
   if (path === '' || path === '/') return { name: 'root' };
   if (path === '/done') return { name: 'done' };
   if (path === '/conflicts') return { name: 'conflicts' };
+  if (path === '/devices') return { name: 'devices' };
+  // F-5. The query is a path segment rather than a query string, for the reason
+  // X-7 already gives: it stays in the fragment, so a result list is linkable
+  // and survives a cold launch without any of it reaching a server.
+  if (path === '/search') return { name: 'search', query: '' };
+  const search = /^\/search\/(.*)$/.exec(path);
+  if (search) return { name: 'search', query: decodeURIComponent(search[1]!) };
   const node = /^\/n\/([^/]+)$/.exec(path);
   if (node) return { name: 'node', id: decodeURIComponent(node[1]!) };
   return { name: 'unknown', hash: path };
@@ -32,6 +41,10 @@ export function hrefOf(route: Route): string {
       return '#/done';
     case 'conflicts':
       return '#/conflicts';
+    case 'search':
+      return route.query === '' ? '#/search' : `#/search/${encodeURIComponent(route.query)}`;
+    case 'devices':
+      return '#/devices';
     case 'unknown':
       return `#${route.hash}`;
   }
@@ -46,8 +59,16 @@ export const DONE_HREF = hrefOf({ name: 'done' });
  */
 export const CONFLICTS_HREF = hrefOf({ name: 'conflicts' });
 
+/** §6's view and §8's, both permanent in the nav — see requirements.md §5. */
+export const SEARCH_HREF = hrefOf({ name: 'search', query: '' });
+export const DEVICES_HREF = hrefOf({ name: 'devices' });
+
 export function nodeHref(id: NodeId): string {
   return hrefOf({ name: 'node', id });
+}
+
+export function searchHref(query: string): string {
+  return hrefOf({ name: 'search', query });
 }
 
 export class Router {

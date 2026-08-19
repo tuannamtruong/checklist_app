@@ -64,7 +64,7 @@ describe('one sync cycle', () => {
     const sync = new FolderSync(folder.folder, OURS);
 
     const result = await sync.cycle();
-    expect(result).toEqual({ peers: 1, skipped: [], changed: true });
+    expect(result).toEqual({ peers: 1, skipped: [], changed: true, described: true });
     expect(folder.reads).toEqual([`checklist.${PEER}.ops.jsonl`]);
     expect(sync.logs).toEqual([{ device: PEER, ops: ops(PEER, 2) }]);
   });
@@ -112,7 +112,12 @@ describe('one sync cycle', () => {
     const folder = watched({ [name]: 'not json at all\n' });
     const sync = new FolderSync(folder.folder, OURS);
 
-    expect(await sync.cycle()).toEqual({ peers: 1, skipped: [name], changed: false });
+    expect(await sync.cycle()).toEqual({
+      peers: 1,
+      skipped: [name],
+      changed: false,
+      described: false,
+    });
     expect(sync.logs).toEqual([]);
   });
 
@@ -153,7 +158,12 @@ describe('one sync cycle', () => {
     };
     const sync = new FolderSync(folder, OURS, { onError: (error) => errors.push(error) });
 
-    expect(await sync.cycle()).toEqual({ peers: 0, skipped: [], changed: false });
+    expect(await sync.cycle()).toEqual({
+      peers: 0,
+      skipped: [],
+      changed: false,
+      described: false,
+    });
     expect(errors.length).toBe(1);
   });
 });

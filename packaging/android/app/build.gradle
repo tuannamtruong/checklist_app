@@ -1,0 +1,48 @@
+plugins {
+    id "com.android.application"
+}
+
+android {
+    namespace "dev.checklist.app"
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "dev.checklist.app"
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "0.3"
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    // WebViewAssetLoader: serves the bundled page over an https:// origin, so
+    // ES modules and the service worker load. From file:// both are refused.
+    implementation "androidx.webkit:webkit:1.11.0"
+    // DocumentFile: the readable way to walk a SAF tree.
+    implementation "androidx.documentfile:documentfile:1.0.1"
+}
+
+// The web build is not duplicated into the Android project — `make apk` builds
+// dist/ and this copies it in, so there is one build and the phone cannot drift
+// from the laptop — architecture.md §7.
+def webSrc = rootProject.file("../../dist")
+def webOut = layout.buildDirectory.dir("webassets")
+
+tasks.register("copyWebAssets", Copy) {
+    from(webSrc)
+    into webOut
+    doFirst {
+        if (!webSrc.exists()) {
+            throw new GradleException("no dist/ to package — run `make build` first, or use `make apk`")
+        }
+    }
+}
+
+android.sourceSets.main.assets.srcDir(webOut)
+tasks.named("preBuild") { dependsOn("copyWebAssets") }

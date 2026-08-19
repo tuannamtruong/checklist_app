@@ -178,6 +178,15 @@ export function restoreValue(
       if (typeof value !== 'boolean' || !isWritable(node) || node.done === value) return [];
       return [{ op: 'set', id, done: value, ...stamp(ctx) }];
     }
+    // The one field where taking the dropped value is not a `set`, because the
+    // field's two writers are `delete` and `restore` — T-13, sync-flow.md §4.9.
+    // It is also the one case that may write to a tombstoned node, which is the
+    // entire point of it.
+    case 'deleted': {
+      const node = tree.nodes[id];
+      if (typeof value !== 'boolean' || !node || node.deleted === value) return [];
+      return value ? remove(tree, ctx, id) : restore(tree, ctx, id);
+    }
     case 'parent':
       return [];
   }
@@ -294,4 +303,34 @@ export function remove(tree: ResolvedTree, ctx: EditContext, id: NodeId): Op[] {
   const node = tree.nodes[id];
   if (!node || node.deleted) return [];
   return [{ op: 'delete', id, ...stamp(ctx) }];
+}
+
+/**
+ * T-13, and the mirror of `remove` in every way that matters: one op, and the
+ * subtree comes back with it because the subtree was never individually
+ * tombstoned — T-7 inherits at read time, so clearing the top of the run is the
+ * whole operation.
+ *
+ * A node whose tombstone is inherited is refused rather than written, because
+ * the op would change nothing: it clears an own-`deleted` this node does not
+ * have. The Done view lists only the top of a deleted run, so it cannot offer
+ * one; a hand-typed `#/n/<id>` can, and this is what it gets.
+ */
+export function restore(tree: ResolvedTree, ctx: EditContext, id: NodeId): Op[] {
+  const node = tree.nodes[id];
+  if (!node || !node.deleted) return [];
+  return [{ op: 'restore', id, ...stamp(ctx) }];
+}
+
+/** True when restoring this row would actually put it back in the tree. */
+export function canRestore(tree: ResolvedTree, id: NodeId): boolean {
+  const node = tree.nodes[id];
+  if (!node || !node.deleted) return false;
+  // An ancestor's tombstone outlives this one, so the row would stay gone.
+  let cursor = parentOf(tree, id);
+  while (cursor !== ROOT) {
+    if (tree.nodes[cursor]?.deleted) return false;
+    cursor = parentOf(tree, cursor);
+  }
+  return true;
 }

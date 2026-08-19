@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- DeviceDefault keeps the system light/dark choice, which the page's own
+         prefers-color-scheme styling then follows. -->
+    <style name="AppTheme" parent="@android:style/Theme.DeviceDefault.DayNight">
+        <item name="android:windowNoTitle">true</item>
+    </style>
+</resources>
