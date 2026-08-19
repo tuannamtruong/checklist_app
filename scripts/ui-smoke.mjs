@@ -178,6 +178,36 @@ async function main() {
       `depth ${await depthOf(page, 'Oat milk')}`,
     );
 
+    // --- K-8: the quick-add line -------------------------------------------
+    const quickAdd = page.locator('[data-testid="quick-add"]');
+    await quickAdd.fill('Batteries');
+    await page.keyboard.press('Enter');
+    const added = await rowByTitle(page, 'Batteries');
+    check(
+      'typing a title and pressing Enter makes a task — K-8',
+      (await added.getAttribute('data-kind')) === 'task' &&
+        (await added.locator('[data-testid="done"]').count()) === 1,
+      String(await added.getAttribute('data-kind')),
+    );
+    check(
+      'and the line is empty and still holds the caret, ready for the next one',
+      (await quickAdd.inputValue()) === '' &&
+        (await page.evaluate(() => document.activeElement?.dataset?.testid ?? null)) === 'quick-add',
+      String(await page.evaluate(() => document.activeElement?.dataset?.testid ?? null)),
+    );
+    const rowsBeforeEscape = await page.locator('[data-testid="row"]').count();
+    await quickAdd.fill('Never written');
+    await page.keyboard.press('Escape');
+    // Blur commits what is left in the line, so this also asserts that Escape
+    // emptied it rather than only leaving it unwritten.
+    await page.locator('[data-testid="tree"]').click({ position: { x: 5, y: 5 } });
+    check(
+      'Escape throws away what was typed there, and nothing is written — K-8',
+      (await page.locator('[data-testid="row"]').count()) === rowsBeforeEscape &&
+        !(await titlesOf(page)).includes('Never written'),
+      `${await page.locator('[data-testid="row"]').count()} rows, was ${rowsBeforeEscape}`,
+    );
+
     // --- A-1 to A-6: tags, the flag and the filter -------------------------
     const milkRow2 = await rowByTitle(page, 'Milk');
     const flag = milkRow2.locator('[data-testid="priority"]');
@@ -215,8 +245,8 @@ async function main() {
 
     // A-6: a row created under a filter carries it, or it would vanish as it
     // was typed.
-    await page.locator('[data-testid="add-task"]').click();
-    await page.keyboard.type('Errand run');
+    await page.locator('[data-testid="quick-add"]').fill('Errand run');
+    await page.keyboard.press('Enter');
     await page.locator('[data-testid="filter-clear"]').click();
     const errand = await rowByTitle(page, 'Errand run');
     check(
@@ -805,6 +835,13 @@ async function dragRow(page, title, ontoTitle, where) {
   const refused = await target.getAttribute('data-drop-refused');
   await page.mouse.up();
   return refused;
+}
+
+/** Every title on screen, in render order. */
+async function titlesOf(page) {
+  return page
+    .locator('[data-testid="row"] [data-testid="title"]')
+    .evaluateAll((inputs) => inputs.map((input) => input.value));
 }
 
 async function rowByTitle(page, title) {

@@ -5,9 +5,10 @@
 A checklist and notes app for one person across several devices. Local-first, no application server: devices synchronise
 through a folder that a cloud provider's own client keeps in sync.
 
-**Status: milestones M1, M2, M3 and M4 are built** — the local-first core, sync through the folder, then compaction,
-search, device names, undelete and the two platform bundles, and lastly the settings screen and its six themes. The
-production tree is `src/`, driven by `package.json`.
+**Status: milestones M1 to M5 are built** — the local-first core, sync through the folder, then compaction, search,
+device names, undelete and the two platform bundles, then the settings screen and its six themes, and lastly M5: the
+sync folder section, drag and drop, tags and priority with a filter, and the quick-add line. The production tree is
+`src/`, driven by `package.json`.
 
 ## Development
 
@@ -112,8 +113,8 @@ lower this device's top counter, or every peer reads the file as a partial downl
 §4.8.
 
 Never in a file, always `localStorage`: the device id, collapse state, the drawer's state, which folder this device
-chose, the chosen theme, and dismissed conflict rows. The File System Access handle is the exception, and only because
-it is an object: IndexedDB.
+chose, which cloud app it belongs to, the chosen theme, the tag filter, and dismissed conflict rows. The File System
+Access handle is the exception, and only because it is an object: IndexedDB.
 
 ### Component catalog
 
@@ -150,6 +151,30 @@ Two edits do not follow the straight path, and both are deliberate: a title is a
 committed, and a note body updates the store on a 1 s debounce but only becomes an op on blur, on navigation, or after
 60 s (K-7, S-20).
 
+### Attributes
+
+Any row carries **tags** (A-1) and a **priority** (A-2), and both are ordinary fields: one `set` op, last-writer-wins, a
+conflict row when two devices raced, compaction dropping a superseded one. `src/core/tags.ts` is the only place a tag is
+given its shape — case-folded, `#` dropped, sorted, deduplicated, twelve to a row — and it runs at the *decoder* as well
+as at the input, so a tag from an older build arrives normalised. A tag set merges whole rather than per member;
+past_decision.md §10 says what an OR-set would have cost.
+
+`src/core/filter.ts` ANDs the selected tags over the materialised tree and adds the ancestors of every match, so a hit
+deep in a collapsed folder is reachable — the filter overrides T-8's collapse state while it is on, and
+`src/ui/TagFilter.svelte` says what is active. The selection is `localStorage`, never a file (A-5). A row created while
+a filter is on carries that filter's tags (A-6), or it would vanish as it was typed.
+
+**The three flag colours are theme tokens** — `flag-low`, `flag-medium`, `flag-high` — so a palette is fourteen
+properties rather than eleven and no component names a colour. `themes.test.ts` fails if a theme leaves one out.
+
+### Dragging
+
+`src/ui/drag.svelte.ts` drives T-14 over **pointer** events, never HTML5 drag-and-drop: `dragstart` does not fire on
+touch, and every other edit here reaches a phone. The grip captures the pointer, the row under it is found by
+hit-testing the document, and the top and bottom quarters of a row mean "above" and "below" while the middle means
+"inside". `dropOnto` in `src/core/edit.ts` turns that into one `move` op, and `canDrop` is where T-5 finally has a
+gesture that can provoke it — a refused drop is drawn as refused and writes nothing.
+
 ### What the normal view leaves out
 
 `resolveTree` drops two things from `children`, and every edit and every view reads the filtered set: a tombstoned
@@ -164,7 +189,12 @@ scans the materialised tree per query and stores no index at all (F-4).
 ### Settings
 
 `#/settings` (`src/ui/SettingsPage.svelte`) is everything about *this device* rather than about the tree — X-12 — and it
-is the third and last nav entry, beside Search and Done. Three things sit on it, and only the first writes an op:
+is the third and last nav entry, beside Search and Done. Four things sit on it, and only the device name writes an op:
+
+- **The sync folder** (X-15 to X-17). What this device writes to, a button that opens it, a button that starts the
+  provider's app, and a way to point the device at another folder. None of it is a fourth adapter method:
+  `src/app/shell.ts` asks the *shell* — the Android bridge, the loopback helper's `/shell/open`, the browser — what it
+  can do, and a capability this shell lacks is an absent button. architecture.md §4.1.
 
 - **The device name** (D-1). The one editor for it; `#/devices` lists what every device calls itself and edits none of
   them, including this one.
@@ -173,8 +203,7 @@ is the third and last nav entry, beside Search and Done. Three things sit on it,
 - **The theme** (X-13). `src/core/themes.ts` is the catalog of six ids, `src/app.css` holds one eleven-token palette per
   id under `[data-theme='…']`, and `src/app/theme.svelte.ts` applies it. `themes.test.ts` fails if catalog and
   stylesheet drift. **No component ever names a colour** — that is what makes a seventh theme a CSS block and nothing
-  else. The id is applied by a boot line in `index.html` so a dark theme never flashes light, and it never syncs
-  (X-14).
+  else. The id is applied by a boot line in `index.html` so a dark theme never flashes light, and it never syncs (X-14).
 
 ### What the merge decided without asking
 

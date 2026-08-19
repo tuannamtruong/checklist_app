@@ -2,8 +2,8 @@
 
 Requirement docs and its current state.
 
-**Milestones M1, M2, M3 and M4 are built** — the production tree is `src/`, and every ✅ row below names the file that
-implements it.
+**Milestones M1 to M5 are built** — the production tree is `src/`, and every ✅ row below names the file that implements
+it.
 
 Two commands verify the ✅ rows:
 
@@ -184,9 +184,21 @@ something.
 | K-5 | Any row can be converted to any kind after the fact ("Turn into") | ✅ | `turnInto` in `src/core/edit.ts`, in the row menu. Two devices converting one row differently resolve by `(at, device id)`, with a notice — [§9 Conflict presentation](#9-conflict-presentation) |
 | K-6 | A note can be promoted to a checklist from its own page | ✅ | `src/ui/NodePage.svelte`; the body is kept, so it is reversible |
 | K-7 | Note body saves are debounced (1 s) so typing is not one op per keystroke | ✅ | `src/ui/NoteBody.svelte`. The 1 s debounce governs the store; an **op** is emitted on blur, on navigating away, or after 60 s of continuous editing — S-20 |
+| K-8 | Every list ends in a line where typing a title and pressing Enter makes a **task**, and leaves the line ready for the next one | ✅ | `src/ui/QuickAdd.svelte`, over `createLastChild` with no kind — which is `task`, the default every other creation path already used. The other three kinds keep their buttons beside it |
 
 Notes are deliberately not checkable. `done` is still a field on every node, because K-5 keeps it across a "Turn into"
 so that turning back restores the tick — which is also why T-11's filter reads `done` rather than `kind === 'task'`.
+
+**The quick-add line makes a task and nothing else, and that is the whole of K-8.** A checklist is mostly tasks, so the
+one path that costs no decision has to produce the kind the person was already going to pick — `createLastChild` with no
+kind, which has meant `task` since M1. The other three kinds keep their buttons beside the line, one click away, because
+picking a kind is a decision worth a button rather than a mode.
+
+Its `Enter` is not a row action and is not in the row menu, for the same reason `/` is not —
+[§3.1 Keyboard (desktop)](#31-keyboard-desktop). It acts on the list rather than on the row under the caret, and there
+is no caret in a row when it fires. What it does have in common with the row keys is where the text goes: nothing typed
+is lost, so leaving the line commits what is in it exactly as leaving a title does, and `Escape` is the one way to throw
+it away.
 
 ### 4.1 Tags and priority
 
@@ -598,6 +610,7 @@ every possible destination is a second navigation to build and to test, and the 
 | M2 | Sync | **Closed.** Every device's file read and folded together (`src/core/merge.ts`, `src/app/folder-sync.ts`), the activity-driven cycle (S-19), the conflict nav of [§9 Conflict presentation](#9-conflict-presentation), and the adapter set — `fsaa`, `http`, `android` beside the two M1 shipped, chosen by [architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter)'s flowchart. What it left standing is rows 1 and 4 of [§15 Deviations and defects found during verification](#15-deviations-and-defects-found-during-verification) |
 | M3 | Compaction and polish | **Closed.** Compaction (S-14) once its trigger fires, [§6 Search](#6-search), device management ([§8 Device management](#8-device-management)), the restore path T-13 owes the Done view, and the two bundles [architecture.md §7 Packaging](architecture.md#7-packaging) describes — `make windows` and `make apk`. What it left standing is rows 5 and 10 of [§15 Deviations and defects found during verification](#15-deviations-and-defects-found-during-verification) |
 | M4 | Settings and appearance | **Closed.** One screen for everything about this device rather than about the tree (X-12), and the six themes X-13 puts behind it — [§10.1 Themes](#101-themes). It moved the D-1 name editor and the D-4 log link onto that screen and took a nav entry away rather than adding one. It changed no component's colours, because no component ever named one |
+| M5 | Attributes, the drag and the folder screen | **Closed.** Four features that each turned out to be a caller of something already there: the drag (T-14) over the `move` op M1 wrote, tags and priority ([§4.1 Tags and priority](#41-tags-and-priority)) over the `set` op and the conflict list M2 built, the quick-add line (K-8) over `createLastChild`, and the sync folder section ([§10.2 The sync folder, on the settings screen](#102-the-sync-folder-on-the-settings-screen)) over the shell that already held the folder. It closed row 2 of [§15 Deviations and defects found during verification](#15-deviations-and-defects-found-during-verification) — T-5's refusal has a gesture that can provoke it at last |
 
 M2 is closed against a folder, not against a provider. The three adapters it added are the three methods every other
 adapter already offers, so what remains untested is the client underneath them, and observing that needs a Windows and

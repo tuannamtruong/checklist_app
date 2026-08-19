@@ -13,6 +13,7 @@
   import type { ViewState } from '../app/view-state.svelte';
   import type { RowFocus } from './focus.svelte';
   import { DONE_HREF } from '../app/router.svelte';
+  import QuickAdd from './QuickAdd.svelte';
   import Row from './Row.svelte';
   import { RowDrag } from './drag.svelte';
   import { visibleRows } from './rows';
@@ -91,37 +92,35 @@
   </p>
 {/if}
 
-<div class="mt-2 flex flex-wrap gap-2 px-2">
-  <button
-    type="button"
-    class="rounded-md border border-line px-2.5 py-1.5 text-sm text-ink-muted hover:border-accent hover:text-accent"
-    data-testid="add-task"
-    onclick={() => add('task')}
-  >
-    + Task
-  </button>
-  <button
-    type="button"
-    class="rounded-md border border-line px-2.5 py-1.5 text-sm text-ink-muted hover:border-accent hover:text-accent"
-    data-testid="add-list"
-    onclick={() => add('list')}
-  >
-    + List
-  </button>
-  <button
-    type="button"
-    class="rounded-md border border-line px-2.5 py-1.5 text-sm text-ink-muted hover:border-accent hover:text-accent"
-    data-testid="add-note"
-    onclick={() => add('note')}
-  >
-    + Note
-  </button>
-  <button
-    type="button"
-    class="rounded-md border border-line px-2.5 py-1.5 text-sm text-ink-muted hover:border-accent hover:text-accent"
-    data-testid="add-folder"
-    onclick={() => add('folder')}
-  >
-    + Folder
-  </button>
+<!-- K-8. The line first and on its own row, the other three kinds under it: a
+     checklist is mostly tasks, so the path that costs no decision makes one, and
+     on a phone it is the full width it needs to be typed into. -->
+<div class="mt-2 flex flex-col gap-2 px-2">
+  <QuickAdd {session} {view} {parent} />
+  <div class="flex flex-wrap gap-2">
+    <button
+      type="button"
+      class="rounded-md border border-line px-2.5 py-1.5 text-sm text-ink-muted hover:border-accent hover:text-accent"
+      data-testid="add-list"
+      onclick={() => add('list')}
+    >
+      + List
+    </button>
+    <button
+      type="button"
+      class="rounded-md border border-line px-2.5 py-1.5 text-sm text-ink-muted hover:border-accent hover:text-accent"
+      data-testid="add-note"
+      onclick={() => add('note')}
+    >
+      + Note
+    </button>
+    <button
+      type="button"
+      class="rounded-md border border-line px-2.5 py-1.5 text-sm text-ink-muted hover:border-accent hover:text-accent"
+      data-testid="add-folder"
+      onclick={() => add('folder')}
+    >
+      + Folder
+    </button>
+  </div>
 </div>
