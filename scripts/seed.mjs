@@ -35,7 +35,9 @@ async function main() {
 
   const page = context.pages()[0] ?? (await context.newPage());
   await page.goto(BASE_URL);
-  await page.waitForSelector('[data-testid="tree"]');
+  // Attached, not visible: an empty tree renders a zero-height div, and "you
+  // have no rows yet" is a state worth opening the window on, not a timeout.
+  await page.waitForSelector('[data-testid="tree"]', { state: 'attached' });
   console.log(`serving ${BASE_URL} — close the window to stop`);
 
   if (headless) {
