@@ -333,6 +333,31 @@ async function main() {
         (await page.locator('[data-testid="log-link"]').isVisible()),
     );
 
+    // --- X-15 to X-17: the sync folder section -------------------------------
+    // This run reaches its folder through `local-folder`, which is the browser
+    // itself: there is no folder to show and no client to start, so what is
+    // asserted is that the section names what this device writes to and that a
+    // capability this shell does not have is an absent button rather than a
+    // dead one — requirements.md §10.2.
+    const folderSection = await page.locator('[data-testid="settings-folder-label"]').innerText();
+    const footerFolder = await page.locator('[data-testid="folder-label"]').innerText();
+    check(
+      'settings names the folder this device syncs through — X-15',
+      folderSection.trim() === footerFolder.trim() && folderSection.trim() !== '',
+      folderSection,
+    );
+    check(
+      'a browser that cannot open a folder offers no button, only the picker — §10.2',
+      (await page.locator('[data-testid="open-folder"]').count()) === 0 &&
+        (await page.locator('[data-testid="open-provider"]').count()) === 0 &&
+        (await page.locator('[data-testid="change-folder"]').isVisible()),
+    );
+    check(
+      'the provider catalog is offered, and nothing is chosen by default — X-17',
+      (await page.locator('[data-testid="provider"]').inputValue()) === '' &&
+        (await page.locator('[data-testid="provider"] option').count()) === 7,
+    );
+
     // --- X-13, X-14: themes -------------------------------------------------
     const themeIds = await page
       .locator('[data-testid="theme-option"]')

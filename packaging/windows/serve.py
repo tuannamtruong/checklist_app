@@ -23,6 +23,10 @@ Two reasons this process exists at all:
 The folder API is exactly the three methods of architecture.md 4, spelled as
 HTTP because that is what a page can call: list, read, write. It is the other
 side of src/adapters/http-folder.ts and it grows no fourth method.
+
+/shell/open is beside that API rather than part of it -- architecture.md 4.1. It
+opens the folder in the desktop's file manager and starts the cloud client, both
+of which are things a page cannot do and neither of which the sync path calls.
 """
 
 from __future__ import annotations
@@ -31,6 +35,7 @@ import argparse
 import json
 import os
 import re
+import shutil
 import socket
 import subprocess
 import sys
@@ -62,6 +67,47 @@ MIME = {
 # `checklist.<device-id>.ops.jsonl` plus anything the adapter conformance suite
 # asks of a folder.
 SEGMENT = re.compile(r"^[A-Za-z0-9._-]{1,120}$")
+
+# --------------------------------------------------------------- the shell
+
+# X-15 and X-17 -- architecture.md 4.1. The page may ask for two things beyond
+# the folder API: show me the folder, and start the cloud client.
+#
+# It names a *command*, never a path, and the pattern is the same narrow one the
+# folder API uses. The command is resolved on PATH and run with no arguments and
+# no shell, so the page can say what to start and can never say where to start it
+# from. The one path this endpoint will ever open is the folder, which came from
+# --folder on the command line rather than from the page.
+COMMAND = re.compile(r"^[A-Za-z0-9._-]{1,40}$")
+
+
+def open_with_desktop(target: str) -> None:
+    """Hand a folder to whatever this desktop opens folders with."""
+    if os.name == "nt":
+        os.startfile(target)  # type: ignore[attr-defined]  # Windows only
+        return
+    for cmd in (["xdg-open", target], ["explorer.exe", target], ["open", target]):
+        try:
+            subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return
+        except OSError:
+            continue
+    raise FolderError(500, "no file manager on this desktop")
+
+
+def start_app(command: str) -> None:
+    if not COMMAND.match(command):
+        raise FolderError(400, f"bad command: {command!r}")
+    found = shutil.which(command)
+    if found is None:
+        # Not an error in the app: the client is simply not installed here, or
+        # not on PATH, and the page says so rather than showing a status.
+        raise FolderError(404, f"{command} was not found on this device")
+    try:
+        subprocess.Popen([found], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except OSError as exc:
+        raise FolderError(500, f"could not start {command}: {exc}") from exc
+
 
 SERVER: ThreadingHTTPServer | None = None
 VERBOSE = False
@@ -180,7 +226,7 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = unquote(parsed.path)
 
-        if path.startswith("/folder/") or path == "/api/quit":
+        if path.startswith("/folder/") or path.startswith("/shell/") or path == "/api/quit":
             if not self._same_origin():
                 return self._json(403, {"error": "cross-origin request refused"})
 
@@ -192,6 +238,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(200, self._folder().list(prefix))
             if path.startswith("/folder/file/"):
                 return self._file(path[len("/folder/file/") :])
+            if path == "/shell/open":
+                return self._open()
             if path == "/api/quit":
                 return self._quit()
         except FolderError as err:
@@ -226,6 +274,27 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, {"ok": True})
 
         self._json(405, {"error": "method not allowed"})
+
+    def _open(self) -> None:
+        """X-15 and X-17: the folder, or the cloud client, whichever was asked."""
+        if self.command != "POST":
+            return self._json(405, {"error": "method not allowed"})
+        length = int(self.headers.get("Content-Length") or 0)
+        try:
+            asked = json.loads(self.rfile.read(length) or b"{}")
+        except ValueError:
+            raise FolderError(400, "not JSON") from None
+        if not isinstance(asked, dict):
+            raise FolderError(400, "not an object")
+
+        what = asked.get("what")
+        if what == "folder":
+            open_with_desktop(str(self._folder().root))
+            return self._json(200, {"ok": True})
+        if what == "app":
+            start_app(str(asked.get("command", "")))
+            return self._json(200, {"ok": True})
+        raise FolderError(400, f"nothing to open: {what!r}")
 
     def _quit(self) -> None:
         if self.command != "POST":
