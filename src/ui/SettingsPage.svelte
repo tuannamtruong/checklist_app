@@ -25,10 +25,19 @@
   const self = $derived(session.devices.find((device) => device.self));
   const peers = $derived(session.devices.length - 1);
 
+  // X-18. The one shell question that is a fetch rather than a property, so it
+  // is asked here and handed in — architecture.md §4.1. It stays null on every
+  // source but the browser-only fallback, and that is where the button it buys
+  // is the only way back to a folder on a browser with no picker.
+  let offered = $state<string | null>(null);
+  $effect(() => {
+    void offeredFolder(folder.source).then((name) => (offered = name));
+  });
+
   // X-15 to X-17. What this shell can do, asked once per folder rather than
   // assumed: an APK older than X-15 has no `openFolder`, and a browser has none
   // of it — architecture.md §4.1.
-  const shell = $derived(shellActions(folder.source));
+  const shell = $derived(shellActions(folder.source, offered));
   let provider = $state(storedProvider());
   let folderProblem = $state<string | null>(null);
 
@@ -118,17 +127,20 @@
           data-testid="change-folder"
           onclick={changeFolder}
         >
-          Use a different folder…
+          {shell.changeLabel ?? 'Use a different folder…'}
         </button>
       {/if}
     </div>
 
-    {#if shell.changeFolder}
+    <!-- The note outranks the default line, because a shell that named one is
+         saying something the default does not: which folder is on offer, or who
+         decides instead — requirements.md §10.2. -->
+    {#if shell.changeNote}
+      <p class="text-xs text-ink-faint" data-testid="change-note">{shell.changeNote}</p>
+    {:else if shell.changeFolder}
       <p class="text-xs text-ink-faint">
         A different folder is read from scratch: the rows already written stay in this one.
       </p>
-    {:else if shell.changeNote}
-      <p class="text-xs text-ink-faint" data-testid="change-note">{shell.changeNote}</p>
     {/if}
 
     <!-- X-17. The provider is a label this device keeps, and the one thing it
