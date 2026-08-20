@@ -536,6 +536,21 @@ async function main() {
     );
     await page.locator('[data-theme-id="light"]').click();
 
+    // --- D-5: the name the device gave itself ------------------------------
+    // Nothing has typed into this field yet, and it is not empty: the shape is
+    // platform-browser-id4, and the last four are the first four of the id
+    // beside it — requirements.md §8.
+    const givenName = await page.locator('[data-testid="device-name"]').inputValue();
+    const ownId = (await page.locator('[data-testid="settings-device-id"]').innerText()).trim();
+    check(
+      'a device nobody has named carries the name it gave itself — D-5',
+      /^[A-Za-z]{1,5}-[A-Za-z]{1,4}-[0-9a-z]{4}$/.test(givenName) &&
+        givenName.endsWith(`-${ownId.slice(0, 4)}`),
+      `${givenName} for ${ownId}`,
+    );
+    // The screen as a device meets it, before anything has been typed into it.
+    await page.screenshot({ path: join(shots, 'settings-unnamed.png'), fullPage: true });
+
     // --- D-1: this device's name -------------------------------------------
     await page.locator('[data-testid="device-name"]').fill('the laptop');
     await page.waitForTimeout(WRITE_SETTLE_MS);
