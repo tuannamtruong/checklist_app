@@ -464,10 +464,12 @@ async function main() {
     // capability this shell does not have is an absent button rather than a
     // dead one — requirements.md §10.2.
     const folderSection = await page.locator('[data-testid="settings-folder-label"]').innerText();
-    const footerFolder = await page.locator('[data-testid="folder-label"]').innerText();
+    // The sidebar keeps one line about the folder and only while it is the
+    // unsynced fallback, which is what this run is — architecture.md §4.
+    const footerWarning = await page.locator('[data-testid="not-synced"]').innerText();
     check(
       'settings names the folder this device syncs through — X-15',
-      folderSection.trim() === footerFolder.trim() && folderSection.trim() !== '',
+      folderSection.trim() === footerWarning.trim() && folderSection.trim() !== '',
       folderSection,
     );
     check(
@@ -707,11 +709,13 @@ async function main() {
       withPeer.includes('Coffee') && !withPeer.includes('Coffee beans'),
       withPeer.join('|'),
     );
-    check(
-      'the folder now shows two devices',
-      (await page.locator('[data-testid="peer-count"]').innerText()).includes('1 other device'),
-      await page.locator('[data-testid="peer-count"]').innerText(),
-    );
+    // The peer count is on the settings screen rather than in the corner — §10.
+    await page.locator('[data-testid="settings-link"]').click();
+    await page.waitForSelector('[data-testid="settings-page"]');
+    const reach = await page.locator('[data-testid="settings-folder-synced"]').innerText();
+    check('the folder now shows two devices', reach.includes('1 other device'), reach);
+    await page.goBack();
+    await page.waitForSelector('[data-testid="tree"]', { state: 'attached' });
     // The receipt is a write of our own file, so it lands on the write debounce
     // rather than with the fold — sync-flow.md §2.4.
     await page.waitForTimeout(WRITE_SETTLE_MS);
@@ -785,8 +789,8 @@ async function main() {
       await firstRun.waitForSelector('[data-testid="tree"]', { state: 'attached' });
       check(
         'and declining still gets a working app, which says it is not synced',
-        (await firstRun.locator('[data-testid="folder-label"]').innerText()).includes('not synced'),
-        await firstRun.locator('[data-testid="folder-label"]').innerText(),
+        (await firstRun.locator('[data-testid="not-synced"]').innerText()).includes('not synced'),
+        await firstRun.locator('[data-testid="not-synced"]').innerText(),
       );
       await firstRun.reload();
       await firstRun.waitForSelector('[data-testid="tree"]', { state: 'attached' });

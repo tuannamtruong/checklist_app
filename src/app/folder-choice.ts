@@ -9,15 +9,24 @@
 
 import { androidFolder, bridge } from '../adapters/android-folder';
 import { ensurePermission, fsaaFolder, loadHandle, pickFolder, supported } from '../adapters/fsaa-folder';
-import { helperInfo, httpFolder } from '../adapters/http-folder';
+import { helperInfo, httpFolder, type HelperInfo } from '../adapters/http-folder';
 import { localFolder, localFolderHasData } from '../adapters/local-folder';
 import { memoryFolder } from '../adapters/memory-folder';
 import type { FolderAdapter } from '../core/folder';
 
 const MODE_KEY = 'checklist.folder.mode';
 
-/** Only the two the user can be asked for. The rest are decided by the shell. */
-export type FolderMode = 'local' | 'fsaa';
+/**
+ * `local` and `fsaa` are the two the setup screen can be answered with; the
+ * rest of the flowchart is decided by the shell and stores nothing.
+ *
+ * `shell` is neither: it records that a device was moved *off* the browser-only
+ * fallback and back onto whatever the process that launched it hands over —
+ * X-18. Clearing the key would not say that, because a browser still holding
+ * the old `local-folder` log is read as `local` by inference below, so the move
+ * would not survive the reload that performs it.
+ */
+export type FolderMode = 'local' | 'fsaa' | 'shell';
 
 /**
  * Which of the flowchart's branches this folder came out of. The adapters are
@@ -54,7 +63,7 @@ function isUiTest(search: string): boolean {
 
 export function storedMode(storage: Storage): FolderMode | null {
   const stored = storage.getItem(MODE_KEY);
-  return stored === 'local' || stored === 'fsaa' ? stored : null;
+  return stored === 'local' || stored === 'fsaa' || stored === 'shell' ? stored : null;
 }
 
 export function rememberMode(mode: FolderMode, storage: Storage = window.localStorage): void {
@@ -76,6 +85,28 @@ export function browserOnly(storage: Storage = window.localStorage): OpenFolder 
     synced: false,
     uiTest: false,
   };
+}
+
+function openHelper(helper: HelperInfo): OpenFolder | null {
+  if (!helper.configured) return null;
+  return {
+    kind: 'folder',
+    source: 'http',
+    folder: httpFolder(),
+    label: helper.name ?? 'the folder this device serves',
+    synced: true,
+    uiTest: false,
+  };
+}
+
+/**
+ * The folder the process that served this page is holding, if it is holding
+ * one. Startup reaches it through the flowchart below; this is the same
+ * question asked out of turn, by the one screen that has to offer it to a
+ * device the flowchart has already answered `local` for — X-18.
+ */
+export async function shellFolder(): Promise<OpenFolder | null> {
+  return openHelper(await helperInfo());
 }
 
 async function fromHandle(): Promise<FolderChoice | null> {
@@ -136,21 +167,23 @@ export async function chooseFolder(
   }
 
   const helper = await helperInfo();
-  if (helper.configured) {
-    return {
-      kind: 'folder',
-      source: 'http',
-      folder: httpFolder(),
-      label: helper.name ?? 'the folder this device serves',
-      synced: true,
-      uiTest: false,
-    };
-  }
+  const served = openHelper(helper);
+  if (served) return served;
 
   if (supported()) {
     return { kind: 'setup', how: 'fsaa', reason: 'no folder has been picked on this device yet' };
   }
-  return { kind: 'setup', how: 'none', reason: 'this browser cannot open a folder' };
+  // The browser has no picker, so the only folder it will ever see is one the
+  // launcher hands over. Say which of those two is missing: a helper that is
+  // running without a folder is a launcher argument away from working, and
+  // "this browser cannot open a folder" sends the user to fix the wrong thing.
+  return {
+    kind: 'setup',
+    how: 'none',
+    reason: helper.present
+      ? 'this device is serving the app but has not been given a folder yet'
+      : 'this browser cannot open a folder',
+  };
 }
 
 /** The setup screen's button, for the two branches that have one. */

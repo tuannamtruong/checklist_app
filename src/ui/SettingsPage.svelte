@@ -11,7 +11,7 @@
   import { THEMES } from '../core/themes';
   import type { OpenFolder } from '../app/folder-choice';
   import { rememberProvider, storedProvider } from '../app/provider';
-  import { shellActions } from '../app/shell';
+  import { offeredFolder, shellActions } from '../app/shell';
   import type { Theme } from '../app/theme.svelte';
   import type { Session } from '../app/Session.svelte';
   import { DEVICES_HREF, LOGS_HREF } from '../app/router.svelte';
@@ -85,13 +85,17 @@
       <dt class="text-ink-faint">Folder</dt>
       <dd class="min-w-0 truncate" data-testid="settings-folder-label">{folder.label}</dd>
       <dt class="text-ink-faint">Reaches</dt>
+      <!-- A peer in the folder outranks what the adapter says it can do: a
+           device that is reading another's file is reaching it, whatever the
+           fallback's label claims. The sidebar's warning is the other half of
+           this and is not conditional on the count — architecture.md §4. -->
       <dd class="min-w-0" data-testid="settings-folder-synced">
-        {#if !folder.synced}
-          This device only — nothing here syncs
-        {:else if session.peers === 0}
-          No other device yet
-        {:else}
+        {#if session.peers > 0}
           {session.peers} other device{session.peers === 1 ? '' : 's'}
+        {:else if !folder.synced}
+          This device only — nothing here syncs
+        {:else}
+          No other device yet
         {/if}
       </dd>
     </dl>

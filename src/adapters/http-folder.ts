@@ -16,6 +16,13 @@ import type { FolderAdapter } from '../core/folder';
 const BASE = '/folder';
 
 export interface HelperInfo {
+  /**
+   * Whether a helper answered at all. It tells "this page was served by
+   * something else" from "the helper is here and holding nothing", which are
+   * the same `configured: false` to the adapter and two different sentences to
+   * the user — architecture.md §4.
+   */
+  present: boolean;
   configured: boolean;
   /** The folder's own name, never a path assembled here — code-standard.md §1. */
   name?: string;
@@ -40,10 +47,12 @@ export class HttpFolderError extends Error {
 export async function helperInfo(base = BASE): Promise<HelperInfo> {
   try {
     const response = await fetch(`${base}/info`);
-    if (!response.ok) return { configured: false };
-    return (await response.json()) as HelperInfo;
+    if (!response.ok) return { present: true, configured: false };
+    // `present` is this side's word, not the helper's: the helper knows it
+    // exists and has never had reason to say so.
+    return { ...((await response.json()) as HelperInfo), present: true };
   } catch {
-    return { configured: false };
+    return { present: false, configured: false };
   }
 }
 

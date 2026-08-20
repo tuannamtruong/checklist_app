@@ -284,9 +284,9 @@ page, which tells deletion from absence because T-7 keeps the two distinguishabl
 — T-11 hides a row from its parent's page, not from its own — so a row opened from `#/done` gets the page it always had.
 
 Two navigations exist besides the routes: the sidebar (T-10, containers only, and T-11 takes finished ones out of it)
-and breadcrumbs (T-9). Both climb the T-6-resolved parent, never the stored one. `#/done`, `#/search` and `#/settings`
-are permanent entries in the sidebar's nav, because a view that appeared only when it had something in it would be a
-view the user could not learn.
+and breadcrumbs (T-9). Both climb the T-6-resolved parent, never the stored one. `#/done` and `#/search` are permanent
+entries in the sidebar's nav and `#/settings` is a permanent entry in its footer, because a view that appeared only when
+it had something in it would be a view the user could not learn.
 
 `#/conflicts` is the exception to that rule, and deliberately: its entry appears only when there is something in it,
 because a permanent one would be empty almost always — [§9 Conflict presentation](#9-conflict-presentation). It is
@@ -295,8 +295,9 @@ reachable by typing the fragment even then, and answers "nothing to report" rath
 `#/logs` and `#/devices` are not in the sidebar either, and for the opposite reason: both are always there to be found,
 but both are reached from `#/settings`, because what they say is about *this* device and settings is where this device
 is already the subject. A permanent nav entry for a diagnostic would cost every user of the tree a line of nav for a
-page opened when something looks wrong. The nav went from four entries to three when X-12 gathered them: **Search**,
-**Done**, **Settings**, plus **Merged** when there is something in it.
+page opened when something looks wrong. The nav went from four entries to three when X-12 gathered them, and to two when
+Settings took the footer: **Search** and **Done**, plus **Merged** when there is something in it, with **Settings** in
+the corner below them.
 
 ## 6. Search
 
@@ -474,12 +475,13 @@ to empty, and a dismissal is only for a row the user is content to leave as it l
 | X-8 | Deep links survive a cold launch from a home-screen icon | ✅ | The fragment never reaches the network; a reload on `#/n/<id>` is checked in `scripts/ui-smoke.mjs`. The home-screen launch itself is [test.md §3.6 Platform](test.md#36-platform) |
 | X-10 | UI repaints automatically on any data change, including a merged remote one | ✅ | The store publishes; rows hold a draft so a repaint cannot eat the caret — `src/ui/Row.svelte` |
 | X-11 | Deleted/missing node renders a recovery page rather than a crash | ✅ | `src/ui/RecoveryPage.svelte`; it tells absence from deletion, per T-7 |
-| X-12 | One settings screen holds everything that is about this device rather than about the tree: its name, its log, its appearance | ✅ | `src/ui/SettingsPage.svelte` at `#/settings`, in the nav. It writes exactly one op kind — the D-1 rename — and everything else on it is device-local |
+| X-12 | One settings screen holds everything that is about this device rather than about the tree: its name, its log, its appearance | ✅ | `src/ui/SettingsPage.svelte` at `#/settings`, reached from the foot of the sidebar rather than from its nav. It writes exactly one op kind — the D-1 rename — and everything else on it is device-local |
 | X-13 | Six themes: light, dark, green, orange, yellow and teal | ✅ | `src/core/themes.ts` is the catalog and `src/app.css` holds one palette per id; `themes.test.ts` fails if the two drift. Switching swaps the semantic tokens of [§10.1 Themes](#101-themes), so no component names a colour |
 | X-14 | The theme is device-local and takes effect before the first paint | ✅ | `src/app/theme.svelte.ts` — the id in `localStorage` and `data-theme` on the document root, set by a boot line in `index.html` so a dark theme never flashes light. Never in a file, never synced — [§2.3 What is never in the Sync Folder](#23-what-is-never-in-the-sync-folder) |
 | X-15 | The settings screen names the folder this device syncs through, and opens it in the system's file manager where the shell can | ✅ | `src/ui/SettingsPage.svelte`, over `src/app/shell.ts`. Opening a folder is not a fourth adapter method and never becomes one — [architecture.md §4.1 Shell actions, beside the adapter](architecture.md#41-shell-actions-beside-the-adapter) |
 | X-16 | The settings screen points this device at a different folder, and names who decides when it cannot | ✅ | `changeFolder` in `src/app/shell.ts`, which re-enters [architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter)'s picker and reloads. The rows already written do not follow the device to the new folder, and the screen says so before the picker opens |
 | X-17 | The settings screen launches the cloud provider's own app, and which provider that is stays on this device | ✅ | `src/core/providers.ts` is the catalog; the choice is `localStorage`, per [§2.3 What is never in the Sync Folder](#23-what-is-never-in-the-sync-folder). A shell that cannot launch an app says so rather than offering a button that does nothing |
+| X-18 | A device on the browser-only fallback can move to the folder its own launcher is holding, in a browser that has no picker | ✗ | `shellFolder` in `src/app/folder-choice.ts`, over the `local` branch of `src/app/shell.ts`: the loopback helper is asked what it is holding, and taking it stores the `shell` mode and reloads into [architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter)'s ordinary startup. Without it, "this browser only" is a one-way door on the one browser the helper exists for — [§10.2 The sync folder, on the settings screen](#102-the-sync-folder-on-the-settings-screen) |
 
 Packaging decides which of these are reachable, and it answers them per target rather than once — see
 [architecture.md §7 Packaging](architecture.md#7-packaging). X-3 in particular is a PWA install on Chromium and an APK
@@ -488,6 +490,15 @@ on Android, but a desktop shortcut on Firefox, which does not install PWAs.
 X-12 is what makes X-13 cheap rather than a fourth nav entry: appearance is a device's own taste, the device's name is a
 device's own statement about itself, and its log is a device's own record — three things that had no home between them
 and now share one.
+
+**The entry sits in the sidebar's footer, and the footer says nothing else.** The nav above it lists places in the tree,
+and this device is not one of them — an entry among them reads as another list. The corner is where an application puts
+the thing that is about the application, and it is the corner this device's readout was already occupying: the name, the
+folder and the peer count sat there as three lines of small text that could be read but not acted on. Every one of them
+is on the screen behind the entry, saying more than a line could — the folder with the buttons that open it, the name in
+the field that sets it, the count as a link to the list. What stays in the corner is the one control that must be
+reachable from every page (the S-19 refresh) and the one line that is a warning rather than a readout —
+[§10.2 The sync folder, on the settings screen](#102-the-sync-folder-on-the-settings-screen).
 
 ### 10.1 Themes
 
@@ -545,7 +556,7 @@ optional capability of the *shell*, and each shell answers for itself:
 | Android (`android-folder`) | The system's file viewer, on the granted tree | The provider's launch intent, by package name | The system picker, then a reload |
 | Windows helper (`http-folder`) | The desktop's own file manager, from the process that already holds the folder | The provider's command, found on `PATH` and run with no arguments | Not offered: the launcher's `--folder` decides, and the screen says so |
 | Chrome/Edge (`fsaa-folder`) | Not offered: a page holds a directory handle, not a window | Not offered | The File System Access picker, then a reload |
-| This browser only (`local-folder`) | Nothing to open — there is no folder | Not offered | The picker, where the browser has one |
+| This browser only (`local-folder`) | Nothing to open — there is no folder | Not offered | The folder the launcher is holding, where one is; otherwise the picker, where the browser has one (X-18) |
 
 A button that a shell cannot honour is absent rather than disabled-with-a-tooltip: the row above it already says what
 this device reaches its folder through, so an absent button reads as "not here" rather than as a fault.
@@ -553,6 +564,33 @@ this device reaches its folder through, so an absent button reads as "not here" 
 **Changing the folder reloads the page, and takes nothing with it.** The rows already written are in the old folder; the
 new one is read from scratch on the way back up, exactly as a new device reads it. That is stated on the screen before
 the picker opens, because it is the one thing on this page that can lose work.
+
+**"This browser only" must not be a one-way door — X-18.** The last row of that table used to read "the picker, where
+the browser has one", and on Firefox the browser has none: a device that answered "use this browser only" on the setup
+screen could never answer anything else, no matter what became reachable afterwards. That is the wrong shape twice over.
+Firefox is precisely the browser the loopback helper was written for
+([architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter)), so the folder is usually sitting right
+there, being served by the process that served the page; and the screen was saying "this browser cannot open a folder at
+all" while that was true of the browser and false of the device. The way in is easy to fall through — launch the helper
+once with no `--folder`, or open the page before setup has run, and the setup screen offers the browser-only button as
+its only option — and until X-18 there was no way back out.
+
+So the fallback gets the one escape its shell can offer: the settings screen asks the helper what folder it is holding,
+names it, and offers to take it. Three properties keep that honest.
+
+**It is a button, never automatic.** The rows written into `localStorage` do not follow the device to the folder — the
+same rule every other folder change obeys — so a startup that silently adopted the helper's folder would show an empty
+tree to a user who had been writing into this browser all week. The screen says whose rows stay where before the button
+is pressed.
+
+**Taking it is recorded, not merely acted on.** The move stores the `shell` mode, which is what makes it survive the
+reload that performs it: a browser still holding the old `local-folder` log is read as a stored choice of `local`
+otherwise, and startup would put the device straight back where it was.
+
+**The sidebar's warning and this screen's button are the two halves of one thing.** An unsynced device says so in the
+footer on every page, in the one line X-12 left there when everything else moved onto this screen, and the Settings
+entry it sits directly above is the door to the only button that can answer it. The warning is what makes the escape
+findable; without a button behind it, it is a device telling the user something they cannot act on.
 
 **The provider is a device-local label, not a code path.** Nothing in the merge, the adapter or the file format knows
 which provider is under the folder — [§7.3 Fixed constraints](#73-fixed-constraints) — so the catalog in
@@ -579,8 +617,9 @@ _Not written yet._ Expected to cover: the no-server rule, the three-method adapt
 
 ## 15. Deviations and defects found during verification
 
-What M1, M2 and M3 leave standing, in the order it matters. Every row here is a deliberate gap rather than a discovered
-bug — `npm test` and `npm run ui-smoke` both pass.
+What M1, M2 and M3 leave standing, in the order it matters. Every row here but the last is a deliberate gap rather than
+a discovered bug — `npm test` and `npm run ui-smoke` both pass. Row 11 is the exception: a defect found by running the
+Windows bundle in Firefox, and the reason X-18 exists.
 
 | # | Deviation | Why it stands |
 | --- | --- | --- |
@@ -594,6 +633,7 @@ bug — `npm test` and `npm run ui-smoke` both pass.
 | 8 | Two tabs on one origin are one device with two writers | The device id is per-origin, so both tabs write `checklist.<same-id>.ops.jsonl` from separate in-memory logs, and the one that flushes second replaces the other's file. Nothing is lost while both tabs live — the next write from either restores its own ops — but a tab closed without flushing loses what only it had. It is one-writer-per-file (S-3) broken by the browser rather than by the code, it predates M2, and the fix is a lock between tabs rather than anything in the merge. **Compaction makes it sharper**: the second tab's write can restore ops the first tab had already compacted away, so the file grows back. It converges and loses nothing; it merely undoes the saving until both tabs agree |
 | 9 | A device with no name is still eight hex characters | D-1 is built, and a device that has never been named has nothing else to show. The list is where it gets one |
 | 10 | The Windows and Android bundles are built but unobserved | `make windows` and `make apk` produce them — [architecture.md §7 Packaging](architecture.md#7-packaging) — which is what row 1 was waiting for. Running them against a real provider's client is still [test.md §3.6 Platform](test.md#36-platform)'s checklist and has not been done |
+| 11 | The Windows bundle in Firefox showed "This browser only — not synced" while the helper beside it held the folder | **Found in use; the fix is specified as X-18 and not yet built.** Not a Firefox bug and nothing to do with the adapter: the device had a stored choice of `local` from a launch that had no folder yet, the stored choice outranks every shell at startup by design, and the only way out on offer was the File System Access picker — which is the one thing Firefox does not have, so the screen said "this browser cannot open a folder at all" and meant it. Edge was unaffected because it had answered the setup screen with a picked folder instead. The fix is a second question to the shell rather than a change to the startup order: [§10.2 The sync folder, on the settings screen](#102-the-sync-folder-on-the-settings-screen) |
 
 ## 16. Explicitly out of scope
 
