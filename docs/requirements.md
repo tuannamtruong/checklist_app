@@ -184,15 +184,24 @@ something.
 | K-5 | Any row can be converted to any kind after the fact ("Turn into") | ✅ | `turnInto` in `src/core/edit.ts`, in the row menu. Two devices converting one row differently resolve by `(at, device id)`, with a notice — [§9 Conflict presentation](#9-conflict-presentation) |
 | K-6 | A note can be promoted to a checklist from its own page | ✅ | `src/ui/NodePage.svelte`; the body is kept, so it is reversible |
 | K-7 | Note body saves are debounced (1 s) so typing is not one op per keystroke | ✅ | `src/ui/NoteBody.svelte`. The 1 s debounce governs the store; an **op** is emitted on blur, on navigating away, or after 60 s of continuous editing — S-20 |
-| K-8 | Every list ends in a line where typing a title and pressing Enter makes a **task**, and leaves the line ready for the next one | ✅ | `src/ui/QuickAdd.svelte`, over `createLastChild` with no kind — which is `task`, the default every other creation path already used. The other three kinds keep their buttons beside it |
+| K-8 | Every list page opens with a line where typing a title and pressing Enter makes a **task** at the end of the list, and leaves the line ready for the next one | ✅ | `src/ui/QuickAdd.svelte`, over `createLastChild` with no kind — which is `task`, the default every other creation path already used. `src/ui/NodePage.svelte` gives it the page header, centred and above the breadcrumbs; the other three kinds keep their buttons under the list |
 
 Notes are deliberately not checkable. `done` is still a field on every node, because K-5 keeps it across a "Turn into"
 so that turning back restores the tick — which is also why T-11's filter reads `done` rather than `kind === 'task'`.
 
 **The quick-add line makes a task and nothing else, and that is the whole of K-8.** A checklist is mostly tasks, so the
 one path that costs no decision has to produce the kind the person was already going to pick — `createLastChild` with no
-kind, which has meant `task` since M1. The other three kinds keep their buttons beside the line, one click away, because
+kind, which has meant `task` since M1. The other three kinds keep their buttons under the list, one click away, because
 picking a kind is a decision worth a button rather than a mode.
+
+**The line sits in the page header rather than at the end of the list.** Where it goes and where the row lands are two
+questions, and only the second one is the merge's: the row is still appended, so `createLastChild` and every test over
+it are unchanged. What moved is the reach. At the end of a list the line is wherever the last row happens to leave it,
+so a list long enough to scroll puts the one control the app is mostly used for below the fold, and every row added
+pushes it further down. A header is at a fixed place on every list page, which is what makes typing the next task a
+reflex rather than a scroll. It is centred and narrow because it is one short input and a full-width one reads as a
+search bar. The header belongs to the node page alone — Search, Done and Settings have no list to add to, so they have
+no line.
 
 Its `Enter` is not a row action and is not in the row menu, for the same reason `/` is not —
 [§3.1 Keyboard (desktop)](#31-keyboard-desktop). It acts on the list rather than on the row under the caret, and there

@@ -10,6 +10,7 @@
   import Breadcrumbs from './Breadcrumbs.svelte';
   import NoteBody from './NoteBody.svelte';
   import PriorityFlag from './PriorityFlag.svelte';
+  import QuickAdd from './QuickAdd.svelte';
   import TagEditor from './TagEditor.svelte';
   import TagFilter from './TagFilter.svelte';
   import TreeView from './TreeView.svelte';
@@ -33,6 +34,17 @@
     if (!editingTitle) titleDraft = title;
   });
 </script>
+
+<!-- K-8. The line is the page's header rather than the list's last row: at a
+     fixed place on every list page it is the reflex the app is mostly used for,
+     where the end of a long list is below the fold and moves down with every row
+     added — requirements.md §4. Centred and narrow, because a full-width input
+     across a header reads as a search bar. -->
+<header class="border-b border-line px-4 py-3" data-testid="page-header">
+  <div class="mx-auto flex max-w-sm">
+    <QuickAdd {session} {view} {parent} />
+  </div>
+</header>
 
 <div class="mx-auto flex max-w-3xl flex-col gap-4 px-4 py-6">
   {#if node && id}

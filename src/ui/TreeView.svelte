@@ -13,7 +13,6 @@
   import type { ViewState } from '../app/view-state.svelte';
   import type { RowFocus } from './focus.svelte';
   import { DONE_HREF } from '../app/router.svelte';
-  import QuickAdd from './QuickAdd.svelte';
   import Row from './Row.svelte';
   import { RowDrag } from './drag.svelte';
   import { visibleRows } from './rows';
@@ -75,7 +74,7 @@
       class="text-accent hover:underline"
       data-testid="filtered-empty-clear"
       onclick={() => view.clearTagFilter()}
-    >
+  >
       Clear the filter
     </button>
   </p>
@@ -92,35 +91,33 @@
   </p>
 {/if}
 
-<!-- K-8. The line first and on its own row, the other three kinds under it: a
-     checklist is mostly tasks, so the path that costs no decision makes one, and
-     on a phone it is the full width it needs to be typed into. -->
-<div class="mt-2 flex flex-col gap-2 px-2">
-  <QuickAdd {session} {view} {parent} />
-  <div class="flex flex-wrap gap-2">
-    <button
-      type="button"
-      class="rounded-md border border-line px-2.5 py-1.5 text-sm text-ink-muted hover:border-accent hover:text-accent"
-      data-testid="add-list"
-      onclick={() => add('list')}
-    >
-      + List
-    </button>
-    <button
-      type="button"
-      class="rounded-md border border-line px-2.5 py-1.5 text-sm text-ink-muted hover:border-accent hover:text-accent"
-      data-testid="add-note"
-      onclick={() => add('note')}
-    >
-      + Note
-    </button>
-    <button
-      type="button"
-      class="rounded-md border border-line px-2.5 py-1.5 text-sm text-ink-muted hover:border-accent hover:text-accent"
-      data-testid="add-folder"
-      onclick={() => add('folder')}
-    >
-      + Folder
-    </button>
-  </div>
+<!-- The three kinds that are not a task. K-8's line is not here: it is in the
+     page header, at a fixed place rather than wherever the last row leaves it —
+     requirements.md §4. These stay under the list, one click away, because
+     picking a kind is a decision worth a button rather than a mode. -->
+<div class="mt-2 flex flex-wrap gap-2 px-2">
+  <button
+    type="button"
+    class="rounded-md border border-line px-2.5 py-1.5 text-sm text-ink-muted hover:border-accent hover:text-accent"
+    data-testid="add-list"
+    onclick={() => add('list')}
+  >
+    + List
+  </button>
+  <button
+    type="button"
+    class="rounded-md border border-line px-2.5 py-1.5 text-sm text-ink-muted hover:border-accent hover:text-accent"
+    data-testid="add-note"
+    onclick={() => add('note')}
+  >
+    + Note
+  </button>
+  <button
+    type="button"
+    class="rounded-md border border-line px-2.5 py-1.5 text-sm text-ink-muted hover:border-accent hover:text-accent"
+    data-testid="add-folder"
+    onclick={() => add('folder')}
+  >
+    + Folder
+  </button>
 </div>
