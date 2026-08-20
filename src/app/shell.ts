@@ -14,7 +14,7 @@
 
 import { bridge } from '../adapters/android-folder';
 import { supported } from '../adapters/fsaa-folder';
-import { grantFolder, rememberMode, shellFolder, type FolderSource } from './folder-choice';
+import { grantFolder, type FolderSource } from './folder-choice';
 import type { Provider } from '../core/providers';
 
 /** The loopback helper's own prefix, beside `/folder` — packaging/windows/serve.py. */
@@ -31,19 +31,11 @@ export interface ShellActions {
    * startup — requirements.md §10.2.
    */
   changeFolder: (() => Promise<void>) | null;
-  /** What that button says, when the default "somewhere else" is not what it does. */
-  changeLabel: string | null;
-  /** What the user should know: who decides the folder, or what taking one costs. */
+  /** Who decides the folder instead, when this shell does not offer to. */
   changeNote: string | null;
 }
 
-const NONE: ShellActions = {
-  openFolder: null,
-  openApp: null,
-  changeFolder: null,
-  changeLabel: null,
-  changeNote: null,
-};
+const NONE: ShellActions = { openFolder: null, openApp: null, changeFolder: null, changeNote: null };
 
 /** The bridge's contract: an empty string, or a message the page shows. */
 function orThrow(failure: string | undefined): void {
@@ -73,38 +65,7 @@ async function pickAndReload(): Promise<void> {
   window.location.reload();
 }
 
-/**
- * X-18. Leave the browser-only fallback for the folder the launcher is holding.
- *
- * It records the move before reloading rather than merely performing it: the
- * `local-folder` log stays in this browser, and startup reads a browser holding
- * one as a stored choice of `local` — so without the key, the reload would put
- * the device straight back where it was.
- */
-async function adoptShellFolder(): Promise<void> {
-  // Asked again rather than trusted from the render: the settings screen may
-  // have been open since before the helper was given a folder, or since after
-  // it lost one.
-  if (!(await shellFolder())) {
-    throw new Error('this device is no longer serving a folder');
-  }
-  rememberMode('shell');
-  window.location.reload();
-}
-
-/**
- * X-18. What this shell is holding that the device is not using — the one
- * question here that a browser cannot answer synchronously, because it is a
- * `GET /folder/info` rather than a property of `globalThis`. Only the
- * browser-only fallback has anything to gain from the answer, so only it is
- * asked; every other source is already on the folder this would offer.
- */
-export async function offeredFolder(source: FolderSource): Promise<string | null> {
-  if (source !== 'local') return null;
-  return (await shellFolder())?.label ?? null;
-}
-
-export function shellActions(source: FolderSource, offered: string | null = null): ShellActions {
+export function shellActions(source: FolderSource): ShellActions {
   switch (source) {
     case 'android': {
       const android = bridge();
@@ -117,7 +78,6 @@ export function shellActions(source: FolderSource, offered: string | null = null
         // The system picker takes over from here and the page reloads once a
         // folder comes back, so this resolves without having changed anything.
         changeFolder: async () => android.pickFolder(),
-        changeLabel: null,
         changeNote: null,
       };
     }
@@ -126,7 +86,6 @@ export function shellActions(source: FolderSource, offered: string | null = null
         openFolder: () => askHelper({ what: 'folder' }),
         openApp: (provider) => askHelper({ what: 'app', command: provider.command }),
         changeFolder: null,
-        changeLabel: null,
         changeNote: 'the folder is the one this device was launched with — `--folder` on the launcher',
       };
     case 'fsaa':
@@ -134,25 +93,15 @@ export function shellActions(source: FolderSource, offered: string | null = null
       // show and no app to start. The picker is the one thing a browser has.
       return { ...NONE, changeFolder: pickAndReload };
     case 'local':
-      // The one source whose way out the browser does not own. Firefox has no
-      // picker and is not getting one, but the process that served this page
-      // may be holding a folder anyway — that is the whole reason the loopback
-      // helper exists, and a device that fell back to the browser before the
-      // helper had a folder has to be able to walk over to it. X-18.
-      if (offered) {
-        return {
-          ...NONE,
-          changeFolder: adoptShellFolder,
-          changeLabel: `Use ${offered}`,
-          changeNote: `This device is already serving ${offered}. Moving to it reads that folder from scratch — the rows written into this browser stay in this browser.`,
-        };
-      }
+      // No button can reach a folder the shell is not holding, and one it *is*
+      // holding was taken at startup rather than offered here — X-18. So this
+      // is the browser's own picker or nothing, and on Firefox it is nothing.
       return {
         ...NONE,
         changeFolder: supported() ? pickAndReload : null,
         changeNote: supported()
           ? null
-          : 'this browser cannot open a folder, and nothing on this device is offering one',
+          : 'this browser cannot open a folder, and nothing on this device is serving one',
       };
     case 'memory':
       return { ...NONE, changeNote: 'this is the in-memory folder the UI test runs against' };
