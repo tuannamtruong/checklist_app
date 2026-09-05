@@ -234,7 +234,7 @@ export function nextPriority(current: Priority): Priority {
   return cycle[(index + 1) % cycle.length]!;
 }
 
-/** K-5 "Turn into", and K-6's promotion of a note to a checklist. */
+/** K-5 "Turn into", from the row menu, which is the only caller there is. */
 export function turnInto(tree: ResolvedTree, ctx: EditContext, id: NodeId, kind: Kind): Op[] {
   const node = tree.nodes[id];
   if (!isWritable(node) || node.kind === kind) return [];
