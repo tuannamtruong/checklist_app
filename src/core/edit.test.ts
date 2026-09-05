@@ -9,6 +9,7 @@ import {
   addTag,
   createFirstChild,
   createLastChild,
+  createLastChildren,
   createSiblingBelow,
   dropOnto,
   indent,
@@ -27,7 +28,7 @@ import {
   toggleDone,
   turnInto,
 } from './edit';
-import { FakeContext, Session } from './test-support';
+import { FakeContext, Session, titlesOf } from './test-support';
 import { childrenOf, parentOf } from './tree';
 import { ROOT, type NodeId } from './types';
 
@@ -82,6 +83,45 @@ describe('creating rows', () => {
   it('defaults a new row to a task — K-1', () => {
     const [a] = threeRows();
     expect(session.tree.nodes[a]!.kind).toBe('task');
+  });
+});
+
+describe('several rows at once — K-9', () => {
+  it('appends one row per title, in the order they were given', () => {
+    const [a, b, c] = threeRows();
+    ctx.tick();
+    const ops = createLastChildren(session.tree, ctx, ROOT, ['Milk', 'Bread', 'Eggs']);
+    session.apply(ops);
+    expect(titlesOf(session.tree, childrenOf(session.tree, ROOT))).toEqual([
+      'a',
+      'b',
+      'c',
+      'Milk',
+      'Bread',
+      'Eggs',
+    ]);
+    expect([a, b, c].every((id) => session.tree.nodes[id]!.title !== '')).toBe(true);
+  });
+
+  it('mints a key per row against the row before it, not against the tree', () => {
+    ctx.tick();
+    const ops = createLastChildren(session.tree, ctx, ROOT, ['one', 'two', 'three']);
+    const keys = ops.filter((op) => op.op === 'create').map((op) => op.order);
+    expect(new Set(keys).size).toBe(3);
+    expect([...keys].sort()).toEqual(keys);
+  });
+
+  it('is every row a task, carrying the filter the list was under — K-1, A-6', () => {
+    ctx.tick();
+    const ops = createLastChildren(session.tree, ctx, ROOT, ['Milk', 'Bread'], { tags: ['Town'] });
+    session.apply(ops);
+    const rows = childrenOf(session.tree, ROOT).map((id) => session.tree.nodes[id]!);
+    expect(rows.map((row) => row.kind)).toEqual(['task', 'task']);
+    expect(rows.map((row) => row.tags)).toEqual([['town'], ['town']]);
+  });
+
+  it('writes nothing when there is nothing to write — S-10', () => {
+    expect(createLastChildren(session.tree, ctx, ROOT, [])).toEqual([]);
   });
 });
 

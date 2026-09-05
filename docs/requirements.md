@@ -185,6 +185,7 @@ something.
 | K-6 | A note can be promoted to a checklist from its own page | ✅ | `src/ui/NodePage.svelte`; the body is kept, so it is reversible |
 | K-7 | Note body saves are debounced (1 s) so typing is not one op per keystroke | ✅ | `src/ui/NoteBody.svelte`. The 1 s debounce governs the store; an **op** is emitted on blur, on navigating away, or after 60 s of continuous editing — S-20 |
 | K-8 | Every list page opens with a line where typing a title and pressing Enter makes a **task** at the end of the list, and leaves the line ready for the next one | ✅ | `src/ui/QuickAdd.svelte`, over `createLastChild` with no kind — which is `task`, the default every other creation path already used. `src/ui/NodePage.svelte` gives it the page header, centred and above the breadcrumbs; the other three kinds keep their buttons under the list |
+| K-9 | A paste into that line carrying line breaks makes one row per line, all at the end of the list | ✅ | `src/core/paste.ts` is the only place the split is spelled, `createLastChildren` in `src/core/edit.ts` mints the keys, and `src/ui/QuickAdd.svelte` is the one caller. `paste.test.ts`, `edit.test.ts`, `scripts/ui-smoke.mjs` |
 
 Notes are deliberately not checkable. `done` is still a field on every node, because K-5 keeps it across a "Turn into"
 so that turning back restores the tick — which is also why T-11's filter reads `done` rather than `kind === 'task'`.
@@ -202,6 +203,24 @@ pushes it further down. A header is at a fixed place on every list page, which i
 reflex rather than a scroll. It is centred and narrow because it is one short input and a full-width one reads as a
 search bar. The header belongs to the node page alone — Search, Done and Settings have no list to add to, so they have
 no line.
+
+**A pasted paragraph is a list somebody has already written — K-9.** Typing `Enter` after each of fifteen lines is work
+the line breaks already did, so a paste carrying one is fifteen rows at the end of the list rather than one row holding
+fifteen lines. Every one is an ordinary `create`, minted at the end of the list in the pasted order, so the paste merges
+exactly as fifteen separate additions would and nothing new reaches the payload.
+
+Three rules make it predictable, and each of them is about not surprising the person who pressed the key:
+
+- **A paste with no line break in it is an ordinary paste** and writes nothing. The line is still a line, and what is in
+  it is committed by `Enter` or by leaving, exactly as K-8 says.
+- **What was already typed is part of the paste.** The text is split at the caret and the pasted block goes between the
+  halves, because that is where the browser would have put it: a paste after `Buy ` has to mean `Buy milk`.
+- **A blank line is not a row.** A paragraph copied out of a document is usually double-spaced, and a run of untitled
+  rows is not what the person copying it meant. Each line is trimmed for the same reason — the indent is the document's,
+  not the task's.
+
+`src/core/paste.ts` is where that split lives, beside `src/core/tags.ts` and for the same reason: it is a question about
+text rather than about the tree, so it is answered once, in the logic layer, and tested without a browser.
 
 Its `Enter` is not a row action and is not in the row menu, for the same reason `/` is not —
 [§3.1 Keyboard (desktop)](#31-keyboard-desktop). It acts on the list rather than on the row under the caret, and there

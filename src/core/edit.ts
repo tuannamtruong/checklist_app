@@ -105,6 +105,34 @@ export function createLastChild(
   return createAt(ctx, parent, keyAtEnd(siblingNodes(tree, parent)), options);
 }
 
+/**
+ * K-9. A pasted paragraph, as rows: one per title, in the order they were
+ * written, all at the end of the list.
+ *
+ * It is one call rather than one `createLastChild` per line because the tree
+ * this edit is given is the tree as it was before any of them: the second row's
+ * key has to be minted against the first row's, which is not in the tree yet.
+ * Each key is taken after the one before it, so the run lands in the pasted
+ * order however many rows it holds — and every row is still an ordinary
+ * `create`, so a paste merges exactly like fifteen separate ones would.
+ */
+export function createLastChildren(
+  tree: ResolvedTree,
+  ctx: EditContext,
+  parent: ParentId,
+  titles: readonly string[],
+  options: CreateOptions = {},
+): Op[] {
+  const siblings = siblingNodes(tree, parent);
+  const ops: Op[] = [];
+  let order: string | null = null;
+  for (const title of titles) {
+    order = order === null ? keyAtEnd(siblings) : keyBetween(order, null);
+    ops.push(...createAt(ctx, parent, order, { ...options, title }));
+  }
+  return ops;
+}
+
 function createAt(ctx: EditContext, parent: ParentId, order: string, options: CreateOptions): Op[] {
   const id = ctx.mintId();
   const kind = options.kind ?? 'task';
