@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   headingAt,
+  nextHeading,
   parseBody,
   plainText,
   setHeading,
@@ -102,8 +103,12 @@ describe('setHeading — B-4', () => {
     expect(headingAt(body, body.length)).toBe(0);
   });
 
+  it('cycles the levels, which is what one control means — B-4', () => {
+    expect([nextHeading(0), nextHeading(1), nextHeading(2)]).toEqual([1, 2, 0]);
+  });
+
   it('marks the line the caret is on and nothing else', () => {
-    expect(setHeading(body, 2, 1)).toEqual({
+    expect(setHeading(body, 2, 2, 1)).toEqual({
       text: '# Ferry\n## Packing\nSocks',
       start: 4,
       end: 4,
@@ -111,14 +116,22 @@ describe('setHeading — B-4', () => {
   });
 
   it('replaces a level rather than stacking one', () => {
-    expect(setHeading(body, 10, 1).text).toBe('Ferry\n# Packing\nSocks');
+    expect(setHeading(body, 10, 10, 1).text).toBe('Ferry\n# Packing\nSocks');
   });
 
   it('takes the mark off at level 0, and keeps the caret on the line', () => {
-    expect(setHeading(body, 6, 0)).toEqual({ text: 'Ferry\nPacking\nSocks', start: 6, end: 6 });
+    expect(setHeading(body, 6, 6, 0)).toEqual({ text: 'Ferry\nPacking\nSocks', start: 6, end: 6 });
   });
 
   it('marks the first line when the body starts with a newline', () => {
-    expect(setHeading('\nSocks', 0, 1).text).toBe('# \nSocks');
+    expect(setHeading('\nSocks', 0, 0, 1).text).toBe('# \nSocks');
+  });
+
+  it('marks every line a selection touches, and keeps them all selected — B-7', () => {
+    // "Ferry\nPacking" selected, which is two lines and neither of them whole.
+    const marked = setHeading('Ferry\nPacking\nSocks', 0, 13, 2);
+    expect(marked.text).toBe('## Ferry\n## Packing\nSocks');
+    // The same words are still selected, marks and all.
+    expect(marked.text.slice(marked.start, marked.end)).toBe('Ferry\n## Packing');
   });
 });

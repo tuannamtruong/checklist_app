@@ -326,7 +326,8 @@ over.
 | B-1 | A note body carries **bold** and two levels of heading, and no other formatting | ✅ | `src/core/markup.ts` — the one place a mark is spelled, beside `tags.ts` and `paste.ts`; `markup.test.ts` |
 | B-2 | The marks are Markdown's — `**bold**`, `# ` and `## ` — and they are stored in `body` itself | ✅ | Nothing changed in `Node`, the op, the merge, the conflict rows or compaction: `body` is a string before and after |
 | B-3 | The body is edited as text and read as rendered: the marks are visible while the caret is in it, the formatting when it is not | ✅ | `src/ui/NoteBody.svelte`. One textarea, never unmounted — transparent over the rendered blocks when the caret is elsewhere, so the click that reaches it is the click that focuses it |
-| B-4 | `Ctrl-B` wraps the selection, and on-screen controls do the same and set the two heading levels | ✅ | `toggleBold` and `setHeading` in `src/core/markup.ts`, driven by `src/ui/NoteBody.svelte`. A phone has no Ctrl key, which is [§3.1 Keyboard (desktop)](#31-keyboard-desktop)'s rule applied to a body rather than to a row |
+| B-4 | `Ctrl-B` wraps the selection, and two on-screen controls do the same: bold, and a heading that cycles heading, subheading, none | ✅ | `toggleBold`, `setHeading` and `nextHeading` in `src/core/markup.ts`, driven by `src/ui/NoteBody.svelte`. A phone has no Ctrl key, which is [§3.1 Keyboard (desktop)](#31-keyboard-desktop)'s rule applied to a body rather than to a row |
+| B-7 | Selecting a run of text raises those same two controls beside the selection | ✅ | `src/ui/NoteBody.svelte` over `document`'s `selectionchange`; `src/ui/text-rect.ts` measures where the run sits. A heading applies to every line the selection touches — `setHeading` takes a range, and a caret is a range of no width |
 | B-5 | Search matches the body without its marks, and shows the snippet without them | ✅ | `src/core/search.ts` over `plainText()` from `markup.ts` — F-1 is a substring match, and it must not break because `**` sits in the middle of a word; `search.test.ts` |
 | B-6 | The renderer emits structure, never HTML | ✅ | `parseBody` returns blocks and spans; the component renders them, so Svelte's own escaping is what reaches the DOM and a pasted `<script>` is text |
 
@@ -355,10 +356,29 @@ does not control. Editing plain text and rendering it when the caret leaves keep
 because it is a second presentation of a value the field beneath it already carries: assistive technology reads the
 textarea, which holds the text itself, and one value announced twice is one value too many.
 
-**A control writes marks and nothing else, which is what makes them undoable.** `Ctrl-B` and the three buttons produce
+**A control writes marks and nothing else, which is what makes them undoable.** `Ctrl-B` and the two buttons produce
 exactly the characters a person could have typed, so the field's own undo reverses them — there is no editing state to
-keep in step, and pressing the level a line already carries takes it off again. A button must not take the focus while
-it does that, or the blur would commit the body and move the caret out of the text the button is about to edit.
+keep in step. A button must not take the focus while it does that, or the blur would commit the body and move the caret
+out of the text the button is about to edit.
+
+**Two controls, not four: the heading cycles.** None, heading, subheading, and round again, with the button showing
+which one the line carries. That is the shape A-2's priority flag already has —
+[§4.1 Tags and priority](#41-tags-and-priority) — and the argument is the same one: a button per level teaches nothing
+that one button naming the level does not, and the levels are worth a control rather than a menu.
+
+**B-7 puts that pair where the words are.** Selected text is a question about those words, so the answer belongs beside
+them rather than at the top of the page — and it is the *same* two controls, because a second vocabulary for one edit is
+a second thing to learn. The row above the field stays, and is not redundant: it is the only reach when nothing is
+selected, which is the ordinary way to make the line the caret is on a heading, and it is what teaches that the marks
+exist at all.
+
+**Finding the selection is the whole cost of B-7.** A textarea has no range geometry — `Range` and `getClientRects` see
+one replaced element, not the lines inside it — so `src/ui/text-rect.ts` lays the text out a second time in a mirror
+wearing the field's own metrics and measures the run there. It is exact for a wrapped line, because the mirror wraps at
+the width the field does. The alternative was to pin the controls to the top of the field, which is not "beside the
+selection" in any body long enough to scroll. `selectionchange` on the document is what raises them, because a field
+fires no event of its own when a drag ends outside it, and it is the one signal a mouse, a keyboard and a long press on
+a phone all produce.
 
 ## 5. Navigation and routing
 

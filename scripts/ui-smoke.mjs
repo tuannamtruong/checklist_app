@@ -46,7 +46,23 @@ function check(name, ok, detail = '') {
   console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`);
 }
 
-const WRITE_SETTLE_MS = 600;
+/**
+ * Waits until this device's file in the folder carries `written`.
+ *
+ * A fixed pause is a race against the 250 ms write debounce of
+ * `src/app/device-log.ts`, and on a busy main thread the timer sometimes loses
+ * — which shows up as an edit that "did not survive a reload" when the reload
+ * simply outran the write. What the run means to say is that the op reached the
+ * folder, so it says that instead.
+ */
+async function landed(page, written) {
+  await page.waitForFunction(
+    (text) =>
+      (localStorage.getItem('checklist:folder:checklist.5eed0001.ops.jsonl') ?? '').includes(text),
+    written,
+    { timeout: 10_000 },
+  );
+}
 
 async function main() {
   await mkdir(shots, { recursive: true });
@@ -383,7 +399,7 @@ async function main() {
       (await archivedTitles(page, 'finished-row')).join('|') === 'Bread',
       (await archivedTitles(page, 'finished-row')).join('|'),
     );
-    await page.waitForTimeout(WRITE_SETTLE_MS);
+    await landed(page, '"done":false');
     await page.goto(BASE_URL);
     await page.waitForSelector('[data-testid="tree"]');
     check(
@@ -431,10 +447,35 @@ async function main() {
     await page.keyboard.type('\nTickets printed.');
     await page.keyboard.press('Home');
     for (let i = 0; i < 4; i++) await page.keyboard.press('Shift+ArrowRight');
-    await page.locator('[data-testid="mark-bold"]').click();
-    await page.locator('[data-testid="mark-heading1"]').click();
+
+    // --- B-7: the controls follow the selection ----------------------------
+    // The geometry is the claim: a textarea has no range geometry of its own,
+    // so this is the only thing that can say the mirror measurement in
+    // `text-rect.ts` landed on the selected line rather than at the origin.
+    const selectionControls = page.locator('[data-testid="selection-controls"]');
+    await selectionControls.waitFor({ state: 'visible', timeout: 5_000 });
+    const controlsBox = await selectionControls.boundingBox();
+    const fieldBox = await page.locator('[data-testid="note-body"]').boundingBox();
     check(
-      'a control writes the marks into the text itself — B-2, B-4',
+      'selecting text raises the two controls beside it — B-7',
+      controlsBox.y > fieldBox.y &&
+        controlsBox.y + controlsBox.height <= fieldBox.y + fieldBox.height &&
+        Math.abs(controlsBox.x - fieldBox.x) < 40,
+      `controls at ${Math.round(controlsBox.x)},${Math.round(controlsBox.y)} over a field at ${Math.round(fieldBox.x)},${Math.round(fieldBox.y)}`,
+    );
+    await page.screenshot({ path: join(shots, 'note-selection.png'), fullPage: true });
+
+    await page.locator('[data-testid="selection-bold"]').click();
+    check(
+      'the pair writes the marks and keeps the words selected — B-4, B-7',
+      (await page.locator('[data-testid="note-body"]').inputValue()).endsWith(
+        '**Tick**ets printed.',
+      ) && (await selectionControls.isVisible()),
+      (await page.locator('[data-testid="note-body"]').inputValue()).split('\n').at(-1),
+    );
+    await page.locator('[data-testid="selection-heading"]').click();
+    check(
+      'and the heading control marks the line the selection is on — B-4, B-7',
       (await page.locator('[data-testid="note-body"]').inputValue()).endsWith(
         '# **Tick**ets printed.',
       ),
@@ -456,11 +497,23 @@ async function main() {
       (await rendered.innerText()).replace(/\s+/g, ' '),
     );
 
-    // The same control, pressed on the level the line already carries, takes it
-    // off — one button, both directions, and the bold run survives it.
+    // One control, three states: the row's heading button cycles heading,
+    // subheading, none — A-2's flag is the precedent. The bold run survives it.
     await page.locator('[data-testid="note-body"]').click();
     await page.keyboard.press('Control+End');
-    await page.locator('[data-testid="mark-heading1"]').click();
+    check(
+      'and the controls go when the selection does — B-7',
+      (await selectionControls.count()) === 0,
+    );
+    const headingButton = page.locator('[data-testid="mark-heading"]');
+    await headingButton.click();
+    const cycled = await headingButton.getAttribute('data-level');
+    await headingButton.click();
+    check(
+      'the heading control cycles heading, subheading, none — B-4',
+      cycled === '2' && (await headingButton.getAttribute('data-level')) === '0',
+      `${cycled} then ${await headingButton.getAttribute('data-level')}`,
+    );
     await page.locator('[data-testid="page-title"]').click();
     await page.waitForSelector('[data-testid="note-rendered"]');
     check(
@@ -470,7 +523,7 @@ async function main() {
       (await rendered.innerText()).replace(/\s+/g, ' '),
     );
     await page.screenshot({ path: join(shots, 'note-formatted.png'), fullPage: true });
-    await page.waitForTimeout(WRITE_SETTLE_MS);
+    await landed(page, '**Tick**ets printed.');
 
     // --- a reload rebuilds it all from the folder — S-21 ------------------
     await page.reload();
@@ -507,7 +560,7 @@ async function main() {
       (await archivedTitles(page, 'deleted-row')).join('|') === 'Oat milk',
       (await archivedTitles(page, 'deleted-row')).join('|'),
     );
-    await page.waitForTimeout(WRITE_SETTLE_MS);
+    await landed(page, '"op":"restore"');
     await page.goto(BASE_URL);
     await page.waitForSelector('[data-testid="tree"]');
     check(
@@ -660,7 +713,7 @@ async function main() {
 
     // --- D-1: this device's name -------------------------------------------
     await page.locator('[data-testid="device-name"]').fill('the laptop');
-    await page.waitForTimeout(WRITE_SETTLE_MS);
+    await landed(page, '"name":"the laptop"');
     await page.screenshot({ path: join(shots, 'settings.png'), fullPage: true });
     await page.goto(`${BASE_URL}#/settings`);
     await page.waitForSelector('[data-testid="settings-page"]');
@@ -854,7 +907,7 @@ async function main() {
     await page.waitForSelector('[data-testid="tree"]', { state: 'attached' });
     // The receipt is a write of our own file, so it lands on the write debounce
     // rather than with the fold — sync-flow.md §2.4.
-    await page.waitForTimeout(WRITE_SETTLE_MS);
+    await landed(page, peer.device);
     check(
       'our own file records the receipt, so the next edit is not a phantom race',
       await page.evaluate(
@@ -896,7 +949,7 @@ async function main() {
     await page.locator('[data-testid="conflict-restore"]').first().click();
     await page.waitForSelector('[data-testid="conflicts-empty"]');
     check('taking the dropped value back settles it, as an ordinary edit — C-1', true);
-    await page.waitForTimeout(WRITE_SETTLE_MS);
+    await landed(page, '"title":"Coffee beans"');
     await page.goto(BASE_URL);
     await page.waitForSelector('[data-testid="tree"]');
     const settled = await titlesUnder(page, 'Shopping');

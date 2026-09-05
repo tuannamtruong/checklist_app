@@ -183,6 +183,13 @@ snippet comes back without it. What only the browser can show is B-3's two views
 with the caret in the field and the formatting is on screen without it, and the value that survives a reload is the one
 with the marks in it.
 
+B-7 is checked as geometry, which is unusual here and is the point: a textarea has no range geometry, so the controls
+are placed by laying the text out a second time in a mirror element
+([requirements.md §4.3 Bold and headings in a note body](requirements.md#43-bold-and-headings-in-a-note-body)), and the
+only thing that can say the measurement landed on the selected line rather than at the origin is a real browser
+measuring the rendered result. The run selects a word, asserts the controls sit inside the field's box and level with
+the line, uses them, and asserts they go when the selection does.
+
 K-9 is a browser check for a reason a unit test cannot get at: the split itself is `paste.test.ts`'s, but the event that
 carries a clipboard into an input only exists in a browser. The smoke run dispatches one over the quick-add line with
 something already typed in it, and asserts the three things the rule promises — a row per line, in the pasted order, the
@@ -236,7 +243,10 @@ stand-in; a provider's reaction to a file that got *smaller* is behaviour nothin
 
 - **No assertion on wall-clock time.** Every timestamp in a test comes from an injected `now`.
 - **No sleeps as synchronisation.** A sync cycle is invoked, not waited for. The 3 s poll belongs to the app, not to the
-  tests.
+  tests. The browser run cannot invoke the write path the way a unit test can, so it waits for the *file* instead of for
+  a clock: `landed()` in `scripts/ui-smoke.mjs` polls the folder until the op is in it, because a fixed pause is a race
+  against the 250 ms write debounce that a busy main thread sometimes wins — and it fails as "the edit did not survive a
+  reload", which is a sentence about the application that was not true.
 - **No remote network.** Nothing a test does leaves the machine. Loopback is the one exception, and only because it is
   the subject: [§3.4 Integration](#34-integration) starts the helper on `127.0.0.1:38531` and drives `http-folder`
   against it, which is the Firefox path.

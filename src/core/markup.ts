@@ -149,23 +149,54 @@ export function headingAt(text: string, caret: number): HeadingLevel {
 }
 
 /**
- * B-4. Sets the level of the line the caret is on, which is a prefix on one
+ * B-4. One control, three states, in the order it cycles — the same shape A-2's
+ * flag gives priority, and for the same reason: two buttons for two levels
+ * teach nothing that one button showing the level does not.
+ */
+export function nextHeading(level: HeadingLevel): HeadingLevel {
+  return level === 0 ? 1 : level === 1 ? 2 : 0;
+}
+
+/**
+ * B-4. Sets the level of every line the range touches, which is a prefix per
  * line rather than a mode: the mark is in the text, so the field's own undo
  * reverses it like any other typing.
+ *
+ * A caret is a range of no width, so one line is the ordinary case rather than
+ * a special one.
  */
-export function setHeading(text: string, caret: number, level: HeadingLevel): Edited {
-  const from = lineStart(text, caret);
-  const to = lineEnd(text, caret);
-  const line = text.slice(from, to);
-  const current = headingAt(text, caret);
-  const bare = current === 0 ? line : line.slice(current === 2 ? HEADING_2.length : HEADING_1.length);
-  const marked = level === 0 ? bare : (level === 2 ? HEADING_2 : HEADING_1) + bare;
-  const moved = marked.length - line.length;
+export function setHeading(
+  text: string,
+  start: number,
+  end: number,
+  level: HeadingLevel,
+): Edited {
+  const from = lineStart(text, start);
+  const to = lineEnd(text, end);
+  const lines = text.slice(from, to).split('\n');
+  const marked = lines.map((line) => mark(bare(line), level));
+  const next = marked.join('\n');
+  // The caret moves by what changed in front of it: the first line's own shift
+  // for where the range starts, every line's for where it ends.
+  const first = marked[0]!.length - lines[0]!.length;
+  const all = next.length - (to - from);
   return {
-    text: text.slice(0, from) + marked + text.slice(to),
-    start: Math.max(from, caret + moved),
-    end: Math.max(from, caret + moved),
+    text: text.slice(0, from) + next + text.slice(to),
+    start: Math.max(from, start + first),
+    end: Math.max(from, end + all),
   };
+}
+
+/** The line without whatever mark it carries now. */
+function bare(line: string): string {
+  if (line.startsWith(HEADING_2)) return line.slice(HEADING_2.length);
+  if (line.startsWith(HEADING_1)) return line.slice(HEADING_1.length);
+  return line;
+}
+
+function mark(line: string, level: HeadingLevel): string {
+  if (level === 0) return line;
+  return (level === 2 ? HEADING_2 : HEADING_1) + line;
 }
 
 function lineStart(text: string, caret: number): number {

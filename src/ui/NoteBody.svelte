@@ -13,15 +13,18 @@
   // click that focuses it. Swapping two elements would drop the focus on the
   // way through, and a rich field would hand the caret to the browser, which is
   // the one thing K-7 and X-10 need to keep — requirements.md §4.3.
-  import { tick } from 'svelte';
-  import { headingAt, parseBody, setHeading, toggleBold, type HeadingLevel } from '../core/markup';
+  import { onMount, tick } from 'svelte';
+  import { headingAt, nextHeading, parseBody, setHeading, toggleBold } from '../core/markup';
   import type { NodeId } from '../core/types';
   import type { Session } from '../app/Session.svelte';
+  import { textRect } from './text-rect';
 
   let { session, id }: { session: Session; id: NodeId } = $props();
 
   const STORE_DEBOUNCE_MS = 1_000;
   const EMIT_AFTER_MS = 60_000;
+  /** Between the top of the selected line and the controls above it. */
+  const GAP = 8;
 
   // Filled by the effect below, which is also what keeps it in step with a body
   // that changed from outside.
@@ -33,7 +36,13 @@
   let debounce: ReturnType<typeof setTimeout> | null = null;
   let longEdit: ReturnType<typeof setTimeout> | null = null;
 
+  // B-7. Where the selection is, and where on screen its first line begins.
+  let start = $state(0);
+  let end = $state(0);
+  let at = $state<{ top: number; left: number } | null>(null);
+
   const blocks = $derived(parseBody(draft));
+  const level = $derived(headingAt(draft, start));
 
   // A body changed from outside — a peer's edit, in M2 — shows while this device
   // is not the one typing.
@@ -41,6 +50,54 @@
     const body = session.tree.nodes[id]?.body ?? '';
     if (!typing) draft = body;
   });
+
+  /**
+   * B-7. A selection is not an input event, and the field fires nothing when
+   * the pointer drags a range out of it. `selectionchange` is the one signal
+   * that covers a mouse, a keyboard and a long press on a phone alike.
+   */
+  onMount(() => {
+    const onSelect = (): void => {
+      if (document.activeElement !== field) return;
+      readSelection();
+    };
+    document.addEventListener('selectionchange', onSelect);
+    window.addEventListener('scroll', place, true);
+    window.addEventListener('resize', place);
+    return () => {
+      document.removeEventListener('selectionchange', onSelect);
+      window.removeEventListener('scroll', place, true);
+      window.removeEventListener('resize', place);
+    };
+  });
+
+  function readSelection(): void {
+    if (!field) return;
+    start = field.selectionStart;
+    end = field.selectionEnd;
+    place();
+  }
+
+  /** The controls sit above the line the selection starts on, or below it at the top of the page. */
+  function place(): void {
+    if (!field || start === end) {
+      at = null;
+      return;
+    }
+    const rect = textRect(field, start);
+    if (rect === null) {
+      at = null;
+      return;
+    }
+    const box = field.getBoundingClientRect();
+    // A selection scrolled out of the field would otherwise put the controls
+    // over the page around it.
+    if (rect.top + rect.height < box.top || rect.top > box.bottom) {
+      at = null;
+      return;
+    }
+    at = { top: rect.top - GAP, left: rect.left };
+  }
 
   function stopTimers(): void {
     if (debounce !== null) clearTimeout(debounce);
@@ -66,6 +123,7 @@
     stopTimers();
     typing = false;
     editing = false;
+    at = null;
     session.stageBody(id, draft);
     session.commitBody(id);
   }
@@ -79,8 +137,18 @@
     draft = edit.text;
     onInput();
     await tick();
-    field?.focus();
-    field?.setSelectionRange(edit.start, edit.end);
+    // The caret is put back only if it is still here. A control keeps the focus
+    // it never took (`keepCaret`), so this is the ordinary path — but the row of
+    // controls is on screen whether the field has the caret or not, and an edit
+    // made from outside it has no blur coming to emit its op (S-20). It emits
+    // its own, or a reload would be the thing that lost it.
+    if (!field || document.activeElement !== field) {
+      session.stageBody(id, draft);
+      session.commitBody(id);
+      return;
+    }
+    field.setSelectionRange(edit.start, edit.end);
+    readSelection();
   }
 
   function bold(): void {
@@ -88,11 +156,10 @@
     void apply(toggleBold(draft, field.selectionStart, field.selectionEnd));
   }
 
-  /** Pressing the level a line already has takes it off — one control, both ways. */
-  function heading(level: HeadingLevel): void {
+  /** One control, three states — `nextHeading` is the cycle, A-2's flag the precedent. */
+  function heading(): void {
     if (!field) return;
-    const caret = field.selectionStart;
-    void apply(setHeading(draft, caret, headingAt(draft, caret) === level ? 0 : level));
+    void apply(setHeading(draft, field.selectionStart, field.selectionEnd, nextHeading(level)));
   }
 
   function onKeyDown(event: KeyboardEvent): void {
@@ -109,11 +176,14 @@
   function keepCaret(event: MouseEvent): void {
     event.preventDefault();
   }
+
+  const headingLabel = $derived(level === 0 ? 'H' : level === 1 ? 'H1' : 'H2');
 </script>
 
 <!-- B-4. The controls are always here rather than only while the caret is in
      the field: a phone has no Ctrl key, so this row is the only way to reach
-     them there — requirements.md §3.1 applied to a body rather than to a row. -->
+     them with nothing selected — requirements.md §3.1 applied to a body rather
+     than to a row. B-7's pair is the same two controls, at the selection. -->
 <div class="mb-2 flex gap-1" data-testid="note-controls">
   <button
     type="button"
@@ -129,24 +199,16 @@
   <button
     type="button"
     class="row-control rounded border border-line px-2 py-1 text-xs font-semibold text-ink-muted hover:border-accent hover:text-accent"
+    class:border-accent={level !== 0}
+    class:text-accent={level !== 0}
     aria-label="Heading"
-    title="Heading"
-    data-testid="mark-heading1"
+    title="Heading — none, heading, subheading"
+    data-testid="mark-heading"
+    data-level={level}
     onmousedown={keepCaret}
-    onclick={() => heading(1)}
+    onclick={heading}
   >
-    H1
-  </button>
-  <button
-    type="button"
-    class="row-control rounded border border-line px-2 py-1 text-xs font-semibold text-ink-muted hover:border-accent hover:text-accent"
-    aria-label="Subheading"
-    title="Subheading"
-    data-testid="mark-heading2"
-    onmousedown={keepCaret}
-    onclick={() => heading(2)}
-  >
-    H2
+    {headingLabel}
   </button>
 </div>
 
@@ -202,7 +264,46 @@
     data-testid="note-body"
     oninput={onInput}
     onkeydown={onKeyDown}
-    onfocus={() => (editing = true)}
+    onselect={readSelection}
+    onscroll={place}
+    onfocus={() => {
+      editing = true;
+      readSelection();
+    }}
     onblur={onBlur}
   ></textarea>
 </div>
+
+<!-- B-7. Selected text is a question about those words, so the answer is beside
+     them rather than at the top of the page — and it is the same two controls,
+     because a second vocabulary for one edit is a second thing to learn. -->
+{#if at}
+  <div
+    class="fixed z-20 flex -translate-y-full gap-1 rounded-md border border-line bg-surface-raised p-1 shadow-lg"
+    style="top: {at.top}px; left: {at.left}px"
+    data-testid="selection-controls"
+  >
+    <button
+      type="button"
+      class="row-control rounded px-2 py-1 text-xs font-bold text-ink hover:bg-surface-sunken hover:text-accent"
+      aria-label="Bold"
+      data-testid="selection-bold"
+      onmousedown={keepCaret}
+      onclick={bold}
+    >
+      B
+    </button>
+    <button
+      type="button"
+      class="row-control rounded px-2 py-1 text-xs font-semibold text-ink hover:bg-surface-sunken hover:text-accent"
+      class:text-accent={level !== 0}
+      aria-label="Heading"
+      data-testid="selection-heading"
+      data-level={level}
+      onmousedown={keepCaret}
+      onclick={heading}
+    >
+      {headingLabel}
+    </button>
+  </div>
+{/if}

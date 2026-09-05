@@ -162,6 +162,12 @@ mark: `parseBody` returns blocks and spans (never HTML — B-6), `plainText` is 
 (B-5), and `toggleBold`/`setHeading` are the two controls, which write marks a person could have typed and are
 therefore undone by the field's own undo.
 
+Two controls, never four: bold, and a heading that cycles none, heading, subheading — the shape A-2's priority flag
+already has. They sit in a row above the field, and **selecting a run of text raises the same pair beside the
+selection** (B-7). Placing that pair is the one hard part: a textarea has no range geometry, so `src/ui/text-rect.ts`
+lays the text out again in a mirror wearing the field's metrics and measures the run there, and `selectionchange` on
+the document is what raises the controls — a field fires nothing of its own when a drag ends outside it.
+
 `src/ui/NoteBody.svelte` holds one textarea that is never unmounted. When the caret is elsewhere it lies transparent
 over the rendered blocks, so the click that reaches it is the click that focuses it; swapping two elements would drop
 the focus on the way through, and a `contenteditable` would hand the caret to the browser — which K-7's debounce and
