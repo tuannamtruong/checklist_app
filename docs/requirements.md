@@ -20,6 +20,7 @@ Legend:
 | ◐ | partial |
 | ✗ | not built |
 | ✗ **Withdrawn** | built once and taken out again. The row stays, so the ID is never reused and the reason outlives the code |
+| ✗ **Proposed** | designed and written down, not built. The row names the file that will implement it, so the design is reviewable before any code exists |
 
 Sections marked _Not written yet._ are placeholders: the heading records that the topic is owed, and the content is
 still to be decided.
@@ -311,6 +312,49 @@ as ordinary rows because opening one is the whole point of showing it.
 **Nothing else in the application is filtered.** Search (F-4) already scans every row by name and the Done view (T-12)
 is a list of what has left the tree — a filter over either would be a second answer to a question the user asked
 somewhere else. The filter is the tree's, and the nav says so by showing what is active on the tree's own page.
+
+### 4.3 Bold and headings in a note body
+
+**Proposed, not built.** A note's body (K-3) is the one place in the application with more than a line of text in it,
+and it is the only place where "this line is a heading" and "this word matters" cannot be said — everything else here is
+a row, and a row has a kind, a flag and tags to say what it is. The design below is what
+[past_decision.md §12 Formatting in a note body](past_decision.md#12-formatting-in-a-note-body) chose and why.
+
+| ID | Requirement | State | Where it will live |
+| --- | --- | --- | --- |
+| B-1 | A note body carries **bold** and two levels of heading, and no other formatting | ✗ **Proposed** | `src/core/markup.ts`, new — the one place a mark is spelled, beside `tags.ts` and `paste.ts` |
+| B-2 | The marks are Markdown's — `**bold**`, `# ` and `## ` — and they are stored in `body` itself | ✗ **Proposed** | Nothing changes in `Node`, the op, the merge, the conflict rows or compaction: `body` is a string before and after |
+| B-3 | The body is edited as text and read as rendered: the marks are visible while the caret is in it, the formatting when it is not | ✗ **Proposed** | `src/ui/NoteBody.svelte` — the textarea it already is when focused, a rendered block when not |
+| B-4 | `Ctrl-B` wraps the selection, and on-screen controls do the same and set the two heading levels | ✗ **Proposed** | `src/ui/NoteBody.svelte`. A phone has no Ctrl key, which is [§3.1 Keyboard (desktop)](#31-keyboard-desktop)'s rule applied to a body rather than to a row |
+| B-5 | Search matches the body without its marks, and shows the snippet without them | ✗ **Proposed** | `src/core/search.ts` over `plainText()` from `markup.ts` — F-1 is a substring match, and it must not break because `**` sits in the middle of a phrase |
+| B-6 | The renderer emits structure, never HTML | ✗ **Proposed** | `markup.ts` returns blocks and spans; the component renders them, so Svelte's own escaping is what reaches the DOM and a pasted `<script>` is text |
+
+**The marks live in the body, and that is the whole design.** `body` stays a string, so every rule already written about
+it still holds without a word changed: one field, last-writer-wins, a conflict row when two devices raced (C-4), a whole
+body per op on blur or after 60 s (S-20), and a superseded one dropped by compaction (S-14). A build that predates B-1
+shows `**07:40**` — four characters of noise around a legible time, which is the entire argument for Markdown over an
+HTML body or a JSON document: the fallback is readable, on the phone that has not been updated and in the file itself.
+
+**Three marks, and the absence of the rest is the design too.** No italics, links, code, quotes or bullet lists. The
+application already has lists — that is the tree, T-1, and a bullet in a note body is a checklist that cannot be ticked,
+moved or found. A link between rows is what search and the sidebar are for. Every mark added is one more thing to
+escape, to render, to teach and to strip before matching, so the list grows only when a note actually wants one.
+
+**A heading needs the space: `# ` opens a heading, `#town` does not.** A leading hash with no space is how a person
+writes a tag (`src/core/tags.ts` drops it), and a body line beginning `#errand` has to stay the word it is.
+
+**A textarea, not a `contenteditable`.** The body's whole design is a draft in a plain field — K-7's 1 s store debounce,
+S-20's emission on blur, and X-10's rule that a peer's merged edit repaints without eating the caret. A rich field hands
+the DOM to the browser and the caret rules with it, and the merge would be arriving inside a document this application
+does not control. Editing plain text and rendering it when the caret leaves keeps one path through
+`Session.stageBody`/`commitBody`, and it is also what makes B-3 honest: what is stored is exactly what was typed.
+
+**The headings render under the page's own.** A note page is an `h1` (its title) and an `h2` (K-4's "Checklist"), so `#
+` and `## ` in a body render as `h3` and `h4`. The document outline stays true, which is what a screen reader walks.
+
+What it will owe the tests: a table of bodies through `markup.test.ts`, a `search.test.ts` case for a query that spans a
+mark, and one smoke check that the marks are visible with the caret in the body and the formatting is visible without it
+— [test.md §3.5 UI](test.md#35-ui).
 
 ## 5. Navigation and routing
 

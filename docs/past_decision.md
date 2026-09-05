@@ -15,6 +15,7 @@ History of project's decision. The situation, its options and resolution.
 | [Device naming](#8-device-naming) | Each device names itself, in its own file's header line | -  a shared `devices.json`<br>-  a `device` op in the log<br>-  names kept only in `localStorage` |
 | [Theming](#9-theming) | Swap the semantic tokens under `data-theme` on the document root | -  a stylesheet per theme, loaded at runtime<br>-  Tailwind's `dark:` variant on every component<br>-  `prefers-color-scheme` and no choice at all |
 | [Retiring the `list` kind](#11-retiring-the-list-kind) | Read `list` as `folder` at the decoder, and leave every file alone | -  keeping the kind<br>-  a migration pass that rewrites the log<br>-  a log version bump |
+| [Formatting in a note body](#12-formatting-in-a-note-body) — **proposed, not built** | A Markdown subset stored in the body string | -  a rich editor over `contenteditable`, storing HTML<br>-  a JSON document model in a new field<br>-  a `heading` kind of row<br>-  no formatting at all |
 
 ---
 
@@ -305,3 +306,36 @@ build has `folder` among its four kinds and reads what we write without knowing 
 A kind that is genuinely a fourth answer rather than a second icon. The test is the one `list` failed: name the question
 the kind answers that `folder`, `note` and `task` do not. A kind that renders differently is not one — that is what a
 view is for.
+
+## 12. Formatting in a note body
+
+**Proposed rather than taken** —
+[requirements.md §4.3 Bold and headings in a note body](requirements.md#43-bold-and-headings-in-a-note-body) is B-1 to
+B-6, written and not built. A note body (K-3) is the only long text in the application, and it has no way to say that a
+line is a heading or that a word matters. The question is what the body *is* once it can.
+
+### 12.1 The options
+
+| # | Option | What it costs |
+| --- | --- | --- |
+| A | **A Markdown subset inside the body string** — `**bold**`, `# `, `## `, and nothing else | The marks are visible to anything that has not been taught them: an older build, the file in the folder, a search snippet until B-5 strips them. In exchange, `body` is still a string, so no field, no op, no merge rule, no conflict row and no compaction rule changes at all |
+| B | A rich editor over `contenteditable`, storing HTML | The body stops being text. An older build renders the tags as noise rather than as a note, search has to strip them anyway, and the caret belongs to the browser — which is the one thing X-10 and K-7 need to own, because a peer's edit merges into the field while it is being typed in |
+| C | A document model: blocks and spans as JSON, in a new field | A second document format living inside a node, with an encoder, a renderer and a migration — and the field is still last-writer-wins, so it buys structure and pays for it twice. [§4 Sync data model](#4-sync-data-model) refused exactly this shape for the tree |
+| D | Headings as rows: a `heading` kind | It answers half the question — a heading, never bold — and it puts a formatting decision into the tree, where it becomes a row the caret order ([requirements.md §3.1 Keyboard (desktop)](requirements.md#31-keyboard-desktop)), the drag (T-14), the Done view (T-12) and every edit have to special-case. [§11 Retiring the `list` kind](#11-retiring-the-list-kind) removed a kind for being an icon; this would add one for being a font size |
+| E | Nothing: the body stays plain text | Free, and it is what the application does today. It is the option to keep if the marks turn out to be typed once and never again |
+
+**A is proposed.** The reason is not that Markdown is popular; it is that A is the only option under which the sync
+design learns nothing new. The body is one field with one merge rule, and A leaves it a string — so the whole of
+[sync-flow.md §4 Sync data model](sync-flow.md#4-sync-data-model) applies to a formatted body exactly as it applies to
+an unformatted one, and the feature is a parser and a component. B and C both make the body a document, and a document
+in a field that is overwritten whole by the later writer is a document that can be lost whole; that is tolerable for
+text a person can retype and unpleasant for structure they cannot see.
+
+The fallback is the tiebreak between A and the rest. A device that has not been updated shows `**07:40**`, which is a
+time with four characters around it. Under B it shows a paragraph of tags, and under C it shows JSON.
+
+### 12.2 What reopens it
+
+A body that wants a list, a link or code — which is a note-taking application rather than a checklist with notes
+attached. The thing to reach for then is a real editor and the cost is the caret model, so the measurement that would
+justify it is bodies long enough that the person is writing *in* the app rather than *about* the rows.
