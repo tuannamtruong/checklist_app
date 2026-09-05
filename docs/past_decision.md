@@ -15,7 +15,7 @@ History of project's decision. The situation, its options and resolution.
 | [Device naming](#8-device-naming) | Each device names itself, in its own file's header line | -  a shared `devices.json`<br>-  a `device` op in the log<br>-  names kept only in `localStorage` |
 | [Theming](#9-theming) | Swap the semantic tokens under `data-theme` on the document root | -  a stylesheet per theme, loaded at runtime<br>-  Tailwind's `dark:` variant on every component<br>-  `prefers-color-scheme` and no choice at all |
 | [Retiring the `list` kind](#11-retiring-the-list-kind) | Read `list` as `folder` at the decoder, and leave every file alone | -  keeping the kind<br>-  a migration pass that rewrites the log<br>-  a log version bump |
-| [Formatting in a note body](#12-formatting-in-a-note-body) — **proposed, not built** | A Markdown subset stored in the body string | -  a rich editor over `contenteditable`, storing HTML<br>-  a JSON document model in a new field<br>-  a `heading` kind of row<br>-  no formatting at all |
+| [Formatting in a note body](#12-formatting-in-a-note-body) | A Markdown subset stored in the body string | -  a rich editor over `contenteditable`, storing HTML<br>-  a JSON document model in a new field<br>-  a `heading` kind of row<br>-  no formatting at all |
 
 ---
 
@@ -324,8 +324,8 @@ line is a heading or that a word matters. The question is what the body *is* onc
 | D | Headings as rows: a `heading` kind | It answers half the question — a heading, never bold — and it puts a formatting decision into the tree, where it becomes a row the caret order ([requirements.md §3.1 Keyboard (desktop)](requirements.md#31-keyboard-desktop)), the drag (T-14), the Done view (T-12) and every edit have to special-case. [§11 Retiring the `list` kind](#11-retiring-the-list-kind) removed a kind for being an icon; this would add one for being a font size |
 | E | Nothing: the body stays plain text | Free, and it is what the application does today. It is the option to keep if the marks turn out to be typed once and never again |
 
-**A is proposed.** The reason is not that Markdown is popular; it is that A is the only option under which the sync
-design learns nothing new. The body is one field with one merge rule, and A leaves it a string — so the whole of
+**A was taken.** The reason is not that Markdown is popular; it is that A is the only option under which the sync design
+learns nothing new. The body is one field with one merge rule, and A leaves it a string — so the whole of
 [sync-flow.md §4 Sync data model](sync-flow.md#4-sync-data-model) applies to a formatted body exactly as it applies to
 an unformatted one, and the feature is a parser and a component. B and C both make the body a document, and a document
 in a field that is overwritten whole by the later writer is a document that can be lost whole; that is tolerable for

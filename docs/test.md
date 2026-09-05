@@ -176,6 +176,13 @@ asserts the row arrives as a folder rather than as a line that will not parse. T
 `op-log.test.ts`'s; what only the browser run shows is that it holds along the path a peer's file actually takes —
 decode, merge, re-fold, render — which is where losing a row on upgrade would actually happen.
 
+M7's body formatting is checked at both layers, and the split is the useful part. `markup.test.ts` is a table of bodies
+through the parser and the two controls — what a mark means, what an unmatched one means, where the caret lands — and
+`search.test.ts` asserts the one thing B-5 exists for: a term that reaches across a mark still finds the note, and the
+snippet comes back without it. What only the browser can show is B-3's two views of one value: the marks are on screen
+with the caret in the field and the formatting is on screen without it, and the value that survives a reload is the one
+with the marks in it.
+
 K-9 is a browser check for a reason a unit test cannot get at: the split itself is `paste.test.ts`'s, but the event that
 carries a clipboard into an input only exists in a browser. The smoke run dispatches one over the quick-add line with
 something already typed in it, and asserts the three things the rule promises — a row per line, in the pasted order, the

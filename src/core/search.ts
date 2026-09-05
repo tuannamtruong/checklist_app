@@ -7,6 +7,7 @@
 // thing that let sync-flow.md §4.6 defer compaction for years — one person's
 // checklist is thousands of nodes, not millions.
 
+import { plainText } from './markup';
 import { compareSiblings } from './order';
 import { ancestorsOf, type ResolvedTree } from './tree';
 import type { NodeId } from './types';
@@ -69,7 +70,11 @@ export function searchTree(tree: ResolvedTree, query: string): SearchHit[] {
   for (const id of Object.keys(tree.nodes)) {
     const node = tree.nodes[id]!;
     const title = node.title.toLowerCase();
-    const body = (node.body ?? '').toLowerCase();
+    // B-5. The marks are not words: a body reads "Leaves at **07:40**" and a
+    // person searching for "at 07:40" is searching for what they can see —
+    // requirements.md §4.3. It is the identity on a body carrying no marks.
+    const shown = plainText(node.body ?? '');
+    const body = shown.toLowerCase();
     if (!terms.every((term) => title.includes(term) || body.includes(term))) continue;
 
     const inTitle = terms.find((term) => title.includes(term));
@@ -79,7 +84,7 @@ export function searchTree(tree: ResolvedTree, query: string): SearchHit[] {
       id,
       path: ancestorsOf(tree, id),
       field,
-      snippet: field === 'body' && bodyTerm ? snippetOf(node.body ?? '', bodyTerm) : '',
+      snippet: field === 'body' && bodyTerm ? snippetOf(shown, bodyTerm) : '',
       done: node.done,
       deleted: tree.deleted.has(id),
     });

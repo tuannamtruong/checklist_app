@@ -410,18 +410,77 @@ async function main() {
       (await page.locator('[data-testid="promote-to-list"]').count()) === 0,
     );
     await page.screenshot({ path: join(shots, 'note.png'), fullPage: true });
+    // --- B-1 to B-6: bold and headings in the body -------------------------
+    // The claim B-3 makes is about two views of one value, so it is checked as
+    // two views: the marks are visible with the caret in the field, and the
+    // formatting is visible without it.
+    check(
+      'a body is read as rendered, with the field over it — B-3',
+      (await page.locator('[data-testid="note-rendered"]').isVisible()) &&
+        (await page.locator('[data-testid="note-body"]').evaluate((el) =>
+          Number(getComputedStyle(el).opacity),
+        )) === 0,
+    );
     await page.locator('[data-testid="note-body"]').click();
-    await page.keyboard.press('End');
+    check(
+      'and as text the moment the caret is in it',
+      (await page.locator('[data-testid="note-rendered"]').count()) === 0,
+    );
+
+    await page.keyboard.press('Control+End');
     await page.keyboard.type('\nTickets printed.');
+    await page.keyboard.press('Home');
+    for (let i = 0; i < 4; i++) await page.keyboard.press('Shift+ArrowRight');
+    await page.locator('[data-testid="mark-bold"]').click();
+    await page.locator('[data-testid="mark-heading1"]').click();
+    check(
+      'a control writes the marks into the text itself — B-2, B-4',
+      (await page.locator('[data-testid="note-body"]').inputValue()).endsWith(
+        '# **Tick**ets printed.',
+      ),
+      (await page.locator('[data-testid="note-body"]').inputValue()).split('\n').at(-1),
+    );
+
     await page.locator('[data-testid="page-title"]').click();
+    await page.waitForSelector('[data-testid="note-rendered"]');
+    const rendered = page.locator('[data-testid="note-rendered"]');
+    check(
+      'and the marks are a heading and a bold run when the caret leaves — B-1, B-3',
+      (await rendered.locator('h3').innerText()).trim() === 'Tickets printed.' &&
+        (await rendered.locator('h3 strong').innerText()).trim() === 'Tick',
+      (await rendered.locator('h3').innerText()).trim(),
+    );
+    check(
+      'and no mark is left on screen',
+      !(await rendered.innerText()).includes('**') && !(await rendered.innerText()).includes('# '),
+      (await rendered.innerText()).replace(/\s+/g, ' '),
+    );
+
+    // The same control, pressed on the level the line already carries, takes it
+    // off — one button, both directions, and the bold run survives it.
+    await page.locator('[data-testid="note-body"]').click();
+    await page.keyboard.press('Control+End');
+    await page.locator('[data-testid="mark-heading1"]').click();
+    await page.locator('[data-testid="page-title"]').click();
+    await page.waitForSelector('[data-testid="note-rendered"]');
+    check(
+      'pressing a heading level the line already has takes it off — B-4',
+      (await rendered.locator('h3').count()) === 0 &&
+        (await rendered.locator('p strong').last().innerText()).trim() === 'Tick',
+      (await rendered.innerText()).replace(/\s+/g, ' '),
+    );
+    await page.screenshot({ path: join(shots, 'note-formatted.png'), fullPage: true });
     await page.waitForTimeout(WRITE_SETTLE_MS);
 
     // --- a reload rebuilds it all from the folder — S-21 ------------------
     await page.reload();
     await page.waitForSelector('[data-testid="note-body"]');
     check(
-      'the note body survived a reload',
-      (await page.locator('[data-testid="note-body"]').inputValue()).includes('Tickets printed.'),
+      'the note body survived a reload, marks and all — B-2',
+      (await page.locator('[data-testid="note-body"]').inputValue()).endsWith(
+        '\n**Tick**ets printed.',
+      ),
+      (await page.locator('[data-testid="note-body"]').inputValue()).split('\n').at(-1),
     );
     await page.goto(BASE_URL);
     await page.waitForSelector('[data-testid="tree"]');
@@ -481,6 +540,20 @@ async function main() {
         (await page.locator('[data-testid="hit-done"]').count()) === 1,
       (await searchHitTitles(page)).join('|'),
     );
+    // B-5. The body holds `**Tick**ets`, so a term that spans the mark is one
+    // only the stripped text can answer — requirements.md §4.3.
+    await page.locator('[data-testid="search-input"]').fill('tickets');
+    check(
+      'a term reaching across a mark still finds the note — B-5',
+      (await searchHitTitles(page)).includes('Trip notes'),
+      (await searchHitTitles(page)).join('|'),
+    );
+    check(
+      'and the snippet shows the text without its marks',
+      !(await page.locator('[data-testid="hit-snippet"]').first().innerText()).includes('**'),
+      await page.locator('[data-testid="hit-snippet"]').first().innerText(),
+    );
+    await page.locator('[data-testid="search-input"]').fill('bread');
     check(
       'every hit carries the path it sits on — F-2',
       (await page.locator('[data-testid="hit-path"]').first().innerText()).trim() === 'Shopping',

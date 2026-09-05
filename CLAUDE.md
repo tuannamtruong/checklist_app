@@ -5,11 +5,12 @@
 A checklist and notes app for one person across several devices. Local-first, no application server: devices synchronise
 through a folder that a cloud provider's own client keeps in sync.
 
-**Status: milestones M1 to M6 are built** — the local-first core, sync through the folder, then compaction, search,
+**Status: milestones M1 to M7 are built** — the local-first core, sync through the folder, then compaction, search,
 device names, undelete and the two platform bundles, then the settings screen and its six themes, then M5: the sync
 folder section, drag and drop, tags and priority with a filter, and the quick-add line. M6 mostly removed: three kinds
 rather than four (`list` is gone), one control for a kind change rather than two, a sidebar one level deep — and one
-addition, a pasted paragraph becoming one row per line. The production tree is `src/`, driven by `package.json`.
+addition, a pasted paragraph becoming one row per line. M7 is bold and headings in a note body, as marks inside the body
+string. The production tree is `src/`, driven by `package.json`.
 
 ## Development
 
@@ -151,6 +152,20 @@ turn last-writer-wins into last-arriving-wins and every device would converge so
 Two edits do not follow the straight path, and both are deliberate: a title is a draft in its input until it is
 committed, and a note body updates the store on a 1 s debounce but only becomes an op on blur, on navigation, or after
 60 s (K-7, S-20).
+
+### The note body
+
+`body` is a string and stays one (B-2). Bold and two heading levels are Markdown marks *inside* it — `**bold**`, `# `,
+`## ` — so the merge, the conflict rows and compaction never learned that a body can be formatted, and a build that
+predates M7 shows the marks as characters rather than as noise. `src/core/markup.ts` is the only module that spells a
+mark: `parseBody` returns blocks and spans (never HTML — B-6), `plainText` is what search matches and snippets show
+(B-5), and `toggleBold`/`setHeading` are the two controls, which write marks a person could have typed and are
+therefore undone by the field's own undo.
+
+`src/ui/NoteBody.svelte` holds one textarea that is never unmounted. When the caret is elsewhere it lies transparent
+over the rendered blocks, so the click that reaches it is the click that focuses it; swapping two elements would drop
+the focus on the way through, and a `contenteditable` would hand the caret to the browser — which K-7's debounce and
+X-10's repaint-without-eating-the-caret both need to keep.
 
 ### Kinds
 

@@ -57,6 +57,17 @@ describe('searchTree — F-1', () => {
     expect(hits[0]!.snippet).toContain('corner shop');
   });
 
+  it('matches across a mark, and shows the snippet without it — B-5', () => {
+    const { session, ctx, ids } = build();
+    session.apply(
+      setBody(session.tree, ctx.tick(), ids.recipe!, '# Recipe\nWarm the **milk** from the corner shop.'),
+    );
+    const hits = searchTree(session.tree, 'the milk from');
+    expect(hits.map((hit) => hit.id)).toEqual([ids.recipe]);
+    expect(hits[0]!.snippet).toContain('the milk from');
+    expect(hits[0]!.snippet).not.toContain('**');
+  });
+
   it('requires every term, and lets each match a different field', () => {
     const { session, ids } = build();
     // "milk" is in the recipe's body, "recipe" is its title — one row, two fields.

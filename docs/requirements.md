@@ -2,7 +2,7 @@
 
 Requirement docs and its current state.
 
-**Milestones M1 to M6 are built** — the production tree is `src/`, and every ✅ row below names the file that implements
+**Milestones M1 to M7 are built** — the production tree is `src/`, and every ✅ row below names the file that implements
 it.
 
 Two commands verify the ✅ rows:
@@ -315,19 +315,20 @@ somewhere else. The filter is the tree's, and the nav says so by showing what is
 
 ### 4.3 Bold and headings in a note body
 
-**Proposed, not built.** A note's body (K-3) is the one place in the application with more than a line of text in it,
-and it is the only place where "this line is a heading" and "this word matters" cannot be said — everything else here is
-a row, and a row has a kind, a flag and tags to say what it is. The design below is what
-[past_decision.md §12 Formatting in a note body](past_decision.md#12-formatting-in-a-note-body) chose and why.
+A note's body (K-3) is the one place in the application with more than a line of text in it, and it was the only place
+where "this line is a heading" and "this word matters" could not be said — everything else here is a row, and a row has
+a kind, a flag and tags to say what it is.
+[past_decision.md §12 Formatting in a note body](past_decision.md#12-formatting-in-a-note-body) is what this was chosen
+over.
 
-| ID | Requirement | State | Where it will live |
+| ID | Requirement | State | Where |
 | --- | --- | --- | --- |
-| B-1 | A note body carries **bold** and two levels of heading, and no other formatting | ✗ **Proposed** | `src/core/markup.ts`, new — the one place a mark is spelled, beside `tags.ts` and `paste.ts` |
-| B-2 | The marks are Markdown's — `**bold**`, `# ` and `## ` — and they are stored in `body` itself | ✗ **Proposed** | Nothing changes in `Node`, the op, the merge, the conflict rows or compaction: `body` is a string before and after |
-| B-3 | The body is edited as text and read as rendered: the marks are visible while the caret is in it, the formatting when it is not | ✗ **Proposed** | `src/ui/NoteBody.svelte` — the textarea it already is when focused, a rendered block when not |
-| B-4 | `Ctrl-B` wraps the selection, and on-screen controls do the same and set the two heading levels | ✗ **Proposed** | `src/ui/NoteBody.svelte`. A phone has no Ctrl key, which is [§3.1 Keyboard (desktop)](#31-keyboard-desktop)'s rule applied to a body rather than to a row |
-| B-5 | Search matches the body without its marks, and shows the snippet without them | ✗ **Proposed** | `src/core/search.ts` over `plainText()` from `markup.ts` — F-1 is a substring match, and it must not break because `**` sits in the middle of a phrase |
-| B-6 | The renderer emits structure, never HTML | ✗ **Proposed** | `markup.ts` returns blocks and spans; the component renders them, so Svelte's own escaping is what reaches the DOM and a pasted `<script>` is text |
+| B-1 | A note body carries **bold** and two levels of heading, and no other formatting | ✅ | `src/core/markup.ts` — the one place a mark is spelled, beside `tags.ts` and `paste.ts`; `markup.test.ts` |
+| B-2 | The marks are Markdown's — `**bold**`, `# ` and `## ` — and they are stored in `body` itself | ✅ | Nothing changed in `Node`, the op, the merge, the conflict rows or compaction: `body` is a string before and after |
+| B-3 | The body is edited as text and read as rendered: the marks are visible while the caret is in it, the formatting when it is not | ✅ | `src/ui/NoteBody.svelte`. One textarea, never unmounted — transparent over the rendered blocks when the caret is elsewhere, so the click that reaches it is the click that focuses it |
+| B-4 | `Ctrl-B` wraps the selection, and on-screen controls do the same and set the two heading levels | ✅ | `toggleBold` and `setHeading` in `src/core/markup.ts`, driven by `src/ui/NoteBody.svelte`. A phone has no Ctrl key, which is [§3.1 Keyboard (desktop)](#31-keyboard-desktop)'s rule applied to a body rather than to a row |
+| B-5 | Search matches the body without its marks, and shows the snippet without them | ✅ | `src/core/search.ts` over `plainText()` from `markup.ts` — F-1 is a substring match, and it must not break because `**` sits in the middle of a word; `search.test.ts` |
+| B-6 | The renderer emits structure, never HTML | ✅ | `parseBody` returns blocks and spans; the component renders them, so Svelte's own escaping is what reaches the DOM and a pasted `<script>` is text |
 
 **The marks live in the body, and that is the whole design.** `body` stays a string, so every rule already written about
 it still holds without a word changed: one field, last-writer-wins, a conflict row when two devices raced (C-4), a whole
@@ -350,11 +351,14 @@ does not control. Editing plain text and rendering it when the caret leaves keep
 `Session.stageBody`/`commitBody`, and it is also what makes B-3 honest: what is stored is exactly what was typed.
 
 **The headings render under the page's own.** A note page is an `h1` (its title) and an `h2` (K-4's "Checklist"), so `#
-` and `## ` in a body render as `h3` and `h4`. The document outline stays true, which is what a screen reader walks.
+` and `## ` in a body render as `h3` and `h4` and the document outline stays true. The rendered block is `aria-hidden`,
+because it is a second presentation of a value the field beneath it already carries: assistive technology reads the
+textarea, which holds the text itself, and one value announced twice is one value too many.
 
-What it will owe the tests: a table of bodies through `markup.test.ts`, a `search.test.ts` case for a query that spans a
-mark, and one smoke check that the marks are visible with the caret in the body and the formatting is visible without it
-— [test.md §3.5 UI](test.md#35-ui).
+**A control writes marks and nothing else, which is what makes them undoable.** `Ctrl-B` and the three buttons produce
+exactly the characters a person could have typed, so the field's own undo reverses them — there is no editing state to
+keep in step, and pressing the level a line already carries takes it off again. A button must not take the focus while
+it does that, or the blur would commit the body and move the caret out of the text the button is about to edit.
 
 ## 5. Navigation and routing
 
@@ -767,6 +771,8 @@ every possible destination is a second navigation to build and to test, and the 
 | M5 | Attributes, the drag and the folder screen | **Closed.** Four features that each turned out to be a caller of something already there: the drag (T-14) over the `move` op M1 wrote, tags and priority ([§4.1 Tags and priority](#41-tags-and-priority)) over the `set` op and the conflict list M2 built, the quick-add line (K-8) over `createLastChild`, and the sync folder section ([§10.2 The sync folder, on the settings screen](#102-the-sync-folder-on-the-settings-screen)) over the shell that already held the folder. It closed row 2 of [§15 Deviations and defects found during verification](#15-deviations-and-defects-found-during-verification) — T-5's refusal has a gesture that can provoke it at last |
 
 | M6 | Fewer things | **Closed.** A milestone that mostly removed: the fourth kind (K-1, `list` folded into `folder` at the decoder), the second control for a kind change ([K-6, withdrawn](#4-item-kinds-and-attributes)), and the sidebar's copy of the whole tree (T-10, one level now). The one thing it added is K-9, a pasted paragraph becoming one row per line, which is the quick-add line answering a question it already had the machinery for. Nothing here changed the payload, the merge or the folder |
+
+| M7 | Formatting in a note body | **Closed.** B-1 to B-6 — [§4.3 Bold and headings in a note body](#43-bold-and-headings-in-a-note-body) — bold and two heading levels, as Markdown marks inside the body string. The one milestone so far that adds a feature and changes nothing about the payload: `body` was a string before it and is a string after, so the merge, the conflict rows and compaction never learned that a body can be formatted |
 
 M2 is closed against a folder, not against a provider. The three adapters it added are the three methods every other
 adapter already offers, so what remains untested is the client underneath them, and observing that needs a Windows and
