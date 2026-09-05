@@ -14,6 +14,7 @@ History of project's decision. The situation, its options and resolution.
 | [Undelete](#7-undelete) | A `restore` op, making `deleted` an ordinary contested field | -  a `set` carrying `deleted: false`<br>-  copying the subtree to a new id<br>-  delete-always-wins precedence |
 | [Device naming](#8-device-naming) | Each device names itself, in its own file's header line | -  a shared `devices.json`<br>-  a `device` op in the log<br>-  names kept only in `localStorage` |
 | [Theming](#9-theming) | Swap the semantic tokens under `data-theme` on the document root | -  a stylesheet per theme, loaded at runtime<br>-  Tailwind's `dark:` variant on every component<br>-  `prefers-color-scheme` and no choice at all |
+| [Retiring the `list` kind](#11-retiring-the-list-kind) | Read `list` as `folder` at the decoder, and leave every file alone | -  keeping the kind<br>-  a migration pass that rewrites the log<br>-  a log version bump |
 
 ---
 
@@ -270,3 +271,37 @@ A measurement, like everything else here: two devices routinely tagging the same
 list fills with tag rows rather than with the races it was built for. One person with a phone and a laptop is not that
 workload. If it ever is, option B is the one to reach for, and the thing to reuse is the `orderBy` pattern — a member
 carrying the device that wrote it — rather than a new op.
+
+## 11. Retiring the `list` kind
+
+K-1 had four kinds and has three. `list` and `folder` were the same thing wearing two icons: both were containers, both
+could own any kind — T-1 and K-4 make that true of every kind — and neither was checkable. A choice with no consequence
+still has to be made, once per row, forever, so a tree ends up holding both for the same job.
+
+Removing a kind is not a UI change, because the kind is in the log. Every `create` op ever written carries one, and the
+files carrying `list` are in a folder this device may not rewrite —
+[§5 Reading a folder of logs](#5-reading-a-folder-of-logs) and S-3 both say so — and on peers that have not been updated
+yet.
+
+### 11.1 The options
+
+| # | Option | What it costs |
+| --- | --- | --- |
+| A | **Read `list` as `folder` at the decoder** — one line of vocabulary, nothing written | The file keeps saying `list` until the row is written again or compaction drops the op, so a `grep` of the folder shows a kind the code no longer has |
+| B | Keep the kind, and only take it out of the UI | The kind stays in the type, the icon, the menu and the conflict rows forever, and an old file can still create one. Nothing is simplified — the choice is merely hidden from new rows |
+| C | A migration pass that rewrites this device's log, turning every `list` into a `folder` | A second thing that rewrites a log, beside compaction, with the same "must never lower the top counter" rule to get right — [sync-flow.md §4.8 The compaction cut](sync-flow.md#48-the-compaction-cut). It fixes this device's file and no peer's, so A is still needed underneath it |
+| D | Bump `LOG_VERSION` and refuse the old files | Every device is a stranger until it is upgraded, and a folder mid-upgrade loses rows. This is the failure the format exists to prevent |
+
+**A was taken**, and C was not taken *as well* because it buys nothing A does not: the ops that carry `list` are already
+superseded by whatever the row was set to since, and compaction drops them on its own schedule. The decoder is where
+`cleanTags` already does the same job for A-1 — a value from an older build arrives in this build's vocabulary — so the
+rule has one home and one test.
+
+The direction matters and is not symmetric: `list` becomes `folder`, never the reverse, because a peer running the older
+build has `folder` among its four kinds and reads what we write without knowing anything happened.
+
+### 11.2 What reopens it
+
+A kind that is genuinely a fourth answer rather than a second icon. The test is the one `list` failed: name the question
+the kind answers that `folder`, `note` and `task` do not. A kind that renders differently is not one — that is what a
+view is for.

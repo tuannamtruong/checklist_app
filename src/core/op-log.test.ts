@@ -94,6 +94,19 @@ describe('decodeLog', () => {
     expect(decodeLog(text)?.skipped).toBe(1);
   });
 
+  it('reads the kind an older build wrote as the kind this one has — K-1', () => {
+    const text =
+      `${JSON.stringify(header)}\n` +
+      '{"op":"create","id":"n_9","parent":"root","kind":"list","order":"a1","c":1,"at":1}\n' +
+      '{"op":"set","id":"n_9","kind":"list","c":2,"at":2}\n';
+    const decoded = decodeLog(text);
+    expect(decoded?.skipped).toBe(0);
+    expect(decoded?.ops).toEqual([
+      { op: 'create', id: 'n_9', parent: ROOT, kind: 'folder', order: 'a1', c: 1, at: 1, dev: DEV },
+      { op: 'set', id: 'n_9', kind: 'folder', c: 2, at: 2, dev: DEV },
+    ]);
+  });
+
   it('reads a hand-written log with no trailing newline', () => {
     const text = `${JSON.stringify(header)}\n{"op":"delete","id":"n_1","c":9,"at":10}`;
     expect(decodeLog(text)?.ops).toEqual([{ op: 'delete', id: 'n_1', c: 9, at: 10, dev: DEV }]);

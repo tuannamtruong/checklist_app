@@ -1,5 +1,5 @@
 <script lang="ts">
-  // K-2: a task renders a real checkbox and the other three render an icon that
+  // K-2: a task renders a real checkbox and the other two render an icon that
   // says which one they are. Nothing else distinguishes them structurally — any
   // kind may own children.
   //
@@ -18,15 +18,6 @@
       stroke="currentColor"
       stroke-width="1.4"
       stroke-linejoin="round"
-    />
-  </svg>
-{:else if kind === 'list'}
-  <svg class={className} viewBox="0 0 20 20" fill="none" aria-hidden="true">
-    <path
-      d="M6.5 5.5h9M6.5 10h9M6.5 14.5h9M3.5 5.5h.01M3.5 10h.01M3.5 14.5h.01"
-      stroke="currentColor"
-      stroke-width="1.4"
-      stroke-linecap="round"
     />
   </svg>
 {:else if kind === 'note'}

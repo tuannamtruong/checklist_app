@@ -13,9 +13,9 @@ function title(id: string, text: string): Op {
   return { op: 'set', id, title: text, c: ++counter, at: 1_100, dev: 'aaaa0001' };
 }
 
-/** A list holding two tasks, which is enough tree for a move to mean something. */
+/** A folder holding two tasks, which is enough tree for a move to mean something. */
 const shop: Op[] = [
-  create('n_shop', ROOT, 'a1', 'list'),
+  create('n_shop', ROOT, 'a1', 'folder'),
   title('n_shop', 'Shopping'),
   create('n_milk', 'n_shop', 'a1'),
   title('n_milk', 'Milk'),
@@ -33,7 +33,7 @@ describe('logEntries — D-4', () => {
     expect(rows).toHaveLength(shop.length);
     expect(rows[0]!.id).toBe('n_bread');
     expect(rows[0]!.detail).toBe('title “Bread”');
-    expect(rows.at(-1)!.detail).toBe('new list in All lists');
+    expect(rows.at(-1)!.detail).toBe('new folder in All lists');
   });
 
   it('carries the counter and the clock of the op itself', () => {

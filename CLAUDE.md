@@ -5,10 +5,11 @@
 A checklist and notes app for one person across several devices. Local-first, no application server: devices synchronise
 through a folder that a cloud provider's own client keeps in sync.
 
-**Status: milestones M1 to M5 are built** — the local-first core, sync through the folder, then compaction, search,
-device names, undelete and the two platform bundles, then the settings screen and its six themes, and lastly M5: the
-sync folder section, drag and drop, tags and priority with a filter, and the quick-add line. The production tree is
-`src/`, driven by `package.json`.
+**Status: milestones M1 to M6 are built** — the local-first core, sync through the folder, then compaction, search,
+device names, undelete and the two platform bundles, then the settings screen and its six themes, then M5: the sync
+folder section, drag and drop, tags and priority with a filter, and the quick-add line. M6 mostly removed: three kinds
+rather than four (`list` is gone), one control for a kind change rather than two, a sidebar one level deep — and one
+addition, a pasted paragraph becoming one row per line. The production tree is `src/`, driven by `package.json`.
 
 ## Development
 
@@ -150,6 +151,18 @@ turn last-writer-wins into last-arriving-wins and every device would converge so
 Two edits do not follow the straight path, and both are deliberate: a title is a draft in its input until it is
 committed, and a note body updates the store on a 1 s debounce but only becomes an op on blur, on navigation, or after
 60 s (K-7, S-20).
+
+### Kinds
+
+Three, and `src/core/types.ts` is the whole list: `folder`, `note`, `task` (K-1). Kind drives rendering and never
+structure — any kind may own children — so the only real distinctions are that a task is checkable and a note has a
+body. `list` was a fourth until M6 and was a folder with a different icon; `src/core/op-log.ts` reads a `list` in an
+older file as a `folder`, which is the only migration there is and is the same read-time normalisation `tags.ts` does.
+Nothing rewrites a file to do it, and a peer on an older build reads `folder` without noticing anything happened —
+past_decision.md §11.
+
+`src/ui/SidebarLinks.svelte` renders the **top-level** folders and notes and does not recurse (T-10): the sidebar is the
+way back to the few places worth starting from, and the tree view is what draws the nesting.
 
 ### Attributes
 

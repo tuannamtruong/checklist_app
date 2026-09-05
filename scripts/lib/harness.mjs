@@ -120,12 +120,12 @@ export function seedLog(device = DEVICE) {
   };
 
   const rows = [
-    { id: 'n_seed0001', parent: 'root', kind: 'list', order: 'a1', title: 'Shopping' },
+    { id: 'n_seed0001', parent: 'root', kind: 'folder', order: 'a1', title: 'Shopping' },
     { id: 'n_seed0002', parent: 'n_seed0001', kind: 'task', order: 'a1', title: 'Milk' },
     { id: 'n_seed0003', parent: 'n_seed0001', kind: 'task', order: 'a2', title: 'Bread', done: true },
     { id: 'n_seed0004', parent: 'n_seed0001', kind: 'task', order: 'a3', title: 'Coffee beans' },
     { id: 'n_seed0005', parent: 'root', kind: 'folder', order: 'a2', title: 'House' },
-    { id: 'n_seed0006', parent: 'n_seed0005', kind: 'list', order: 'a1', title: 'Kitchen' },
+    { id: 'n_seed0006', parent: 'n_seed0005', kind: 'folder', order: 'a1', title: 'Kitchen' },
     { id: 'n_seed0007', parent: 'n_seed0006', kind: 'task', order: 'a1', title: 'Descale the kettle' },
     { id: 'n_seed0008', parent: 'root', kind: 'note', order: 'a3', title: 'Trip notes' },
     { id: 'n_seed0009', parent: 'n_seed0008', kind: 'task', order: 'a1', title: 'Book the ferry' },
@@ -170,8 +170,13 @@ export function peerLog(device = PEER) {
     { op: 'create', id: 'n_peer0001', parent: 'n_seed0001', kind: 'task', order: 'a5', c: 1, at },
     { op: 'set', id: 'n_peer0001', title: 'Tea', c: 2, at: at + 1_000 },
     { op: 'set', id: 'n_seed0004', title: 'Coffee', c: 3, at: at + 2_000 },
+    // K-1. A kind this build no longer has, written by a peer that still does.
+    // It has to arrive as a folder rather than as a line that will not parse,
+    // or upgrading one device would lose a row on every other — past_decision.md §11.
+    { op: 'create', id: 'n_peer0002', parent: 'root', kind: 'list', order: 'a9', c: 4, at: at + 3_000 },
+    { op: 'set', id: 'n_peer0002', title: 'Garage', c: 5, at: at + 4_000 },
   ].map((line) => JSON.stringify(line));
-  const header = JSON.stringify({ v: 1, dev: device, clock: { [device]: 3 } });
+  const header = JSON.stringify({ v: 1, dev: device, clock: { [device]: 5 } });
   return { device, name: `checklist.${device}.ops.jsonl`, text: [header, ...lines].join('\n') + '\n' };
 }
 

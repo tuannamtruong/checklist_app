@@ -91,19 +91,11 @@
   </p>
 {/if}
 
-<!-- The three kinds that are not a task. K-8's line is not here: it is in the
+<!-- The two kinds that are not a task. K-8's line is not here: it is in the
      page header, at a fixed place rather than wherever the last row leaves it —
      requirements.md §4. These stay under the list, one click away, because
      picking a kind is a decision worth a button rather than a mode. -->
 <div class="mt-2 flex flex-wrap gap-2 px-2">
-  <button
-    type="button"
-    class="rounded-md border border-line px-2.5 py-1.5 text-sm text-ink-muted hover:border-accent hover:text-accent"
-    data-testid="add-list"
-    onclick={() => add('list')}
-  >
-    + List
-  </button>
   <button
     type="button"
     class="rounded-md border border-line px-2.5 py-1.5 text-sm text-ink-muted hover:border-accent hover:text-accent"

@@ -42,7 +42,6 @@ export interface RowAction {
 
 const KIND_LABELS: Record<Kind, string> = {
   folder: 'Folder',
-  list: 'List',
   note: 'Note',
   task: 'Task',
 };

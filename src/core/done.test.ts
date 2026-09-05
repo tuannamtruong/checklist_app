@@ -30,11 +30,11 @@ function treeOf(ops: readonly Op[]) {
 const shop = [
   create('n_house', ROOT, 'a1', 'folder'),
   title('n_house', 'House'),
-  create('n_kitchen', 'n_house', 'a1', 'list'),
+  create('n_kitchen', 'n_house', 'a1', 'folder'),
   title('n_kitchen', 'Kitchen'),
   create('n_kettle', 'n_kitchen', 'a1'),
   title('n_kettle', 'Descale the kettle'),
-  create('n_shop', ROOT, 'a2', 'list'),
+  create('n_shop', ROOT, 'a2', 'folder'),
   title('n_shop', 'Shopping'),
   create('n_milk', 'n_shop', 'a1'),
   title('n_milk', 'Milk'),

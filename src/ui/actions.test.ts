@@ -71,7 +71,6 @@ describe('the row menu and the keyboard', () => {
     const id = add(ROOT);
     const names = rowActions(context(id)).map((action) => action.name);
     expect(names).toContain('turn-into-note');
-    expect(names).toContain('turn-into-list');
     expect(names).toContain('turn-into-folder');
     expect(names).not.toContain('turn-into-task');
   });

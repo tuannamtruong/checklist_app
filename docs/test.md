@@ -171,6 +171,11 @@ capital that `cleanTag` folds away, and the filter (A-4, A-6) is checked for the
 the tree shows a match *and the path to it*, and that a row created while the filter is on carries the filter's tags
 rather than vanishing as it is typed.
 
+M6 puts one line in the peer's file for the same reason: it names `list`, a kind K-1 no longer has, and the smoke run
+asserts the row arrives as a folder rather than as a line that will not parse. The decoder's own rule is
+`op-log.test.ts`'s; what only the browser run shows is that it holds along the path a peer's file actually takes —
+decode, merge, re-fold, render — which is where losing a row on upgrade would actually happen.
+
 K-9 is a browser check for a reason a unit test cannot get at: the split itself is `paste.test.ts`'s, but the event that
 carries a clipboard into an input only exists in a browser. The smoke run dispatches one over the quick-add line with
 something already typed in it, and asserts the three things the rule promises — a row per line, in the pasted order, the

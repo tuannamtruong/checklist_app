@@ -35,7 +35,7 @@ function pair(): { a: Replica; b: Replica } {
 describe('concurrent edits to different subtrees', () => {
   it('merge with nothing to tell the user about', () => {
     const { a, b } = pair();
-    const shopping = add(a, ROOT, 'Shopping', 'list');
+    const shopping = add(a, ROOT, 'Shopping', 'folder');
     const house = add(a, ROOT, 'House', 'folder');
     b.pull(a);
 
@@ -153,7 +153,7 @@ describe('deleting a subtree that contains a cycle — T-6 with T-7', () => {
 describe('a delete racing an edit inside the subtree — T-7', () => {
   it('lets the tombstone win over the whole subtree', () => {
     const { a, b } = pair();
-    const trip = add(a, ROOT, 'Trip', 'list');
+    const trip = add(a, ROOT, 'Trip', 'folder');
     const ferry = add(a, trip, 'Ferry');
     b.pull(a);
 
@@ -173,7 +173,7 @@ describe('a delete racing an edit inside the subtree — T-7', () => {
 describe('restoring a deleted row — T-13', () => {
   it('brings the whole subtree back, on every device, with one op', () => {
     const { a, b } = pair();
-    const trip = add(a, ROOT, 'Trip', 'list');
+    const trip = add(a, ROOT, 'Trip', 'folder');
     const ferry = add(a, trip, 'Ferry');
     a.at(4_000).run((tree, ctx) => remove(tree, ctx, trip));
     settle([a, b]);
@@ -200,7 +200,7 @@ describe('restoring a deleted row — T-13', () => {
     const a = new Replica('aaaa0001', 1_000);
     const b = new Replica('bbbb0002', 1_000);
     const c = new Replica('cccc0003', 1_000);
-    const trip = add(a, ROOT, 'Trip', 'list');
+    const trip = add(a, ROOT, 'Trip', 'folder');
     b.pull(a);
     c.pull(a);
 
@@ -232,7 +232,7 @@ describe('restoring a deleted row — T-13', () => {
 
   it('says nothing about the other fields of a row that is still gone', () => {
     const { a, b } = pair();
-    const trip = add(a, ROOT, 'Trip', 'list');
+    const trip = add(a, ROOT, 'Trip', 'folder');
     b.pull(a);
     a.at(5_000).run((tree, ctx) => setTitle(tree, ctx, trip, 'Holiday'));
     b.at(5_001).run((tree, ctx) => setTitle(tree, ctx, trip, 'Weekend'));
@@ -250,7 +250,7 @@ describe('restoring a deleted row — T-13', () => {
 describe('a third device joining mid-sequence — S-9', () => {
   it('converges from an empty vector, with no registration step', () => {
     const { a, b } = pair();
-    const list = add(a, ROOT, 'Shopping', 'list');
+    const list = add(a, ROOT, 'Shopping', 'folder');
     add(a, list, 'Milk');
     b.pull(a);
     b.at(2_000);
@@ -291,7 +291,7 @@ describe('a device offline across many peer edits', () => {
 
 describe('sibling ordering under concurrent insertion — T-2', () => {
   const { a, b } = pair();
-  const list = add(a, ROOT, 'Shopping', 'list');
+  const list = add(a, ROOT, 'Shopping', 'folder');
   b.pull(a);
   const milk = a.at(6_000).run((tree, ctx) => createLastChild(tree, ctx, list, { title: 'Milk' }))[0]!.id;
   const bread = b.at(6_000).run((tree, ctx) => createLastChild(tree, ctx, list, { title: 'Bread' }))[0]!.id;
@@ -343,7 +343,7 @@ function generate(seed: number, steps: number): { replicas: Replica[]; ops: Op[]
 
     if (roll < 0.3 || known.length === 0) {
       const parent = known.length > 0 && dice() < 0.5 ? pick(known) : ROOT;
-      known.push(add(replica, parent, `row ${step}`, pick(['task', 'list', 'note', 'folder'])));
+      known.push(add(replica, parent, `row ${step}`, pick(['task', 'folder', 'note', 'folder'])));
     } else if (roll < 0.55) {
       const id = pick(known);
       replica.run((tree, ctx) => setTitle(tree, ctx, id, `title ${step}`));

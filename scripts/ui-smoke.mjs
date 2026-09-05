@@ -86,7 +86,7 @@ async function main() {
     const sidebar = (await page.locator('[data-testid="sidebar-link"]').allInnerTexts()).map((t) => t.trim());
     check(
       'the sidebar shows top-level folders and notes, and nothing deeper — T-10',
-      sidebar.includes('House') && sidebar.includes('Trip notes') && !sidebar.includes('Kitchen'),
+      sidebar.join(',') === 'Shopping,House,Trip notes',
       sidebar.join(','),
     );
 
@@ -763,6 +763,14 @@ async function main() {
       'and its concurrent title write won on both, by (at, device id)',
       withPeer.includes('Coffee') && !withPeer.includes('Coffee beans'),
       withPeer.join('|'),
+    );
+    // K-1. The peer's file names a kind this build no longer has. It has to fold
+    // to a folder rather than to a line that will not parse — past_decision.md §11.
+    const garage = await rowByTitle(page, 'Garage');
+    check(
+      'a row a peer created as a list arrives as a folder — K-1',
+      (await garage.getAttribute('data-kind')) === 'folder',
+      String(await garage.getAttribute('data-kind')),
     );
     // The peer count is on the settings screen rather than in the corner — §10.
     await page.locator('[data-testid="settings-link"]').click();

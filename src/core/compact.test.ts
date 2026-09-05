@@ -42,7 +42,7 @@ function generate(seed: number, steps: number): Replica[] {
 
     if (roll < 0.2 || known.length === 0) {
       const parent = known.length > 0 && dice() < 0.5 ? pick(known) : ROOT;
-      known.push(add(replica, parent, `row ${step}`, pick(['task', 'list', 'note', 'folder'])));
+      known.push(add(replica, parent, `row ${step}`, pick(['task', 'folder', 'note', 'folder'])));
     } else if (roll < 0.45) {
       const id = pick(known);
       replica.run((tree, ctx) => setTitle(tree, ctx, id, `title ${step}`));

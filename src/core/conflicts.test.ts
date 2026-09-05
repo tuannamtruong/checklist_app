@@ -112,12 +112,12 @@ describe('which fields raise a row', () => {
     const row = add(a, 'Trip', 'task');
     b.pull(a);
     a.at(2_000).run((tree, ctx) => turnInto(tree, ctx, row, 'note'));
-    b.at(2_001).run((tree, ctx) => turnInto(tree, ctx, row, 'list'));
+    b.at(2_001).run((tree, ctx) => turnInto(tree, ctx, row, 'folder'));
     settle([a, b]);
 
     const rows = rowsOf(a);
     expect(rows.length).toBe(1);
-    expect(rows[0]).toMatchObject({ kind: 'field', field: 'kind', kept: 'list', dropped: 'note' });
+    expect(rows[0]).toMatchObject({ kind: 'field', field: 'kind', kept: 'folder', dropped: 'note' });
   });
 
   it('a note body, whole — S-20', () => {
@@ -138,7 +138,7 @@ describe('which fields raise a row', () => {
   it('a concurrent move, which is the parent field like any other', () => {
     const { a, b } = pair();
     const row = add(a, 'Milk');
-    const shopping = add(a, 'Shopping', 'list');
+    const shopping = add(a, 'Shopping', 'folder');
     const house = add(a, 'House', 'folder');
     b.pull(a);
     a.at(2_000).run((tree, ctx) => moveTo(tree, ctx, row, shopping, null));

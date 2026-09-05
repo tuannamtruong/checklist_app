@@ -2,7 +2,7 @@
 
 Requirement docs and its current state.
 
-**Milestones M1 to M5 are built** — the production tree is `src/`, and every ✅ row below names the file that implements
+**Milestones M1 to M6 are built** — the production tree is `src/`, and every ✅ row below names the file that implements
 it.
 
 Two commands verify the ✅ rows:
@@ -48,7 +48,7 @@ and never replays per read — [sync-flow.md §4.6 The decision](sync-flow.md#46
 | `parent` | node id or `root` | Always read through the cycle-repair resolver, never directly — T-6 |
 | `parentSetAt` | timestamp | When the move was written. The repair reads it; nothing reads the local clock |
 | `parentSetBy` | device id | The device that wrote the move, and the repair's tiebreak when two `parentSetAt` collide — [sync-flow.md §6.2 The repair](sync-flow.md#62-the-repair) |
-| `kind` | one of `folder`, `list`, `note`, `task` | K-1. Mutable after the fact — K-5 |
+| `kind` | one of `folder`, `note`, `task` | K-1. Mutable after the fact — K-5. A `list` in an older file decodes as `folder` |
 | `title` | string | The row label, every kind |
 | `done` | boolean | Tasks only — K-2. Also the T-11 filter: a row carrying it leaves the normal view |
 | `body` | string or null | Notes only — K-3 |
@@ -190,29 +190,43 @@ something.
 
 | ID | Requirement | State | Where |
 | --- | --- | --- | --- |
-| K-1 | A row is one of four kinds: `folder`, `list`, `note` or `task` | ✅ | `src/core/types.ts`. Only a task is checkable; a top-level `folder` or `note` is what T-10 shows in the sidebar. Kind drives rendering, never structure — any kind may own children |
-| K-2 | Tasks render a checkbox; folders/lists/notes render a kind icon | ✅ | `src/ui/Row.svelte`, `src/ui/KindIcon.svelte` |
+| K-1 | A row is one of three kinds: `folder`, `note` or `task` | ✅ | `src/core/types.ts`. Only a task is checkable; a top-level `folder` or `note` is what T-10 shows in the sidebar. Kind drives rendering, never structure — any kind may own children. There were four until M6: `list` is read as `folder` by `src/core/op-log.ts`, so a file written before it went keeps folding to the same tree — `op-log.test.ts` |
+| K-2 | Tasks render a checkbox; folders and notes render a kind icon | ✅ | `src/ui/Row.svelte`, `src/ui/KindIcon.svelte` |
 | K-3 | A note has a long free-text body with its own full-page editor | ✅ | `src/ui/NodePage.svelte`, `src/ui/NoteBody.svelte` |
 | K-4 | A note can still own checklist children (heading + items pattern) | ✅ | The note's page renders its body and its children; `edit.test.ts` |
 | K-5 | Any row can be converted to any kind after the fact ("Turn into") | ✅ | `turnInto` in `src/core/edit.ts`, in the row menu. Two devices converting one row differently resolve by `(at, device id)`, with a notice — [§9 Conflict presentation](#9-conflict-presentation) |
 | K-6 | ~~A note can be promoted to a checklist from its own page~~ | ✗ **Withdrawn** | Built in M1 and taken out again: it was a second control for the one op K-5 already offers, and the only one that changed a kind from outside the row menu. Nothing replaces it — `turnInto` is unchanged and the row menu still reaches every kind |
 | K-7 | Note body saves are debounced (1 s) so typing is not one op per keystroke | ✅ | `src/ui/NoteBody.svelte`. The 1 s debounce governs the store; an **op** is emitted on blur, on navigating away, or after 60 s of continuous editing — S-20 |
-| K-8 | Every list page opens with a line where typing a title and pressing Enter makes a **task** at the end of the list, and leaves the line ready for the next one | ✅ | `src/ui/QuickAdd.svelte`, over `createLastChild` with no kind — which is `task`, the default every other creation path already used. `src/ui/NodePage.svelte` gives it the page header, centred and above the breadcrumbs; the other three kinds keep their buttons under the list |
+| K-8 | Every list page opens with a line where typing a title and pressing Enter makes a **task** at the end of the list, and leaves the line ready for the next one | ✅ | `src/ui/QuickAdd.svelte`, over `createLastChild` with no kind — which is `task`, the default every other creation path already used. `src/ui/NodePage.svelte` gives it the page header, centred and above the breadcrumbs; the other two kinds keep their buttons under the list |
 | K-9 | A paste into that line carrying line breaks makes one row per line, all at the end of the list | ✅ | `src/core/paste.ts` is the only place the split is spelled, `createLastChildren` in `src/core/edit.ts` mints the keys, and `src/ui/QuickAdd.svelte` is the one caller. `paste.test.ts`, `edit.test.ts`, `scripts/ui-smoke.mjs` |
+
+**There were four kinds and there are three — `list` is gone.** A `list` and a `folder` differed by an icon and by
+nothing else: both were containers, both could hold any kind (K-4 and T-1 make that true of every kind), and neither was
+checkable. The choice between them was therefore a choice with no consequence, made at the moment of creation and
+carried forever, so one person's tree ended up holding both for the same job — a row that read as a list on the device
+that made it and as a folder on the one that opened it a month later. Three kinds are three answers to three different
+questions: something that holds things, something that holds text, something that gets ticked.
+
+**The rename happens at the decoder, not by rewriting anything —** [§2.2 The op](#22-the-op). `src/core/op-log.ts` reads
+a `kind` of `list` as `folder`, exactly as it normalises a tag from an older build, so a file written before this change
+folds to the same tree without a migration pass, a version bump or a rewrite of a peer's file — which
+[§7.3 Fixed constraints](#73-fixed-constraints) forbids anyway. Refusing the line instead would have dropped the
+`create` and taken the row with it, and a row that vanishes on upgrade is the failure the format exists to prevent. A
+peer still running the older build reads the `folder` this one writes, because `folder` was always one of its four.
 
 Notes are deliberately not checkable. `done` is still a field on every node, because K-5 keeps it across a "Turn into"
 so that turning back restores the tick — which is also why T-11's filter reads `done` rather than `kind === 'task'`.
 
 **K-6 was withdrawn, and what it cost was a second answer to a settled question.** "Promote to checklist" sat on a
 note's own page and wrote `turnInto`, which is exactly what the row menu's "Turn into" writes one level up — so one op
-had two controls, in two places, worded two ways, and only one of them could reach the other three kinds. The page kept
-the button that was easiest to press by accident while reading a note, and a kind change is a deliberate edit rather
-than a reading gesture. K-5 is untouched and `turnInto` has one caller now: the row menu, which is where every other
-row-level edit already lives and which a phone can reach.
+had two controls, in two places, worded two ways, and only one of them could reach the other kinds. The page kept the
+button that was easiest to press by accident while reading a note, and a kind change is a deliberate edit rather than a
+reading gesture. K-5 is untouched and `turnInto` has one caller now: the row menu, which is where every other row-level
+edit already lives and which a phone can reach.
 
 **The quick-add line makes a task and nothing else, and that is the whole of K-8.** A checklist is mostly tasks, so the
 one path that costs no decision has to produce the kind the person was already going to pick — `createLastChild` with no
-kind, which has meant `task` since M1. The other three kinds keep their buttons under the list, one click away, because
+kind, which has meant `task` since M1. The other two kinds keep their buttons under the list, one click away, because
 picking a kind is a decision worth a button rather than a mode.
 
 **The line sits in the page header rather than at the end of the list.** Where it goes and where the row lands are two
@@ -707,6 +721,8 @@ every possible destination is a second navigation to build and to test, and the 
 | M3 | Compaction and polish | **Closed.** Compaction (S-14) once its trigger fires, [§6 Search](#6-search), device management ([§8 Device management](#8-device-management)), the restore path T-13 owes the Done view, and the two bundles [architecture.md §7 Packaging](architecture.md#7-packaging) describes — `make windows` and `make apk`. What it left standing is rows 5 and 10 of [§15 Deviations and defects found during verification](#15-deviations-and-defects-found-during-verification) |
 | M4 | Settings and appearance | **Closed.** One screen for everything about this device rather than about the tree (X-12), and the six themes X-13 puts behind it — [§10.1 Themes](#101-themes). It moved the D-1 name editor and the D-4 log link onto that screen and took a nav entry away rather than adding one. It changed no component's colours, because no component ever named one |
 | M5 | Attributes, the drag and the folder screen | **Closed.** Four features that each turned out to be a caller of something already there: the drag (T-14) over the `move` op M1 wrote, tags and priority ([§4.1 Tags and priority](#41-tags-and-priority)) over the `set` op and the conflict list M2 built, the quick-add line (K-8) over `createLastChild`, and the sync folder section ([§10.2 The sync folder, on the settings screen](#102-the-sync-folder-on-the-settings-screen)) over the shell that already held the folder. It closed row 2 of [§15 Deviations and defects found during verification](#15-deviations-and-defects-found-during-verification) — T-5's refusal has a gesture that can provoke it at last |
+
+| M6 | Fewer things | **Closed.** A milestone that mostly removed: the fourth kind (K-1, `list` folded into `folder` at the decoder), the second control for a kind change ([K-6, withdrawn](#4-item-kinds-and-attributes)), and the sidebar's copy of the whole tree (T-10, one level now). The one thing it added is K-9, a pasted paragraph becoming one row per line, which is the quick-add line answering a question it already had the machinery for. Nothing here changed the payload, the merge or the folder |
 
 M2 is closed against a folder, not against a provider. The three adapters it added are the three methods every other
 adapter already offers, so what remains untested is the client underneath them, and observing that needs a Windows and

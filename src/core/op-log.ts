@@ -75,8 +75,28 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function isKind(value: unknown): value is Kind {
-  return typeof value === 'string' && (KINDS as readonly string[]).includes(value);
+/**
+ * K-1. A kind this build no longer has, and the kind it is read as.
+ *
+ * `list` was a kind until M6 and is a folder now. The translation sits at the
+ * decoder for the same reason `cleanTags` does: a file written by an older
+ * build — or by a peer that has not been updated yet, which is the ordinary
+ * case in a folder several devices write to — has to fold to the tree this
+ * build holds. Refusing the line instead would drop the row it created, and a
+ * row that vanishes on upgrade is the one failure this format exists to avoid.
+ *
+ * Nothing is rewritten: the op in the file keeps saying `list` until this
+ * device writes that row again or compaction drops the op, and a peer still
+ * running the old build reads the `folder` we write, because `folder` was
+ * always one of its kinds too.
+ */
+const RENAMED_KINDS: Readonly<Record<string, Kind>> = { list: 'folder' };
+
+/** The kind a line names, in this build's vocabulary, or null if it names none. */
+function readKind(value: unknown): Kind | null {
+  if (typeof value !== 'string') return null;
+  if ((KINDS as readonly string[]).includes(value)) return value as Kind;
+  return RENAMED_KINDS[value] ?? null;
 }
 
 function isPriority(value: unknown): value is Priority {
@@ -125,8 +145,9 @@ function parseOp(line: string, dev: DeviceId): Op | null {
 
   switch (value['op']) {
     case 'create': {
-      const { parent, kind, order } = value;
-      if (typeof parent !== 'string' || !isKind(kind) || typeof order !== 'string') return null;
+      const { parent, order } = value;
+      const kind = readKind(value['kind']);
+      if (typeof parent !== 'string' || kind === null || typeof order !== 'string') return null;
       return { op: 'create', id, parent, kind, order, c, at, dev, ...seen };
     }
     case 'set': {
@@ -136,7 +157,8 @@ function parseOp(line: string, dev: DeviceId): Op | null {
       if (typeof value['body'] === 'string' || value['body'] === null) {
         op.body = value['body'] as string | null;
       }
-      if (isKind(value['kind'])) op.kind = value['kind'];
+      const kind = readKind(value['kind']);
+      if (kind !== null) op.kind = kind;
       // A-1. Normalised on the way in as well as on the way out: a tag from an
       // older build or a hand-edited line is put in the same form as one this
       // device typed, or two spellings of one tag would be two tags.

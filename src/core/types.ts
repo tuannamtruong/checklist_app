@@ -12,10 +12,18 @@ export const ROOT = 'root';
 
 export type ParentId = NodeId | typeof ROOT;
 
-/** K-1. Kind drives rendering, never structure: any kind may own children. */
-export type Kind = 'folder' | 'list' | 'note' | 'task';
+/**
+ * K-1. Kind drives rendering, never structure: any kind may own children.
+ *
+ * There were four until M6. `list` and `folder` differed by an icon and by
+ * nothing else — both were containers, both held any kind, and neither was
+ * checkable — so a row read as a list on the device that made it and as a
+ * folder on the one that looked at it later. A file written before that still
+ * says `list`, and `core/op-log.ts` reads it as a folder.
+ */
+export type Kind = 'folder' | 'note' | 'task';
 
-export const KINDS: readonly Kind[] = ['folder', 'list', 'note', 'task'];
+export const KINDS: readonly Kind[] = ['folder', 'note', 'task'];
 
 /**
  * T-10. The sidebar shows these kinds, at the top level only. It is the way
