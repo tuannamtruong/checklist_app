@@ -1,39 +1,37 @@
 <script lang="ts">
-  // T-10: the sidebar carries containers only — folders and lists. A note owns
-  // children (K-4) but is a place the user goes rather than goes through, and
-  // tasks are the bulk of a checklist, so either would bury the navigation.
+  // T-10: the sidebar carries the top-level folders and the top-level notes,
+  // and nothing deeper. It is the way back to the few places worth starting
+  // from, not a second copy of the tree — a tree that is unlimited in depth
+  // (T-1) is unlimited in this column too, and the nav below it goes off the
+  // bottom of the screen long before the tree does. The tree view draws the
+  // nesting and breadcrumbs (T-9) climb back out of it.
   //
   // Finished and deleted branches are already gone: childrenOf is the filtered
   // set, so T-11 and T-7 take them out of here without this file knowing.
   import { childrenOf } from '../core/tree';
-  import { CONTAINER_KINDS, type ParentId } from '../core/types';
+  import { ROOT, SIDEBAR_KINDS } from '../core/types';
   import type { Session } from '../app/Session.svelte';
   import { nodeHref } from '../app/router.svelte';
   import KindIcon from './KindIcon.svelte';
-  import SidebarBranch from './SidebarBranch.svelte';
 
   let {
     session,
-    parent,
     currentId,
-    depth = 0,
     onNavigate,
   }: {
     session: Session;
-    parent: ParentId;
     currentId: string | null;
-    depth?: number;
     onNavigate?: (() => void) | undefined;
   } = $props();
 
-  const containers = $derived(
-    childrenOf(session.tree, parent).filter((id) =>
-      CONTAINER_KINDS.includes(session.tree.nodes[id]!.kind),
+  const links = $derived(
+    childrenOf(session.tree, ROOT).filter((id) =>
+      SIDEBAR_KINDS.includes(session.tree.nodes[id]!.kind),
     ),
   );
 </script>
 
-{#each containers as id (id)}
+{#each links as id (id)}
   {@const node = session.tree.nodes[id]!}
   <a
     href={nodeHref(id)}
@@ -41,7 +39,6 @@
     class:bg-accent-soft={id === currentId}
     class:text-accent={id === currentId}
     class:text-ink-muted={id !== currentId}
-    style="padding-left: {0.5 + depth * 0.75}rem"
     data-testid="sidebar-link"
     data-row-id={id}
     onclick={() => onNavigate?.()}
@@ -49,5 +46,4 @@
     <KindIcon kind={node.kind} class="size-4 shrink-0" />
     <span class="truncate">{node.title || 'Untitled'}</span>
   </a>
-  <SidebarBranch {session} parent={id} {currentId} depth={depth + 1} {onNavigate} />
 {/each}
