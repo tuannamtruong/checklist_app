@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deletedRows, finishedChildCount, finishedRows } from './done';
+import { deletedRows, finishedRows } from './done';
 import { foldOps } from './materialise';
 import { resolveTree } from './tree';
 import { ROOT, type Kind, type Op, type ParentId } from './types';
@@ -101,19 +101,5 @@ describe('deletedRows — T-12', () => {
   it('gives a row deleted at the root an empty path', () => {
     const tree = treeOf([...shop, remove('n_shop', 900)]);
     expect(deletedRows(tree)).toEqual([{ id: 'n_shop', path: [] }]);
-  });
-});
-
-describe('finishedChildCount — T-11', () => {
-  it('counts only this parent’s own finished rows', () => {
-    const tree = treeOf([...shop, tick('n_milk'), tick('n_bread'), tick('n_kettle')]);
-    expect(finishedChildCount(tree, 'n_shop')).toBe(2);
-    expect(finishedChildCount(tree, 'n_kitchen')).toBe(1);
-    expect(finishedChildCount(tree, ROOT)).toBe(0);
-  });
-
-  it('does not count a finished row that was then deleted', () => {
-    const tree = treeOf([...shop, tick('n_milk'), remove('n_milk', 900)]);
-    expect(finishedChildCount(tree, 'n_shop')).toBe(0);
   });
 });

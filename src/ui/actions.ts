@@ -46,10 +46,6 @@ const KIND_LABELS: Record<Kind, string> = {
   task: 'Task',
 };
 
-export function kindLabel(kind: Kind): string {
-  return KIND_LABELS[kind];
-}
-
 export function rowActions(ctx: RowActionContext): RowAction[] {
   const { session, view, focus, rows, id } = ctx;
   const tree = session.tree;

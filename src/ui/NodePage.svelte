@@ -14,7 +14,6 @@
   import TagEditor from './TagEditor.svelte';
   import TagFilter from './TagFilter.svelte';
   import TreeView from './TreeView.svelte';
-  import { kindLabel } from './actions';
 
   let {
     session,
@@ -65,20 +64,16 @@
       <!-- A-1 and A-2 for the row this page *is*, since its own row is one
            level up and a task's row has no page link — requirements.md §4.1. -->
       <PriorityFlag {session} {id} priority={node.priority} />
-      <span class="rounded-full bg-surface-sunken px-2.5 py-1 text-xs text-ink-muted" data-testid="page-kind">
-        {kindLabel(node.kind)}
-      </span>
     </div>
 
     <TagEditor {session} {id} />
 
-    <!-- K-4. A note's body, and then whatever it owns: the heading is the seam
-         between the two, so a note reads as one page rather than as a body with
-         a stray list under it. Changing what this row *is* is the row menu's
-         (K-5), one level up, and is the only place it ever was — K-6. -->
+    <!-- K-4. A note's body, and then whatever it owns, with nothing between
+         them: the children read as the note's own list. Changing what this row
+         *is* is the row menu's (K-5), one level up, and is the only place it
+         ever was — K-6. -->
     {#if node.kind === 'note'}
       <NoteBody {session} {id} />
-      <h2 class="mt-2 text-sm font-medium text-ink-muted">Checklist</h2>
     {/if}
   {:else}
     <h1 class="text-2xl font-semibold" data-testid="page-title">All lists</h1>

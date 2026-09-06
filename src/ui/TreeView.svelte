@@ -4,7 +4,6 @@
   // Flat rather than recursive because the keyboard model works on what the
   // user can see: `↑` from the first child of a collapsed-away subtree has to
   // land on the row above it, whatever their depths — rows.ts.
-  import { finishedChildCount } from '../core/done';
   import { createFirstChild, createLastChild } from '../core/edit';
   import { filteredIds } from '../core/filter';
   import { childrenOf } from '../core/tree';
@@ -12,7 +11,6 @@
   import type { Session } from '../app/Session.svelte';
   import type { ViewState } from '../app/view-state.svelte';
   import type { RowFocus } from './focus.svelte';
-  import { DONE_HREF } from '../app/router.svelte';
   import Row from './Row.svelte';
   import { RowDrag } from './drag.svelte';
   import { visibleRows } from './rows';
@@ -41,9 +39,6 @@
     ),
   );
   const isEmpty = $derived(childrenOf(session.tree, parent).length === 0);
-  // Only asked when the list looks empty, which is the only time the answer
-  // changes what it says — T-11.
-  const finished = $derived(isEmpty ? finishedChildCount(session.tree, parent) : 0);
 
   // A-6. A row created under a filter carries that filter's tags, or it would
   // vanish as it was created — requirements.md §4.1.
@@ -77,17 +72,6 @@
   >
       Clear the filter
     </button>
-  </p>
-{/if}
-
-{#if isEmpty}
-  <p class="px-2 py-6 text-sm text-ink-muted" data-testid="empty">
-    {#if finished > 0}
-      All done — {finished} finished {finished === 1 ? 'row is' : 'rows are'} in
-      <a class="text-accent hover:underline" href={DONE_HREF}>Done</a>.
-    {:else}
-      Nothing here yet.
-    {/if}
   </p>
 {/if}
 

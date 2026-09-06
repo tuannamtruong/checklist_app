@@ -12,7 +12,7 @@
 
 import { compareSiblings } from './order';
 import { ancestorsOf, parentOf, type ResolvedTree } from './tree';
-import { ROOT, type NodeId, type ParentId } from './types';
+import { ROOT, type NodeId } from './types';
 
 export interface ArchivedRow {
   id: NodeId;
@@ -57,18 +57,6 @@ export function finishedRows(tree: ResolvedTree): ArchivedRow[] {
   );
   ids.sort((a, b) => comparePaths(tree, a, b));
   return ids.map((id) => ({ id, path: ancestorsOf(tree, id) }));
-}
-
-/**
- * How many of one parent's rows T-11 is holding back.
- *
- * An empty list and a list the user has finished are different states, and
- * saying "nothing here yet" about the second one reads as data loss.
- */
-export function finishedChildCount(tree: ResolvedTree, parent: ParentId): number {
-  return Object.keys(tree.nodes).filter(
-    (id) => tree.nodes[id]!.done && !tree.deleted.has(id) && parentOf(tree, id) === parent,
-  ).length;
 }
 
 /**
