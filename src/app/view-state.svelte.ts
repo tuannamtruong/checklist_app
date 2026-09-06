@@ -8,6 +8,24 @@ import type { NodeId } from '../core/types';
 const COLLAPSED_KEY = 'checklist.collapsed';
 const DRAWER_KEY = 'checklist.drawer';
 const TAG_FILTER_KEY = 'checklist.tagfilter';
+const SIDEBAR_WIDTH_KEY = 'checklist.sidebarwidth';
+
+/**
+ * X-20. Bounds rather than a free drag: narrower than the first and a title is
+ * a truncation, wider than the last and the sidebar is the page. The default is
+ * the `w-64` the column had before it could be dragged, so a device that never
+ * touches the grip sees exactly what it always saw.
+ */
+export const SIDEBAR_WIDTH = { min: 176, max: 480, default: 256 } as const;
+
+function loadWidth(storage: Storage): number {
+  const raw = Number(storage.getItem(SIDEBAR_WIDTH_KEY));
+  return Number.isFinite(raw) && raw > 0 ? clampWidth(raw) : SIDEBAR_WIDTH.default;
+}
+
+function clampWidth(px: number): number {
+  return Math.round(Math.min(SIDEBAR_WIDTH.max, Math.max(SIDEBAR_WIDTH.min, px)));
+}
 
 function loadIds(storage: Storage, key: string): Set<NodeId> {
   try {
@@ -34,12 +52,19 @@ export class ViewState {
   private tags = $state<Set<string>>(new Set());
   /** Below `md` the sidebar is a drawer, and the drawer starts shut — X-2. */
   drawerOpen = $state(false);
+  /**
+   * X-20, in pixels, and only above `md`: below it the sidebar is a drawer over
+   * the page rather than a column beside it, so there is nothing for a width to
+   * take room from.
+   */
+  sidebarWidth = $state<number>(SIDEBAR_WIDTH.default);
 
   constructor(storage: Storage = window.localStorage) {
     this.storage = storage;
     this.collapsedIds = loadIds(storage, COLLAPSED_KEY);
     this.tags = loadIds(storage, TAG_FILTER_KEY);
     this.drawerOpen = storage.getItem(DRAWER_KEY) === 'open';
+    this.sidebarWidth = loadWidth(storage);
   }
 
   /** A-4. The selection, as the filter and the bar both read it. */
@@ -80,6 +105,14 @@ export class ViewState {
   expand(id: NodeId): void {
     if (!this.collapsedIds.has(id)) return;
     this.toggleCollapsed(id);
+  }
+
+  /** X-20. Clamped here rather than at the grip, so every caller gets the bounds. */
+  setSidebarWidth(px: number): void {
+    const next = clampWidth(px);
+    if (next === this.sidebarWidth) return;
+    this.sidebarWidth = next;
+    this.storage.setItem(SIDEBAR_WIDTH_KEY, String(next));
   }
 
   setDrawer(open: boolean): void {

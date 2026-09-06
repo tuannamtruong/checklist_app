@@ -212,3 +212,10 @@ body {
   font-size: 0.9rem;
   line-height: 1.25rem;
 }
+
+/* X-20: a pointer that starts on the sidebar's grip is a resize, never a
+   scroll — the same rule `.drag-handle` needs, and unlayered for the same
+   reason. */
+.sidebar-grip {
+  touch-action: none;
+}

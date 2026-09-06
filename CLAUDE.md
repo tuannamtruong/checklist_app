@@ -136,9 +136,9 @@ it. Never a peer's file: one writer per file, and that is also why the cut needs
 lower this device's top counter, or every peer reads the file as a partial download and skips it forever. sync-flow.md
 §4.8.
 
-Never in a file, always `localStorage`: the device id, collapse state, the drawer's state, which folder this device
-chose, which cloud app it belongs to, the chosen theme, the tag filter, and dismissed conflict rows. The File System
-Access handle is the exception, and only because it is an object: IndexedDB.
+Never in a file, always `localStorage`: the device id, collapse state, the drawer's state, the sidebar's width, which
+folder this device chose, which cloud app it belongs to, the chosen theme, the tag filter, and dismissed conflict rows.
+The File System Access handle is the exception, and only because it is an object: IndexedDB.
 
 ### Component catalog
 
@@ -181,14 +181,14 @@ committed, and a note body updates the store on a 1 s debounce but only becomes 
 `## ` — so the merge, the conflict rows and compaction never learned that a body can be formatted, and a build that
 predates M7 shows the marks as characters rather than as noise. `src/core/markup.ts` is the only module that spells a
 mark: `parseBody` returns blocks and spans (never HTML — B-6), `plainText` is what search matches and snippets show
-(B-5), and `toggleBold`/`setHeading` are the two controls, which write marks a person could have typed and are
-therefore undone by the field's own undo.
+(B-5), and `toggleBold`/`setHeading` are the two controls, which write marks a person could have typed and are therefore
+undone by the field's own undo.
 
 Two controls, never four: bold, and a heading that cycles none, heading, subheading — the shape A-2's priority flag
 already has. They sit in a row above the field, and **selecting a run of text raises the same pair beside the
 selection** (B-7). Placing that pair is the one hard part: a textarea has no range geometry, so `src/ui/text-rect.ts`
-lays the text out again in a mirror wearing the field's metrics and measures the run there, and `selectionchange` on
-the document is what raises the controls — a field fires nothing of its own when a drag ends outside it.
+lays the text out again in a mirror wearing the field's metrics and measures the run there, and `selectionchange` on the
+document is what raises the controls — a field fires nothing of its own when a drag ends outside it.
 
 `src/ui/NoteBody.svelte` holds one textarea that is never unmounted. When the caret is elsewhere it lies transparent
 over the rendered blocks, so the click that reaches it is the click that focuses it; swapping two elements would drop

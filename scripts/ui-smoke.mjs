@@ -106,6 +106,44 @@ async function main() {
       sidebar.join(','),
     );
 
+    // --- X-20: the sidebar's width is dragged, and it stays dragged ---------
+    // The grip is a pointer gesture over a two-pixel strip, so a browser is the
+    // only place the capture and the clamp can both be exercised.
+    const sidebarWidth = async () =>
+      Math.round((await page.locator('[data-testid="sidebar"]').boundingBox()).width);
+    const startWidth = await sidebarWidth();
+    await page.locator('[data-testid="sidebar-resize"]').hover();
+    await page.mouse.down();
+    await page.mouse.move(startWidth + 84, 400, { steps: 8 });
+    await page.mouse.up();
+    const dragged = await sidebarWidth();
+    check('the sidebar is dragged wider by its grip — X-20', dragged > startWidth + 60, `${startWidth} -> ${dragged}`);
+
+    await page.locator('[data-testid="sidebar-resize"]').hover();
+    await page.mouse.down();
+    await page.mouse.move(2000, 400, { steps: 8 });
+    await page.mouse.up();
+    const clamped = await sidebarWidth();
+    check('and stops at its bound rather than taking the page', clamped <= 480, String(clamped));
+
+    await page.reload();
+    await page.waitForSelector('[data-testid="tree"]');
+    check(
+      'the width is device-local state, so it survives a reload — §2.3',
+      (await sidebarWidth()) === clamped,
+      `${clamped} -> ${await sidebarWidth()}`,
+    );
+
+    // Back to the default, so every check below measures the layout it was
+    // written against.
+    await page.locator('[data-testid="sidebar-resize"]').focus();
+    await page.keyboard.press('Home');
+    check(
+      'and the keyboard reaches the grip when no pointer does',
+      (await sidebarWidth()) === startWidth,
+      String(await sidebarWidth()),
+    );
+
     // --- the row menu carries every keyboard action — §3.1 ----------------
     const milkRow = await rowByTitle(page, 'Milk');
     await milkRow.locator('[data-testid="row-menu-button"]').click();

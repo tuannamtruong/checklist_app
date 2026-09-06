@@ -7,6 +7,7 @@
   import type { Dismissals } from '../app/dismissals.svelte';
   import type { ViewState } from '../app/view-state.svelte';
   import SidebarLinks from './SidebarLinks.svelte';
+  import SidebarResizer from './SidebarResizer.svelte';
   import { CONFLICTS_HREF, DONE_HREF, SEARCH_HREF, SETTINGS_HREF } from '../app/router.svelte';
 
   let {
@@ -55,9 +56,15 @@
     ></button>
   {/if}
 
+  <!-- X-20. The width is a custom property rather than an inline `width`, so it
+       reaches only the `md` rule that reads it: below that breakpoint the
+       sidebar is a drawer laid over the page, where a width takes room from
+       nothing and a dragged one would only make the drawer odd. `md:relative`
+       rather than `md:static` is what the grip anchors to. -->
   <aside
-    class="fixed inset-y-0 left-0 z-40 flex w-64 shrink-0 flex-col border-r border-line bg-surface-raised transition-transform md:static md:translate-x-0"
+    class="fixed inset-y-0 left-0 z-40 flex w-64 shrink-0 flex-col border-r border-line bg-surface-raised transition-transform md:relative md:w-[var(--sidebar-width)] md:translate-x-0"
     class:-translate-x-full={!view.drawerOpen}
+    style="--sidebar-width: {view.sidebarWidth}px"
     data-testid="sidebar"
     data-open={view.drawerOpen}
   >
@@ -171,6 +178,8 @@
         {/if}
       </div>
     </footer>
+
+    <SidebarResizer {view} />
   </aside>
 
   <div class="flex min-w-0 flex-1 flex-col">
