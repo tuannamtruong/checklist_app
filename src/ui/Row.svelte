@@ -128,7 +128,7 @@
          grip on every row at rest is a column of dots down the page. -->
     <button
       type="button"
-      class="drag-handle row-control w-4 shrink-0 cursor-grab text-ink-faint opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+      class="drag-handle row-control row-icon w-4 shrink-0 cursor-grab text-ink-faint opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
       aria-label="Move {node.title || 'untitled'}"
       data-testid="drag-handle"
       onpointerdown={onDragStart}
@@ -141,7 +141,7 @@
 
     <button
       type="button"
-      class="row-control w-5 shrink-0 text-ink-faint hover:text-ink"
+      class="row-control row-icon w-5 shrink-0 text-ink-faint hover:text-ink"
       class:invisible={children.length === 0}
       aria-label={collapsed ? 'Expand' : 'Collapse'}
       aria-expanded={children.length > 0 ? !collapsed : undefined}
@@ -154,22 +154,27 @@
     <!-- Always unchecked in practice: T-11 takes a ticked row out of the tree,
          so the only place a checked box renders is the Done view. -->
     {#if node.kind === 'task'}
-      <input
-        type="checkbox"
-        class="row-control size-4 shrink-0 accent-accent"
-        checked={node.done}
-        aria-label="Done"
-        data-testid="done"
-        onchange={tick}
-      />
+      <!-- The target is the label, never the box: a checkbox is drawn at its own
+           width and height, so a thumb-sized minimum on it would draw a
+           thumb-sized tick rather than give a small one room to be hit. -->
+      <label class="row-control row-icon shrink-0">
+        <input
+          type="checkbox"
+          class="size-[0.8rem] accent-accent"
+          checked={node.done}
+          aria-label="Done"
+          data-testid="done"
+          onchange={tick}
+        />
+      </label>
     {:else}
       <a
         href={nodeHref(id)}
-        class="row-control shrink-0 text-ink-muted hover:text-accent"
+        class="row-control row-icon shrink-0 text-ink-muted hover:text-accent"
         aria-label="Open {node.title || 'untitled'}"
         data-testid="open"
       >
-        <KindIcon kind={node.kind} class="size-4" />
+        <KindIcon kind={node.kind} class="size-[1.2rem]" />
       </a>
     {/if}
 

@@ -36,14 +36,16 @@
         data-testid="finished-row"
         data-row-id={row.id}
       >
-        <input
-          type="checkbox"
-          class="row-control size-4 shrink-0 accent-accent"
-          checked={node.done}
-          aria-label="Done"
-          data-testid="done"
-          onchange={() => session.run((tree, ctx) => toggleDone(tree, ctx, row.id))}
-        />
+        <label class="row-control row-icon shrink-0">
+          <input
+            type="checkbox"
+            class="size-[0.8rem] accent-accent"
+            checked={node.done}
+            aria-label="Done"
+            data-testid="done"
+            onchange={() => session.run((tree, ctx) => toggleDone(tree, ctx, row.id))}
+          />
+        </label>
         <a
           href={nodeHref(row.id)}
           class="min-w-0 flex-1 truncate text-sm text-ink-muted line-through hover:text-accent"
@@ -71,7 +73,7 @@
         data-testid="deleted-row"
         data-row-id={row.id}
       >
-        <KindIcon kind={node.kind} class="size-4 shrink-0 text-ink-faint" />
+        <KindIcon kind={node.kind} class="size-[1.2rem] shrink-0 text-ink-faint" />
         <a
           href={nodeHref(row.id)}
           class="min-w-0 flex-1 truncate text-sm text-ink-muted hover:text-accent"
