@@ -471,6 +471,28 @@ export function restore(tree: ResolvedTree, ctx: EditContext, id: NodeId): Op[] 
   return [{ op: 'restore', id, ...stamp(ctx) }];
 }
 
+/**
+ * T-12's one action, whichever way the row left.
+ *
+ * The archive draws no distinction between a ticked row and a deleted one, so
+ * neither does the button on it: this clears the row's own tombstone, its own
+ * tick, or both. Both are ops the Done view already wrote — a `restore` and an
+ * ordinary `set` — so nothing here is a new kind of write, and a row that was
+ * deleted while ticked comes back into its list rather than straight into the
+ * archive again.
+ *
+ * `toggleDone` is not the caller's route to the second op: it refuses a
+ * tombstoned node, which is exactly the node this is for.
+ */
+export function unarchive(tree: ResolvedTree, ctx: EditContext, id: NodeId): Op[] {
+  const node = tree.nodes[id];
+  if (!node) return [];
+  const ops: Op[] = [];
+  if (node.deleted) ops.push({ op: 'restore', id, ...stamp(ctx) });
+  if (node.done) ops.push({ op: 'set', id, done: false, ...stamp(ctx) });
+  return ops;
+}
+
 /** True when restoring this row would actually put it back in the tree. */
 export function canRestore(tree: ResolvedTree, id: NodeId): boolean {
   const node = tree.nodes[id];

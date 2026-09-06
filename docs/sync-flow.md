@@ -434,7 +434,10 @@ tombstoned in the first place.
 **`deleted` becomes an ordinary contested field.** Two devices, one deleting and one restoring, resolve by `(at, device
 id)` like a title or a tick. There is no rule that a delete beats a restore or the reverse, and inventing one would be a
 second merge rule for one field — the thing [§4.6 The decision](#46-the-decision)'s per-field rule exists to avoid.
-`deletedAt` is that field's timestamp in the same way `parentSetAt` is `parent`'s.
+`deletedAt` is that field's timestamp in the same way `parentSetAt` is `parent`'s, and `doneAt` is `done`'s. Both are
+derived by the fold from the winning op's `at` rather than carried on the op, so a row written by a build that predates
+[requirements.md §3 Tree structure and editing](requirements.md#3-tree-structure-and-editing) T-12's one archive dates
+itself the moment this replica reads it — no migration, and nothing in the payload changed.
 
 **Contesting it takes three devices, which is worth knowing before looking for the two-device case.** A `delete` is only
 writable from a view where the row is alive and a `restore` only from one where it is dead, and S-10 drops the other as
@@ -684,11 +687,12 @@ Questions the payload decision does not answer, listed so they are not mistaken 
    [§4.6 The decision](#46-the-decision) makes: bytes in exchange for no coordination problem. The view side of this is
    settled and built: the Done view of
    [requirements.md §3 Tree structure and editing](requirements.md#3-tree-structure-and-editing) T-12 is a read-time
-   filter over `done` and the tombstone — derived rather than stored, so it needs no sync and no writes. M3 closed the
-   half this item predicted — a tombstone the user can see is one they will ask to reverse — with
-   [§4.9 The restore op](#49-the-restore-op). **Retention itself stays open**, and reversibility is now an argument for
-   keeping tombstones rather than a reason to drop them: a node whose tombstone was reaped is a node no `restore` can
-   name. [§4.8 The compaction cut](#48-the-compaction-cut) does not touch it — it drops superseded *ops*, never nodes.
+   filter over `done` and the tombstone — derived rather than stored, so it needs no sync and no writes, and it makes no
+   distinction between the two. M3 closed the half this item predicted — a tombstone the user can see is one they will
+   ask to reverse — with [§4.9 The restore op](#49-the-restore-op). **Retention itself stays open**, and reversibility
+   is now an argument for keeping tombstones rather than a reason to drop them: a node whose tombstone was reaped is a
+   node no `restore` can name. [§4.8 The compaction cut](#48-the-compaction-cut) does not touch it — it drops superseded
+   *ops*, never nodes.
 4. **Retiring a device.** No longer a correctness question, and M3 built the presentation
    [requirements.md §8 Device management](requirements.md#8-device-management) owed: a device names itself in its own
    header line and stamps an advisory `lastSeen` there, so a dormant device reads as dormant. What stays open is the

@@ -28,6 +28,7 @@ function created(op: Extract<Op, { op: 'create' }>): Node {
     kind: op.kind,
     title: '',
     done: false,
+    doneAt: null,
     body: op.kind === 'note' ? '' : null,
     tags: [],
     priority: 'none',
@@ -60,7 +61,14 @@ export function applyOp(nodes: NodeMap, op: Op): NodeMap {
     case 'set': {
       const next: Node = { ...existing };
       if (op.title !== undefined) next.title = op.title;
-      if (op.done !== undefined) next.done = op.done;
+      // `doneAt` is `done`'s timestamp in the way `deletedAt` is `deleted`'s,
+      // and it is derived here rather than carried on the op: a build that
+      // predates T-12's one archive wrote the same `set`, so its rows date
+      // themselves the moment this fold reads them — sync-flow.md §4.9.
+      if (op.done !== undefined) {
+        next.done = op.done;
+        next.doneAt = op.done ? op.at : null;
+      }
       if (op.body !== undefined) next.body = op.body;
       if (op.tags !== undefined) next.tags = op.tags;
       if (op.priority !== undefined) next.priority = op.priority;

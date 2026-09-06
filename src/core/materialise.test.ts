@@ -23,6 +23,16 @@ describe('foldOps', () => {
     });
   });
 
+  it('stamps a tick with the time it was written, and clears it on the way back', () => {
+    // T-12 orders the archive by this, and it is derived here rather than
+    // carried on the op, so a row ticked by a build that predates the field
+    // dates itself the moment this fold reads it.
+    const untick: Op = { op: 'set', id: 'n_1', done: false, c: 3, at: 400, dev: 'bbbb0002' };
+    expect(foldOps([create, tick])['n_1']!.doneAt).toBe(250);
+    expect(foldOps([create, tick, untick])['n_1']!.doneAt).toBeNull();
+    expect(foldOps([create])['n_1']!.doneAt).toBeNull();
+  });
+
   it('reaches one state whatever order the ops arrive in', () => {
     const ops = [create, rename, renameLater, tick];
     const forwards = foldOps(ops);

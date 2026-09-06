@@ -1,77 +1,78 @@
-// The Done view's two lists — T-12.
+// The archive — T-12, and it is one list.
 //
-// Both are derived from state resolveTree already holds, so nothing here is
-// stored and nothing here writes: a finished row is one whose own `done` is set,
-// a deleted one is a T-7 tombstone, and the view is a read-time filter over the
-// two — sync-flow.md §7, item 3.
+// A finished row and a deleted one are the same answer to the same question:
+// "where did that go?". They left the tree for different reasons, and the
+// reason is the app's business rather than the reader's — a tick and a delete
+// both mean the row is no longer in the way, and sorting them into two piles
+// asked the reader to remember which kind of gone a row had been before they
+// could find it. One list, newest first, is the order the question is actually
+// asked in: the thing you are looking for is nearly always the thing you just
+// did.
 //
-// Each list names only the *top* of its run. A finished task inside a finished
-// list is one thing the user finished rather than two, and a row inside a
+// Nothing here is stored and nothing here writes. A finished row is one whose
+// own `done` is set, a deleted one is a T-7 tombstone, and both timestamps are
+// fields the fold already carries — sync-flow.md §7, item 3.
+//
+// Each entry names only the *top* of its run. A finished task inside a finished
+// folder is one thing the user finished rather than two, and a row inside a
 // tombstoned subtree was never deleted on its own — listing the descendants
 // would turn one delete into a page of them.
 
-import { compareSiblings } from './order';
 import { ancestorsOf, parentOf, type ResolvedTree } from './tree';
-import { ROOT, type NodeId } from './types';
+import { ROOT, type Node, type NodeId } from './types';
 
 export interface ArchivedRow {
   id: NodeId;
   /** Root first, the row's own parent last — the path T-9 renders. */
   path: readonly NodeId[];
+  /** When the row left the tree: its tombstone's stamp, or its tick's. */
+  at: number | null;
 }
 
-/** Tree order for rows the tree no longer holds: compare the paths, step by step. */
-function comparePaths(tree: ResolvedTree, a: NodeId, b: NodeId): number {
-  const left = [...ancestorsOf(tree, a), a];
-  const right = [...ancestorsOf(tree, b), b];
-  for (let i = 0; i < Math.min(left.length, right.length); i++) {
-    if (left[i] === right[i]) continue;
-    return compareSiblings(tree.nodes[left[i]!]!, tree.nodes[right[i]!]!);
-  }
-  return left.length - right.length;
+/** True when the row is out of the normal view by its own doing, either way. */
+function archived(node: Node): boolean {
+  return node.done || node.deleted;
 }
 
-/** True when some resolved ancestor already answers for this row. */
-function coveredByAncestor(tree: ResolvedTree, id: NodeId, holds: (of: NodeId) => boolean): boolean {
+/**
+ * When this row left, whichever way it left.
+ *
+ * A row that is both ticked and deleted is dated by the tombstone: the delete
+ * is what is undone first, so it is the event the reader is looking for.
+ */
+function leftAt(node: Node): number | null {
+  return node.deleted ? node.deletedAt : node.doneAt;
+}
+
+/** True when some resolved ancestor is already the entry that answers for this row. */
+function coveredByAncestor(tree: ResolvedTree, id: NodeId): boolean {
   let cursor = parentOf(tree, id);
   while (cursor !== ROOT) {
-    if (holds(cursor)) return true;
+    if (archived(tree.nodes[cursor]!)) return true;
     cursor = parentOf(tree, cursor);
   }
   return false;
 }
 
 /**
- * Finished rows, in the order the tree would have shown them.
+ * Every row the tree no longer shows, newest first.
  *
- * A tombstoned row is not one of these however its tick stands: it belongs to
- * the deleted list, and appearing in both would ask the user to reason about a
- * row that is gone twice over.
+ * A row with no stamp at all sorts last rather than first: `doneAt` is a field
+ * the fold derives, and a log compacted before it existed can leave a row
+ * ticked with nothing saying when. Undated at the bottom is the honest place
+ * for it — the alternative dates it 1970 and puts it under today's work.
  */
-export function finishedRows(tree: ResolvedTree): ArchivedRow[] {
+export function archivedRows(tree: ResolvedTree): ArchivedRow[] {
   const ids = Object.keys(tree.nodes).filter(
-    (id) =>
-      tree.nodes[id]!.done &&
-      !tree.deleted.has(id) &&
-      !coveredByAncestor(tree, id, (of) => tree.nodes[of]!.done),
-  );
-  ids.sort((a, b) => comparePaths(tree, a, b));
-  return ids.map((id) => ({ id, path: ancestorsOf(tree, id) }));
-}
-
-/**
- * Tombstoned rows, newest deletion first — which is the order an undo wants, and
- * the only one the data supports: `deletedAt` is recorded, a "finished at" is
- * not.
- */
-export function deletedRows(tree: ResolvedTree): ArchivedRow[] {
-  const ids = Object.keys(tree.nodes).filter(
-    (id) =>
-      tree.nodes[id]!.deleted && !coveredByAncestor(tree, id, (of) => tree.nodes[of]!.deleted),
+    (id) => archived(tree.nodes[id]!) && !coveredByAncestor(tree, id),
   );
   ids.sort((a, b) => {
-    const at = (tree.nodes[b]!.deletedAt ?? 0) - (tree.nodes[a]!.deletedAt ?? 0);
-    return at !== 0 ? at : a < b ? -1 : 1;
+    const left = leftAt(tree.nodes[a]!);
+    const right = leftAt(tree.nodes[b]!);
+    if (left === right) return a < b ? -1 : 1;
+    if (left === null) return 1;
+    if (right === null) return -1;
+    return right - left;
   });
-  return ids.map((id) => ({ id, path: ancestorsOf(tree, id) }));
+  return ids.map((id) => ({ id, path: ancestorsOf(tree, id), at: leftAt(tree.nodes[id]!) }));
 }

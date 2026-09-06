@@ -235,9 +235,12 @@ gesture that can provoke it — a refused drop is drawn as refused and writes no
 
 `resolveTree` drops two things from `children`, and every edit and every view reads the filtered set: a tombstoned
 subtree (T-7, inherited) and a row whose own `done` is set (T-11, **not** inherited). Both are still in `tree.nodes`.
-`src/core/done.ts` reads them back out for the Done view at `#/done` (T-12), which is where a finished row is un-ticked
-and a deleted one restored — T-13, one `restore` op, and the subtree comes back with it because T-7 never tombstoned the
-descendants individually.
+`src/core/done.ts` reads them back out for the Done view at `#/done` (T-12), and it is **one list with no distinction
+between the two**: a tick and a delete are the same answer to "where did that go?", so `archivedRows` returns both,
+newest first by `deletedAt` or `doneAt` — `doneAt` being derived at the fold from the winning `set done`, exactly as
+`deletedAt` is, so nothing in the payload learned about it. One control on each row: `unarchive` in `src/core/edit.ts`
+clears the tombstone, the tick, or both — T-13, one `restore` op, and the subtree comes back with it because T-7 never
+tombstoned the descendants individually. past_decision.md §13.
 
 `src/core/search.ts` at `#/search/<query>` is the other way back to both, and the only one that finds them by name: it
 scans the materialised tree per query and stores no index at all (F-4).

@@ -57,6 +57,13 @@ export interface Node {
   title: string;
   /** Tasks only — K-2. Kept across a "Turn into", so turning back restores it. */
   done: boolean;
+  /**
+   * The `at` of the write that set `done`, in the way `deletedAt` is the
+   * tombstone's — T-12 orders the archive by it. Null whenever `done` is false,
+   * so clearing a tick clears the stamp with it and nothing has to reason about
+   * a date attached to a row that is back in the tree.
+   */
+  doneAt: number | null;
   /** Notes only — K-3. */
   body: string | null;
   /** A-1. Normalised, sorted and deduplicated — `core/tags.ts` owns the shape. */

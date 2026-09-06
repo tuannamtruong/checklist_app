@@ -16,6 +16,7 @@ History of project's decision. The situation, its options and resolution.
 | [Theming](#9-theming) | Swap the semantic tokens under `data-theme` on the document root | -  a stylesheet per theme, loaded at runtime<br>-  Tailwind's `dark:` variant on every component<br>-  `prefers-color-scheme` and no choice at all |
 | [Retiring the `list` kind](#11-retiring-the-list-kind) | Read `list` as `folder` at the decoder, and leave every file alone | -  keeping the kind<br>-  a migration pass that rewrites the log<br>-  a log version bump |
 | [Formatting in a note body](#12-formatting-in-a-note-body) | A Markdown subset stored in the body string | -  a rich editor over `contenteditable`, storing HTML<br>-  a JSON document model in a new field<br>-  a `heading` kind of row<br>-  no formatting at all |
+| [One archive rather than two lists](#13-one-archive-rather-than-two-lists) | One list of everything the tree no longer shows, ordered by when it left | -  keeping the finished and deleted lists apart<br>-  one list with a badge saying which kind of gone<br>-  a separate `archived_at` field on the op |
 
 ---
 
@@ -339,3 +340,44 @@ time with four characters around it. Under B it shows a paragraph of tags, and u
 A body that wants a list, a link or code — which is a note-taking application rather than a checklist with notes
 attached. The thing to reach for then is a real editor and the cost is the caret model, so the measurement that would
 justify it is bodies long enough that the person is writing *in* the app rather than *about* the rows.
+
+---
+
+## 13. One archive rather than two lists
+
+**One list of everything the tree no longer shows, newest first, with no distinction drawn between a ticked row and a
+deleted one.**
+
+The Done view shipped in M1 as two sections — finished, then deleted — because that is how the data is shaped: a tick is
+a field and a tombstone is an op, and they are undone by different writes. Shaping the *screen* that way asked the
+reader a question the screen exists to answer. Someone arriving at `#/done` is looking for a row and knows only that it
+is not where they left it; making them first settle whether they had ticked it or deleted it is asking them to remember
+the thing they came to look up.
+
+Ordering follows from the same argument. Tree order was right for the finished list while it was a second view of the
+tree, and it is wrong for one list nobody browses: the row being looked for is nearly always the last one to go.
+
+### 13.1 The options
+
+| | Option | Cost |
+| --- | --- | --- |
+| A | **One list, ordered by when the row left** — chosen | `done` needed a timestamp, which `deleted` already had |
+| B | Two lists, as built | The reader classifies the row before they can find it, and neither list is in the order the question is asked in |
+| C | One list, each row badged "ticked" or "deleted" | The badge is the classification again, moved from the heading onto every line — and it is the app's bookkeeping rather than anything the reader acts on. The Restore control does the right thing either way, so the badge tells them nothing they can use |
+| D | One list, ordered by an `archived_at` written onto the op | A new field in the payload for something the fold can derive, and every older file would arrive without it |
+
+`doneAt` is derived at the fold from the winning `set done`'s own `at`, in the way `deletedAt` and `parentSetAt` already
+are — [sync-flow.md §4.9 The restore op](sync-flow.md#49-the-restore-op). That is what makes option A cost nothing at
+the payload: no op changed, no file changed, and a row ticked by a build that predates the field dates itself the first
+time this replica folds it. Compaction keeps the last writer of `done`, so the stamp survives the cut for the same
+reason the value does.
+
+One control follows from one list. `unarchive` clears the row's own tombstone, its own tick, or both — the two ops the
+view already wrote, and both together for a row that was deleted while it was ticked, which would otherwise come back
+and drop straight into the archive again.
+
+### 13.2 What reopens it
+
+An archive long enough to need finding rather than scanning. The answer then is a filter or a search over it — F-4
+already reaches these rows by name — and not a second list: splitting by the reason a row left would still be splitting
+by the thing the reader does not remember.

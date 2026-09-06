@@ -52,6 +52,7 @@ and never replays per read — [sync-flow.md §4.6 The decision](sync-flow.md#46
 | `kind` | one of `folder`, `note`, `task` | K-1. Mutable after the fact — K-5. A `list` in an older file decodes as `folder` |
 | `title` | string | The row label, every kind |
 | `done` | boolean | Tasks only — K-2. Also the T-11 filter: a row carrying it leaves the normal view |
+| `doneAt` | timestamp or null | The `at` of the write that set `done`, as `deletedAt` is the tombstone's. T-12 orders the archive by it |
 | `body` | string or null | Notes only — K-3 |
 | `tags` | string set | A-1. Normalised, sorted and deduplicated by `src/core/tags.ts`; merges as one field |
 | `priority` | one of `none`, `low`, `medium`, `high` | A-2. `none` is a value, not an absent field |
@@ -108,8 +109,8 @@ therefore no merge rule for names at all. `lastSeen` (D-2) rides the same line.
 The folder handle itself is the one piece that cannot live in `localStorage` — a File System Access handle is an object
 rather than a string — so it sits in IndexedDB, which changes where it is stored and nothing about the rule.
 
-The Done view itself is not state. It is a read-time filter over `done` and the T-7 tombstone — derived, so it needs no
-sync and no writes.
+The Done view itself is not state. It is a read-time filter over `done` and the T-7 tombstone, ordered by the two
+timestamps the fold already carries — derived, so it needs no sync and no writes.
 
 ## 3. Tree structure and editing
 
@@ -126,8 +127,8 @@ sync and no writes.
 | T-9 | Breadcrumbs show the path back up from any node | ✅ | `src/ui/Breadcrumbs.svelte`, over `ancestorsOf` |
 | T-10 | Sidebar shows the **top-level** `folder` and `note` rows, and nothing deeper | ✅ | `SIDEBAR_KINDS` in `src/core/types.ts`, read by `src/ui/SidebarLinks.svelte`, which renders one level and does not recurse. A task would drown the two kinds that are navigation |
 | T-11 | A ticked row is not in the normal view at all — not in its list, not in the sidebar, not in the caret order, and neither is anything it holds | ✅ | The filter is `resolveTree`'s, beside T-7's: `src/core/tree.ts` drops an own-`done` node from `children`, and one filtered set answers all three. The subtree goes with it because nothing walks *into* a row that is not there — but the flag itself is **not** inherited, so a finished row's own page still shows what is inside it, which is what makes T-12's rows worth opening. `tree.test.ts`, `scripts/ui-smoke.mjs` |
-| T-12 | One Done view lists every finished row and every deleted row, each with the path it sat on | ✅ | `src/core/done.ts` derives both lists; `src/ui/DonePage.svelte` at `#/done`. Each list names the top of its run, never the descendants. A finished row is un-ticked from here and returns to the tree — an ordinary `set done:false`, so it costs no new op. `done.test.ts`, `scripts/ui-smoke.mjs` |
-| T-13 | A deleted row can be restored from the Done view | ✅ | The `restore` op of [§2.2 The op](#22-the-op), added in M3: `src/core/edit.ts` `restore`, offered by `src/ui/DonePage.svelte`. It clears the row's **own** tombstone and nothing else, so a row still under a deleted ancestor stays gone — which is why the Done view lists only the top of a deleted run, and restoring that one brings the whole subtree back with it. `done.test.ts`, `edit.test.ts`, `scripts/ui-smoke.mjs` |
+| T-12 | One Done view lists every row the tree no longer shows — ticked or deleted, one list, newest first, each with the path it sat on | ✅ | `archivedRows` in `src/core/done.ts`; `src/ui/DonePage.svelte` at `#/done`. **No distinction between the two:** a tick and a delete are the same answer to "where did that go?", and two lists made the reader settle which kind of gone a row had been before they could start looking. The order is `deletedAt` or `doneAt`, newest first, because the row being looked for is nearly always the last one to go — tree order is the wrong order for a list nobody browses. One entry per run, never the descendants, and one control on it: `unarchive` in `src/core/edit.ts` clears the tombstone, the tick, or both. `done.test.ts`, `edit.test.ts`, `scripts/ui-smoke.mjs` |
+| T-13 | A deleted row can be restored from the Done view | ✅ | The `restore` op of [§2.2 The op](#22-the-op), added in M3: `src/core/edit.ts` `restore`, offered by `src/ui/DonePage.svelte`. It clears the row's **own** tombstone and nothing else, so a row still under a deleted ancestor stays gone — which is why the Done view lists only the top of a deleted run, and restoring that one brings the whole subtree back with it. It is one of the two ops `unarchive` writes, and the archive's single Restore control is where T-12 offers it. `done.test.ts`, `edit.test.ts`, `scripts/ui-smoke.mjs` |
 | T-14 | A row is dragged to another place in the tree: above a row, below it, or into it | ✅ | `dropOnto` in `src/core/edit.ts`, one `move` op like every other; `src/ui/drag.svelte.ts` drives it over **pointer** events rather than HTML5 drag-and-drop, so a thumb and a mouse take one code path. `edit.test.ts`, `scripts/ui-smoke.mjs` |
 | T-15 | The grip sits in one column at the left edge of every row, whatever the row's depth | ✅ | `src/ui/Row.svelte` puts the depth indent on the row's contents rather than on the row itself, so every grip is at the same x and the indent still draws the nesting. `scripts/ui-smoke.mjs` |
 | T-16 | On a touch screen there is no grip at all: a finger held on the row picks it up | ✅ | `src/ui/drag.svelte.ts` arms the hold on `pointerdown` and fires it after 400 ms of stillness, `src/ui/Row.svelte` captures the pointer there, and the coarse-pointer rule in `src/app.css` takes the grip off the row. `drag.svelte.test.ts`, `scripts/ui-smoke.mjs` |
@@ -411,7 +412,7 @@ helper and to the Android WebView unchanged. `src/app/router.svelte.ts` holds th
 | --- | --- | --- |
 | `#/` | The root: every top-level row | `src/ui/NodePage.svelte` with no node |
 | `#/n/<node-id>` | One node's page — its path, its title, its body if it is a note, and its children | `src/ui/NodePage.svelte` |
-| `#/done` | The Done view of T-12: every finished row, then every deleted one | `src/ui/DonePage.svelte` |
+| `#/done` | The Done view of T-12: every ticked and deleted row in one list, newest first | `src/ui/DonePage.svelte` |
 | `#/conflicts` | What the merge decided without asking — [§9 Conflict presentation](#9-conflict-presentation) | `src/ui/ConflictsPage.svelte` |
 | `#/search` and `#/search/<query>` | The search results of [§6 Search](#6-search) | `src/ui/SearchPage.svelte` |
 | `#/settings` | Everything about this device rather than about the tree — its name, its log, its theme. X-12 in [§10 Application shell, PWA, offline](#10-application-shell-pwa-offline) | `src/ui/SettingsPage.svelte` |

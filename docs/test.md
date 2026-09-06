@@ -137,10 +137,10 @@ keyboard model — `Enter`, `Tab`/`Shift-Tab`, `Alt-↑`/`Alt-↓`, `Backspace` 
 every keyboard action also exists in the row menu, since phones have no Tab key.
 
 Two of the checks are about what is *not* on screen, which a unit test cannot see: ticking a row makes it leave the tree
-and the sidebar (T-11), and the Done view at `#/done` then holds it beside every deleted row, with the path each sat on
-(T-12). Un-ticking there returns the row to the tree it came from, and since M3 so does restoring a deleted one — T-13,
-which the smoke run checks by deleting a row with a child, restoring it from `#/done`, and asserting the child came back
-with it.
+and the sidebar (T-11), and the Done view at `#/done` then holds it in one list with every deleted row, newest first,
+each with the path it sat on (T-12). The one Restore control there returns a ticked row to the tree it came from, and
+since M3 a deleted one too — T-13, which the smoke run checks by deleting a row with a child, restoring it from
+`#/done`, and asserting the child came back with it.
 
 M3 adds two more views to drive: `#/search` for [requirements.md §6 Search](requirements.md#6-search) — that a query
 finds a title, a note body, and a row T-11 has hidden — and `#/devices` for D-1, that a name typed there survives a

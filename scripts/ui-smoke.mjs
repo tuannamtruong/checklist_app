@@ -425,17 +425,13 @@ async function main() {
     // --- T-12: the Done view ----------------------------------------------
     await page.locator('[data-testid="done-link"]').click();
     await page.waitForSelector('[data-testid="done-page"]');
-    const finishedTitles = await archivedTitles(page, 'finished-row');
+    // Ticked and deleted in one list, and the seeded pair are older than the two
+    // this run made — so the order is the only thing that can produce this.
+    const archived = await archivedTitles(page);
     check(
-      'the Done view holds every finished row — T-12',
-      finishedTitles.join('|') === 'Milk|Bread',
-      finishedTitles.join('|'),
-    );
-    const deletedTitles = await archivedTitles(page, 'deleted-row');
-    check(
-      'and every deleted one, newest first',
-      deletedTitles.join('|') === 'Oat milk|Old receipts',
-      deletedTitles.join('|'),
+      'the Done view holds every ticked and deleted row in one list, newest first — T-12',
+      archived.join('|') === 'Milk|Oat milk|Old receipts|Bread',
+      archived.join('|'),
     );
     const paths = (await page.locator('[data-testid="archived-path"]').allInnerTexts()).map((t) => t.trim());
     check(
@@ -445,13 +441,13 @@ async function main() {
     );
     await page.screenshot({ path: join(shots, 'done.png'), fullPage: true });
 
-    // Un-ticking here is an ordinary field write, so the row goes back to its
-    // list. Nothing un-deletes — T-13.
-    await finishedRowByTitle(page, 'Milk').locator('[data-testid="done"]').click();
+    // One control, whichever way the row left. On a ticked row it is an ordinary
+    // field write, so the row goes back to its list.
+    await archivedRowByTitle(page, 'Milk').locator('[data-testid="restore"]').click();
     check(
-      'un-ticking in the Done view returns the row to its list',
-      (await archivedTitles(page, 'finished-row')).join('|') === 'Bread',
-      (await archivedTitles(page, 'finished-row')).join('|'),
+      'restoring a ticked row returns it to its list',
+      (await archivedTitles(page)).join('|') === 'Oat milk|Old receipts|Bread',
+      (await archivedTitles(page)).join('|'),
     );
     await landed(page, '"done":false');
     await page.goto(BASE_URL);
@@ -601,18 +597,18 @@ async function main() {
     await page.waitForSelector('[data-testid="done-page"]');
     check(
       'and so did the Done view, which is derived rather than stored — T-12',
-      (await archivedTitles(page, 'finished-row')).join('|') === 'Bread' &&
-        (await archivedTitles(page, 'deleted-row')).join('|') === 'Oat milk|Old receipts',
+      (await archivedTitles(page)).join('|') === 'Oat milk|Old receipts|Bread',
+      (await archivedTitles(page)).join('|'),
     );
 
     // --- T-13: restoring, which M1 and M2 could not do --------------------
     // One op, and the subtree comes with it: T-7 never tombstoned the child
     // individually, so clearing the top of the run is the whole operation.
-    await deletedRowByTitle(page, 'Old receipts').locator('[data-testid="restore"]').click();
+    await archivedRowByTitle(page, 'Old receipts').locator('[data-testid="restore"]').click();
     check(
-      'restoring a row takes it out of the deleted list — T-13',
-      (await archivedTitles(page, 'deleted-row')).join('|') === 'Oat milk',
-      (await archivedTitles(page, 'deleted-row')).join('|'),
+      'restoring a deleted row takes it out of the archive — T-13',
+      (await archivedTitles(page)).join('|') === 'Oat milk|Bread',
+      (await archivedTitles(page)).join('|'),
     );
     await landed(page, '"op":"restore"');
     await page.goto(BASE_URL);
@@ -1189,19 +1185,19 @@ async function rowByTitle(page, title) {
   throw new Error(`no row titled ${JSON.stringify(title)}`);
 }
 
-/** The Done view's rows of one section, in the order it renders them — T-12. */
-async function archivedTitles(page, testid) {
+/** The archive's rows, in the order it renders them — newest first, T-12. */
+async function archivedTitles(page) {
   const titles = await page
-    .locator(`[data-testid="${testid}"] [data-testid="archived-title"]`)
+    .locator('[data-testid="archived-row"] [data-testid="archived-title"]')
     .allInnerTexts();
   return titles.map((title) => title.trim());
 }
 
-function finishedRowByTitle(page, title) {
-  return page.locator('[data-testid="finished-row"]').filter({ hasText: title });
-}
-function deletedRowByTitle(page, title) {
-  return page.locator('[data-testid="deleted-row"]').filter({ hasText: title });
+/** Exact, because one list now holds both "Milk" and "Oat milk". */
+function archivedRowByTitle(page, title) {
+  return page.locator('[data-testid="archived-row"]', {
+    has: page.locator(`[data-testid="archived-title"]:text-is("${title}")`),
+  });
 }
 async function searchHitTitles(page) {
   const titles = await page.locator('[data-testid="hit-title"]').allInnerTexts();

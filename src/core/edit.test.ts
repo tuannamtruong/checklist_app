@@ -27,6 +27,7 @@ import {
   setTitle,
   toggleDone,
   turnInto,
+  unarchive,
 } from './edit';
 import { FakeContext, Session, titlesOf } from './test-support';
 import { childrenOf, parentOf } from './tree';
@@ -460,6 +461,35 @@ describe('deleting — T-7 and §3.1', () => {
     expect(canRestore(session.tree, child)).toBe(false);
     expect(restore(session.tree, ctx, child)).toEqual([]);
     expect(canRestore(session.tree, a)).toBe(true);
+  });
+
+  it('takes a row back out of the archive whichever way it left — T-12', () => {
+    const [a, b] = threeRows();
+    ctx.tick();
+    session.apply(toggleDone(session.tree, ctx, a));
+    ctx.tick();
+    session.apply(remove(session.tree, ctx, b));
+
+    expect(unarchive(session.tree, ctx, a).map((op) => op.op)).toEqual(['set']);
+    expect(unarchive(session.tree, ctx, b).map((op) => op.op)).toEqual(['restore']);
+    expect(unarchive(session.tree, ctx, 'n_missing')).toEqual([]);
+  });
+
+  it('clears both the tombstone and the tick when the row carries both', () => {
+    // Otherwise a row deleted while ticked would come back and go straight into
+    // the archive again, which reads as a restore that did nothing.
+    const [a] = threeRows();
+    ctx.tick();
+    session.apply(toggleDone(session.tree, ctx, a));
+    ctx.tick();
+    session.apply(remove(session.tree, ctx, a));
+
+    ctx.tick();
+    const ops = unarchive(session.tree, ctx, a);
+    expect(ops.map((op) => op.op)).toEqual(['restore', 'set']);
+    session.apply(ops);
+    expect(childrenOf(session.tree, ROOT)).toContain(a);
+    expect(session.tree.nodes[a]!.done).toBe(false);
   });
 
   it('refuses every field write to a tombstoned row', () => {
