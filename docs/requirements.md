@@ -130,6 +130,7 @@ sync and no writes.
 | T-13 | A deleted row can be restored from the Done view | ✅ | The `restore` op of [§2.2 The op](#22-the-op), added in M3: `src/core/edit.ts` `restore`, offered by `src/ui/DonePage.svelte`. It clears the row's **own** tombstone and nothing else, so a row still under a deleted ancestor stays gone — which is why the Done view lists only the top of a deleted run, and restoring that one brings the whole subtree back with it. `done.test.ts`, `edit.test.ts`, `scripts/ui-smoke.mjs` |
 | T-14 | A row is dragged to another place in the tree: above a row, below it, or into it | ✅ | `dropOnto` in `src/core/edit.ts`, one `move` op like every other; `src/ui/drag.svelte.ts` drives it over **pointer** events rather than HTML5 drag-and-drop, so a thumb and a mouse take one code path. `edit.test.ts`, `scripts/ui-smoke.mjs` |
 | T-15 | The grip sits in one column at the left edge of every row, whatever the row's depth | ✅ | `src/ui/Row.svelte` puts the depth indent on the row's contents rather than on the row itself, so every grip is at the same x and the indent still draws the nesting. `scripts/ui-smoke.mjs` |
+| T-16 | On a touch screen there is no grip at all: a finger held on the row picks it up | ✅ | `src/ui/drag.svelte.ts` arms the hold on `pointerdown` and fires it after 400 ms of stillness, `src/ui/Row.svelte` captures the pointer there, and the coarse-pointer rule in `src/app.css` takes the grip off the row. `drag.svelte.test.ts`, `scripts/ui-smoke.mjs` |
 
 [sync-flow.md §3 Why a snapshot does not scale to a tree](sync-flow.md#3-why-a-snapshot-does-not-scale-to-a-tree) is why
 T-2, T-5, T-6 and T-7 constrain the sync payload, not just the UI.
@@ -143,6 +144,20 @@ same icon on a phone — and every other edit in this application reaches a phon
 top quarter is above it, the bottom quarter is below it, and the middle is inside it. Inside is what makes drag able to
 express T-5's refusal — it is the one gesture that can ask for a row to become its own descendant — so a refused target
 is drawn as refused and the drop writes nothing.
+
+**A phone has no grip, and a finger held on the row is the gesture instead — T-16.** A grip drawn large enough for a
+thumb is a column of dots down every row, and it spends the width a title needs on a control that is a second way to do
+the one thing a hold already means on a phone. So a coarse pointer gets no grip and the row itself is what is picked up,
+after 400 ms of stillness and no more than 8 px of travel — long enough that a tap and a scroll are not drags, short
+enough to beat the browser's own long press. A mouse never takes this path: the pointer type is on the event, and a
+desktop has the grip right there under the pointer.
+
+**What the browser would otherwise do with that hold has to be taken back, and none of it can be said in CSS.**
+`touch-action` is read when the finger goes down, and at that moment the gesture was still a tap, so the drag prevents
+the events instead as they arrive: the `touchmove` that would scroll the page under the row — cancellable right up until
+scrolling actually starts, and by definition nothing has moved yet — the `contextmenu` and the text selection the
+browser's own long press raises at about half a second, and the click the finger delivers on the way up, which would
+otherwise put the caret in whatever title the row was dropped on and raise the keyboard.
 
 **The grip is not indented and the rest of the row is — T-15.** The indent used to sit on the row itself, so the grip
 moved right with everything else and a column of grips down a nested list was a staircase. What an indent is for is

@@ -979,6 +979,73 @@ async function main() {
       (await page.locator('[data-testid="conflicts-link"]').count()) === 0,
     );
 
+    // --- press and hold, on a touch screen — T-16 --------------------------
+    // Its own context: `hasTouch` is settled when a context is made, and the
+    // rest of this run is a mouse. Playwright's touchscreen can only tap, so
+    // the hold itself is dispatched over CDP.
+    const phone = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      hasTouch: true,
+      isMobile: true,
+    });
+    await seedInto(phone);
+    try {
+      const touch = await phone.newPage();
+      await touch.goto(BASE_URL);
+      await touch.waitForSelector('[data-testid="tree"]');
+      const finger = await phone.newCDPSession(touch);
+
+      check(
+        'a touch screen is what the app thinks it has',
+        await touch.evaluate(() => matchMedia('(pointer: coarse)').matches),
+      );
+      check(
+        'there is no grip to reach for — T-16',
+        await touch.evaluate(() => {
+          const grip = document.querySelector('[data-testid="drag-handle"]');
+          return grip !== null && getComputedStyle(grip).display === 'none';
+        }),
+      );
+
+      const milk = await (await rowByTitle(touch, 'Milk')).boundingBox();
+      const beans = await (await rowByTitle(touch, 'Coffee beans')).boundingBox();
+      const held = { x: milk.x + milk.width / 2, y: milk.y + milk.height / 2 };
+
+      await fingerAt(finger, 'touchStart', held.x, held.y);
+      await touch.waitForTimeout(600);
+      check(
+        'a finger held on the row picks it up — T-16',
+        (await (await rowByTitle(touch, 'Milk')).getAttribute('data-dragging')) === 'true',
+      );
+      await touch.screenshot({ path: join(shots, 'phone-drag.png') });
+
+      // Two moves again: one to leave the row, one to land in the bottom
+      // quarter of the target, which is "after" — src/ui/drag.svelte.ts.
+      const landing = beans.y + beans.height - 3;
+      await fingerAt(finger, 'touchMove', held.x, (held.y + landing) / 2);
+      await fingerAt(finger, 'touchMove', held.x, landing);
+      await fingerAt(finger, 'touchEnd', held.x, landing);
+      check(
+        'and letting go drops it where the finger was — T-16, T-14',
+        (await titlesUnder(touch, 'Shopping')).join('|') === 'Coffee beans|Milk',
+        (await titlesUnder(touch, 'Shopping')).join('|'),
+      );
+
+      // A finger that moves is scrolling the page, not carrying a row.
+      await fingerAt(finger, 'touchStart', held.x, held.y);
+      await fingerAt(finger, 'touchMove', held.x, held.y + 60);
+      await touch.waitForTimeout(600);
+      const scrolled = await touch.evaluate(() =>
+        [...document.querySelectorAll('[data-testid="row"]')].some(
+          (row) => row.dataset.dragging === 'true',
+        ),
+      );
+      await fingerAt(finger, 'touchEnd', held.x, held.y + 60);
+      check('a finger that travels is a scroll and picks nothing up — T-16', !scrolled);
+    } finally {
+      await phone.close();
+    }
+
     // --- first run, in a browser with nothing in it — architecture.md §4 -----
     // Its own context, because the question is what a device with no folder and
     // no op log does, and the seeded one has both.
@@ -1044,6 +1111,18 @@ async function dragRow(page, title, ontoTitle, where) {
   const refused = await target.getAttribute('data-drop-refused');
   await page.mouse.up();
   return refused;
+}
+
+/**
+ * One touch point, dispatched over CDP — Playwright's own touchscreen can only
+ * tap, and T-16 is about how long the finger stays down. `touchEnd` carries the
+ * points that are *still* down, which for one finger is none.
+ */
+function fingerAt(session, type, x, y) {
+  return session.send('Input.dispatchTouchEvent', {
+    type,
+    touchPoints: type === 'touchEnd' ? [] : [{ x, y, radiusX: 12, radiusY: 12, force: 1, id: 1 }],
+  });
 }
 
 /** The titles of the rows at the top level, in render order. */

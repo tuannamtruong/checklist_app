@@ -85,6 +85,40 @@
     );
   }
 
+  // T-16, the touch half of the same drag. A coarse pointer has no grip to press,
+  // so the row itself is picked up by a finger held on it — and a mouse never
+  // takes this path, because on a desktop the grip is right there under it.
+  function onRowPointerDown(event: PointerEvent): void {
+    if (event.pointerType === 'mouse') return;
+    // A button and a link mean what they say, even under a long press.
+    if ((event.target as HTMLElement | null)?.closest('button, a')) return;
+    const row = event.currentTarget as HTMLElement;
+    drag.arm(id, event.clientX, event.clientY, () => {
+      row.setPointerCapture(event.pointerId);
+      // A row being dragged under an open keyboard is half a screen of it. The
+      // title commits on its way out, which is the ordinary blur — nothing new.
+      (document.activeElement as HTMLElement | null)?.blur();
+    });
+  }
+
+  function onRowPointerMove(event: PointerEvent): void {
+    if (event.pointerType === 'mouse') return;
+    if (drag.id === id) onDragMove(event);
+    else drag.armedMove(event.clientX, event.clientY);
+  }
+
+  function onRowPointerUp(event: PointerEvent): void {
+    if (event.pointerType === 'mouse') return;
+    drag.disarm();
+    if (drag.id === id) onDragEnd();
+  }
+
+  function onRowPointerCancel(event: PointerEvent): void {
+    if (event.pointerType === 'mouse') return;
+    drag.disarm();
+    if (drag.id === id) drag.cancel();
+  }
+
   function onDragEnd(): void {
     const target = drag.end();
     if (!target) return;
@@ -122,9 +156,17 @@
     data-depth={depth}
     data-drop={drop?.where ?? ''}
     data-drop-refused={refused}
+    data-dragging={drag.id === id}
+    role="group"
+    aria-label={node.title || 'Untitled'}
+    onpointerdown={onRowPointerDown}
+    onpointermove={onRowPointerMove}
+    onpointerup={onRowPointerUp}
+    onpointercancel={onRowPointerCancel}
   >
-    <!-- T-14. Always there on a touch screen, on hover or focus otherwise: a
-         grip on every row at rest is a column of dots down the page. -->
+    <!-- T-14 on a desktop, on hover or focus: a grip on every row at rest is a
+         column of dots down the page. There is none at all on a touch screen —
+         T-16 picks the row up by holding a finger on it. -->
     <button
       type="button"
       class="drag-handle row-control row-icon w-4 shrink-0 cursor-grab text-ink-faint opacity-0 group-hover:opacity-100 focus-visible:opacity-100"

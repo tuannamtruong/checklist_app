@@ -182,9 +182,11 @@ body {
     min-height: 2.25rem;
   }
 
-  /* T-14: there is no hover on a touch screen, so the grip is simply there. */
+  /* T-16: a touch screen has no grip at all. One drawn large enough for a thumb
+     is a column of dots down the page spending the width a title needs, and a
+     finger held on the row already means "pick this up" here. */
   .drag-handle {
-    opacity: 1;
+    display: none;
   }
 }
 

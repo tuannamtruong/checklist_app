@@ -6,6 +6,10 @@
 // would be a desktop-only feature wearing the same grip on a phone — and every
 // other edit in this application reaches a phone. One `pointerdown`, one
 // capture, and the row under the pointer found by hit-testing serves both.
+//
+// T-16 is the other half of that: a touch screen has no grip, so the pointer
+// that starts the drag is a finger held on the row itself. The geometry below
+// does not know which of the two started it.
 
 import type { DropWhere } from '../core/edit';
 import type { NodeId } from '../core/types';
@@ -16,6 +20,15 @@ import type { NodeId } from '../core/types';
  * with a thumb and narrow enough that the middle is the easy target.
  */
 const EDGE = 0.25;
+
+/**
+ * T-16. How long a finger rests on a row before the row is picked up, and how
+ * far it may travel in that time. Long enough that a tap and the start of a
+ * scroll are neither of them drags, short enough to be ahead of the browser's
+ * own long press — which is what would otherwise select the title's text.
+ */
+const HOLD_MS = 400;
+const HOLD_SLOP = 8;
 
 export interface DropTarget {
   id: NodeId;
@@ -33,10 +46,77 @@ export class RowDrag {
   /** T-5: the pointer is over a drop the tree will refuse, and it is drawn so. */
   refused = $state(false);
 
+  /** T-16: the finger resting on a row, before the hold has fired. */
+  #hold: { id: NodeId; x: number; y: number; timer: ReturnType<typeof setTimeout> } | null = null;
+  /** What the hold took away from the browser, ready to be given back. */
+  #release: (() => void) | null = null;
+
   start(id: NodeId): void {
     this.id = id;
     this.target = null;
     this.refused = false;
+  }
+
+  /**
+   * T-16, the touch half: arm the press and hold. `onHold` runs when the row is
+   * picked up rather than now — the view captures the pointer there, because a
+   * capture taken at `pointerdown` would eat every tap that is not a drag.
+   */
+  arm(id: NodeId, x: number, y: number, onHold: () => void): void {
+    this.disarm();
+    const timer = setTimeout(() => {
+      this.#hold = null;
+      this.#suppress();
+      this.start(id);
+      // A finger covers the row it picked up, so the confirmation is the one
+      // sense not looking at it. Absent on a desktop, and optional everywhere.
+      if (typeof navigator !== 'undefined') navigator.vibrate?.(15);
+      onHold();
+    }, HOLD_MS);
+    this.#hold = { id, x, y, timer };
+  }
+
+  /** A finger that travels before the hold fires was scrolling, not dragging. */
+  armedMove(x: number, y: number): void {
+    const hold = this.#hold;
+    if (!hold) return;
+    if (Math.abs(x - hold.x) > HOLD_SLOP || Math.abs(y - hold.y) > HOLD_SLOP) this.disarm();
+  }
+
+  /** Forget a hold that has not fired. A hold that has is `cancel`'s business. */
+  disarm(): void {
+    if (this.#hold) clearTimeout(this.#hold.timer);
+    this.#hold = null;
+  }
+
+  /**
+   * Everything the browser does with a finger held on a row, taken back — and
+   * none of it can be said in CSS. `touch-action` is read when the finger goes
+   * down and at that moment this was still a tap, so the events are prevented
+   * as they arrive instead: the `touchmove` that would scroll the page (still
+   * cancellable, because by definition nothing has moved yet), the
+   * `contextmenu` and selection the browser's own long press raises a moment
+   * later, and the click of the finger coming up, which would otherwise put the
+   * caret in the title the row was dropped on.
+   */
+  #suppress(): void {
+    if (typeof document === 'undefined') return;
+    document.getSelection()?.removeAllRanges();
+    const block = (event: Event) => event.preventDefault();
+    const swallow = (event: Event) => {
+      event.preventDefault();
+      event.stopPropagation();
+    };
+    document.addEventListener('touchmove', block, { passive: false });
+    document.addEventListener('contextmenu', block, { capture: true });
+    this.#release = () => {
+      document.removeEventListener('touchmove', block);
+      document.removeEventListener('contextmenu', block, { capture: true });
+      // The click arrives after `pointerup`, so this one outlives the drag —
+      // for one click or a third of a second, whichever comes first.
+      document.addEventListener('click', swallow, { capture: true, once: true });
+      setTimeout(() => document.removeEventListener('click', swallow, { capture: true }), 300);
+    };
   }
 
   /**
@@ -68,6 +148,9 @@ export class RowDrag {
   }
 
   cancel(): void {
+    this.disarm();
+    this.#release?.();
+    this.#release = null;
     this.id = null;
     this.target = null;
     this.refused = false;
