@@ -13,6 +13,7 @@
     "test:watch": "vitest",
     "seed": "node scripts/seed.mjs",
     "ui-smoke": "node scripts/ui-smoke.mjs",
+    "shot": "node scripts/shot.mjs",
     "docs:check": "python3 scripts/md-reflow.py docs/*.md --check",
     "make-icons": "node scripts/make-icons.mjs"
   },

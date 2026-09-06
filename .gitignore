@@ -28,6 +28,7 @@ dist-ssr
 
 # Screenshots from scripts/ui-smoke.mjs
 ui-smoke/
+ui-shots/
 
 # Python
 *__pycache__*

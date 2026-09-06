@@ -62,10 +62,10 @@
     data-open={view.drawerOpen}
   >
     <div class="flex items-center justify-between border-b border-line px-3 py-3">
-      <a href="#/" class="text-sm font-semibold" onclick={() => view.setDrawer(false)}>Checklist</a>
+      <a href="#/" class="sidebar-text font-semibold" onclick={() => view.setDrawer(false)}>Checklist</a>
       <button
         type="button"
-        class="row-control rounded px-2 text-ink-muted hover:text-ink md:hidden"
+        class="sidebar-text row-control rounded px-2 text-ink-muted hover:text-ink md:hidden"
         aria-label="Close navigation"
         onclick={() => view.setDrawer(false)}
       >
@@ -83,42 +83,42 @@
            taking entries of their own. -->
       <a
         href={SEARCH_HREF}
-        class="mt-2 flex items-center gap-2 rounded-md border-t border-line px-2 pt-3 pb-1.5 text-sm hover:bg-surface-sunken"
+        class="sidebar-text mt-2 flex items-center gap-2 rounded-md border-t border-line px-2 pt-3 pb-1.5 hover:bg-surface-sunken"
         class:text-accent={searchOpen}
         class:text-ink-muted={!searchOpen}
         data-testid="search-link"
         onclick={() => view.setDrawer(false)}
       >
-        <span class="size-4 shrink-0 text-center" aria-hidden="true">⌕</span>
+        <span class="size-[1.2rem] shrink-0 text-center" aria-hidden="true">⌕</span>
         <span class="truncate">Search</span>
-        <span class="ml-auto shrink-0 text-xs text-ink-faint">/</span>
+        <span class="sidebar-note ml-auto shrink-0 text-ink-faint">/</span>
       </a>
 
       <a
         href={DONE_HREF}
-        class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-surface-sunken"
+        class="sidebar-text flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-surface-sunken"
         class:text-accent={doneOpen}
         class:text-ink-muted={!doneOpen}
         data-testid="done-link"
         onclick={() => view.setDrawer(false)}
       >
-        <span class="size-4 shrink-0 text-center" aria-hidden="true">☑</span>
+        <span class="size-[1.2rem] shrink-0 text-center" aria-hidden="true">☑</span>
         <span class="truncate">Done</span>
       </a>
 
       {#if pending > 0 || conflictsOpen}
         <a
           href={CONFLICTS_HREF}
-          class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-surface-sunken"
+          class="sidebar-text flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-surface-sunken"
           class:text-accent={conflictsOpen}
           class:text-ink-muted={!conflictsOpen}
           data-testid="conflicts-link"
           onclick={() => view.setDrawer(false)}
         >
-          <span class="size-4 shrink-0 text-center" aria-hidden="true">⚡</span>
+          <span class="size-[1.2rem] shrink-0 text-center" aria-hidden="true">⚡</span>
           <span class="truncate">Merged</span>
           {#if pending > 0}
-            <span class="ml-auto rounded-full bg-accent-soft px-1.5 text-xs text-accent">
+            <span class="sidebar-note ml-auto rounded-full bg-accent-soft px-1.5 text-accent">
               {pending}
             </span>
           {/if}
@@ -137,19 +137,19 @@
            never produce silently — architecture.md §4. The label says it in
            full, so the line is the label — folder-choice.ts. -->
       {#if !synced}
-        <p class="px-2 pb-1.5 text-xs text-danger" data-testid="not-synced">{folderLabel}</p>
+        <p class="sidebar-note px-2 pb-1.5 text-danger" data-testid="not-synced">{folderLabel}</p>
       {/if}
 
       <div class="flex items-center gap-1">
         <a
           href={SETTINGS_HREF}
-          class="flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-surface-sunken"
+          class="sidebar-text flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 hover:bg-surface-sunken"
           class:text-accent={settingsOpen}
           class:text-ink-muted={!settingsOpen}
           data-testid="settings-link"
           onclick={() => view.setDrawer(false)}
         >
-          <span class="size-4 shrink-0 text-center" aria-hidden="true">⚙</span>
+          <span class="size-[1.2rem] shrink-0 text-center" aria-hidden="true">⚙</span>
           <span class="truncate">Settings</span>
         </a>
         {#if synced}
@@ -159,7 +159,7 @@
                leads to — a sync you have to navigate to is one nobody presses. -->
           <button
             type="button"
-            class="row-control shrink-0 rounded px-2 py-1.5 text-sm text-ink-faint hover:text-ink"
+            class="sidebar-text row-control shrink-0 rounded px-2 py-1.5 text-ink-faint hover:text-ink"
             aria-label="Sync now"
             title="Sync now"
             data-testid="sync-now"

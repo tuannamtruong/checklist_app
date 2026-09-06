@@ -35,7 +35,7 @@
   {@const node = session.tree.nodes[id]!}
   <a
     href={nodeHref(id)}
-    class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-surface-sunken"
+    class="sidebar-text flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-surface-sunken"
     class:bg-accent-soft={id === currentId}
     class:text-accent={id === currentId}
     class:text-ink-muted={id !== currentId}
@@ -43,7 +43,7 @@
     data-row-id={id}
     onclick={() => onNavigate?.()}
   >
-    <KindIcon kind={node.kind} class="size-4 shrink-0" />
+    <KindIcon kind={node.kind} class="size-[1.2rem] shrink-0" />
     <span class="truncate">{node.title || 'Untitled'}</span>
   </a>
 {/each}

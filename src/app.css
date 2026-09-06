@@ -195,3 +195,20 @@ body {
 .drag-handle {
   touch-action: none;
 }
+
+/* X-19: the sidebar reads a fifth larger than the page beside it. It is
+   navigation glanced at from across a desk rather than text being edited, and
+   at `text-sm` it was the smallest type on a screen whose whole job is to be
+   aimed at. One rule rather than a size named in six components: `sidebar-text`
+   is Tailwind's `text-sm` × 1.2 and `sidebar-note` is `text-xs` × 1.2, so the
+   proportions inside the column are the ones they always were. Unlayered, so
+   they win over the utility they replace. */
+.sidebar-text {
+  font-size: 1.05rem;
+  line-height: 1.5rem;
+}
+
+.sidebar-note {
+  font-size: 0.9rem;
+  line-height: 1.25rem;
+}
