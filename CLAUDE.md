@@ -82,6 +82,28 @@ in its own process group and kills the group, because `npx` does not pass a sign
 the usual source of a leftover. `make dev`, `make preview`, `make seed` and `make ui-smoke` name the holding process
 instead of failing bare, and `make stop` frees the port.
 
+**Under WSL the port has a second half, and `scripts/win-port.sh` is what reaches it.** The two halves of `127.0.0.1`
+are two namespaces: the Windows bundle's `serve.py` can hold 38531 on the Windows side while vite binds it here — both
+succeed — and a browser *on Windows* is then served whatever `make windows` last staged into that bundle's `web/`, never
+this server. `lsof` and `ss` cannot see across, so the script asks Windows through `netstat.exe`, matching a listening
+socket by its `0.0.0.0:0` peer because the status column is localised.
+
+**`make dev` closes that helper; nothing else does.** `dev` depends on `win-port-stop` *before* `port-check`, since the
+Windows listener has to be gone before vite binds or WSL's forwarder never takes the port over there. `make preview` and
+`make ui-smoke` only name it (`win-port-note`): both are watched from inside WSL, which reaches vite regardless, and the
+app on the Windows taskbar is not theirs to shut. `make win-port-stop` closes it on its own. Only *our* helper is ever
+killed, identified by `serve.py` plus `checklist` in its **command line** rather than by its image name, since
+`pythonw.exe` is any number of other programs; anything else holding the port is named and left alone, and our own
+`wslrelay.exe` forwarder is skipped so the note never fires on us. The script is silent and successful off WSL, so the
+targets depend on it unconditionally.
+
+**The dev server also removes a service worker left over from a build.** The bundle, `make preview` and `make dev` are
+one origin, so a worker any of them installed still answers navigations from its precache and the dev server is never
+asked anything — the app looks frozen at the last build. `vite.config.ts` serves a worker of its own at `/sw.js` in
+development whose only job is to remove itself: it skips waiting, empties every cache, unregisters, and reloads the
+pages it was holding. It is a `configureServer` hook and nothing else, so `make preview` and `make ui-smoke` still serve
+the real `dist/sw.js` — X-5's offline cold start is that worker doing its job, and `ui-smoke` fails if it stops.
+
 
 
 
