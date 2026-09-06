@@ -200,6 +200,22 @@ async function main() {
       `depth ${await depthOf(page, 'Oat milk')}`,
     );
 
+    // T-15: the grip is outside the indent, so a nested list draws one column
+    // of grips rather than a staircase of them.
+    const grips = await page.evaluate(() =>
+      [...document.querySelectorAll('[data-testid="row"]')].map((row) => ({
+        depth: row.dataset.depth,
+        x: Math.round(row.querySelector('[data-testid="drag-handle"]').getBoundingClientRect().x),
+      })),
+    );
+    const gripColumns = new Set(grips.map((grip) => grip.x));
+    const gripDepths = new Set(grips.map((grip) => grip.depth));
+    check(
+      'every grip sits in one column, whatever the row’s depth — T-15',
+      gripColumns.size === 1 && gripDepths.size > 1,
+      `${gripColumns.size} columns over ${gripDepths.size} depths`,
+    );
+
     // --- K-8: the quick-add line -------------------------------------------
     const quickAdd = page.locator('[data-testid="quick-add"]');
     await quickAdd.fill('Batteries');

@@ -116,7 +116,6 @@
     class:bg-accent-soft={drop?.where === 'inside' && !refused}
     class:outline-2={refused}
     class:outline-danger={refused}
-    style="padding-left: {depth * 1.25}rem"
     data-testid="row"
     data-row-id={id}
     data-kind={node.kind}
@@ -139,10 +138,14 @@
       <span aria-hidden="true">⠿</span>
     </button>
 
+    <!-- T-15. The indent starts here, after the grip, rather than on the row:
+         a grip that moved right with the nesting made a staircase of the one
+         control that means the same thing at every depth. -->
     <button
       type="button"
       class="row-control row-icon w-5 shrink-0 text-ink-faint hover:text-ink"
       class:invisible={children.length === 0}
+      style="margin-left: {depth * 1.25}rem"
       aria-label={collapsed ? 'Expand' : 'Collapse'}
       aria-expanded={children.length > 0 ? !collapsed : undefined}
       data-testid="disclosure"
