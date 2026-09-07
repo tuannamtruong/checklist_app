@@ -44,13 +44,6 @@ public class FolderBridge {
     /** What a document tree opens as, for the file app that shows it — X-15. */
     private static final String DIR_MIME = "vnd.android.document/directory";
 
-    /**
-     * A package name and nothing else. The page names one from the catalog in
-     * src/core/providers.ts; this is what keeps a page that names something else
-     * from reaching an arbitrary component — X-17.
-     */
-    private static final String PACKAGE_PATTERN = "[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)*";
-
     private final Context context;
     private final FolderStore store;
     private final Runnable pickFolder;
@@ -87,7 +80,7 @@ public class FolderBridge {
 
     /**
      * X-15. Shows the granted folder in whatever app opens folders on this
-     * phone, which on most is the provider's own.
+     * phone, which on most is the cloud client's own.
      *
      * Unlike the picker, this runs on the calling thread: an activity started
      * from the application context with NEW_TASK needs no UI thread, and doing
@@ -110,28 +103,6 @@ public class FolderBridge {
             // Plenty of phones have no app that views a folder. That is a thing
             // to say, not a crash.
             return "nothing on this phone opens a folder";
-        }
-    }
-
-    /**
-     * X-17. Starts the cloud client whose folder this is, so it can carry what
-     * this device just wrote. The app is never talked to — it is only started.
-     */
-    @JavascriptInterface
-    public String openApp(String packageName) {
-        if (packageName == null || !packageName.matches(PACKAGE_PATTERN)) {
-            return "refused: " + packageName;
-        }
-        Intent launch = context.getPackageManager().getLaunchIntentForPackage(packageName);
-        // Null is also what a package outside <queries> looks like, so the
-        // manifest carries the same catalog the page does.
-        if (launch == null) return "that app is not installed on this phone";
-        launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        try {
-            context.startActivity(launch);
-            return "";
-        } catch (Exception e) {
-            return String.valueOf(e.getMessage());
         }
     }
 

@@ -174,15 +174,19 @@ methods is what lets the merge be tested against a plain object and shipped agai
 for one adapter and is a stub in the other five —
 [code-standard.md §3 Module boundaries](code-standard.md#3-module-boundaries).
 
-So X-15 to X-17 are a separate, entirely optional capability. `src/app/shell.ts` asks the shell that is actually running
-— the Android bridge, the loopback helper, the browser — what it can do, and the settings screen renders only the
-answers it gets:
+So X-15 and X-16 are a separate, entirely optional capability. `src/app/shell.ts` asks the shell that is actually
+running — the Android bridge, the loopback helper, the browser — what it can do, and the settings screen renders only
+the answers it gets:
 
 | Action | Android | Windows helper | Browser |
 | --- | --- | --- | --- |
 | `openFolder` | `AndroidFolder.openFolder()`, an `ACTION_VIEW` on the granted tree | `POST /shell/open` with `{"what":"folder"}` | — |
-| `openApp` | `AndroidFolder.openApp(pkg)`, the launch intent for a package | `POST /shell/open` with `{"what":"app"}` and a command found on `PATH` | — |
 | `changeFolder` | `AndroidFolder.pickFolder()` | — (`--folder` is the launcher's) | The File System Access picker |
+
+There was a third action, `openApp`, which started the cloud client whose folder this is. It is gone with X-17 —
+[requirements.md §10.2 The sync folder, on the settings screen](requirements.md#102-the-sync-folder-on-the-settings-screen)
+— and it took the provider catalog, the Android `<queries>` block and the helper's command runner with it. What is left
+is about the folder, which is the only thing this app has an opinion on.
 
 Three properties keep this from being the fourth method by another name:
 
@@ -193,15 +197,13 @@ convenience, and the merge cannot tell whether they exist.
 is holding, offered to a device on the fallback" — and that was the wrong place for it. Startup already asks the shells
 that exact question, so the answer belongs where the folder is chosen and not on a screen the user has to find first. It
 also has to be asynchronous, where every other answer on this table is a property of `globalThis`. `shellActions` stays
-synchronous and this table stays three rows because the fix went into §4's flowchart instead.
+synchronous and this table stays short because the fix went into [§4 The folder adapter](#4-the-folder-adapter)'s
+flowchart instead.
 
-**The helper takes a command, never a path.** `POST /shell/open` accepts a bare command name matching the same narrow
-pattern the folder API uses, resolves it with `shutil.which` and runs it with no arguments and no shell. It cannot be
-asked to run something out of a directory the caller names, which is the property that makes a loopback endpoint that
-starts processes acceptable at all. It refuses cross-origin exactly as `/folder/` does.
-
-**The folder itself is the one path the helper will open**, because the helper already had it: it came from `--folder`
-on the command line rather than from the page.
+**The helper starts no process the page named.** `POST /shell/open` opens the folder and nothing else, and the folder
+came from `--folder` on the command line rather than from the page. The endpoint took a command name to run while X-17
+stood; taking that out leaves a loopback endpoint that can be asked for one thing it already held. It refuses
+cross-origin exactly as `/folder/` does.
 
 ## 5. Device identity and local storage
 

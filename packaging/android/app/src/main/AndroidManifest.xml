@@ -12,19 +12,12 @@
     -->
 
     <!--
-      X-17. Android 11 hides installed packages from an app that has not said
-      which ones it cares about, and getLaunchIntentForPackage returns null for
-      the rest. This is the same catalog src/core/providers.ts holds, and it is
-      only ever used to *start* one of them: there is no INTERNET permission
-      here, so nothing is ever said to it.
+      Android 11 hides from an app the components it has not said it cares
+      about, so the one intent this app ever fires has to be declared. It named
+      six cloud clients here while X-17 stood; that button is gone, and with it
+      the only reason this app had to know another app exists.
     -->
     <queries>
-        <package android:name="mega.privacy.android.app" />
-        <package android:name="com.dropbox.android" />
-        <package android:name="com.google.android.apps.docs" />
-        <package android:name="com.microsoft.skydrive" />
-        <package android:name="com.nextcloud.client" />
-        <package android:name="com.nutomic.syncthingandroid" />
         <!-- X-15: whatever this phone opens a folder with. -->
         <intent>
             <action android:name="android.intent.action.VIEW" />

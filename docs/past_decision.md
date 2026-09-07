@@ -18,6 +18,7 @@ History of project's decision. The situation, its options and resolution.
 | [Formatting in a note body](#12-formatting-in-a-note-body) | A Markdown subset stored in the body string | -  a rich editor over `contenteditable`, storing HTML<br>-  a JSON document model in a new field<br>-  a `heading` kind of row<br>-  no formatting at all |
 | [One archive rather than two lists](#13-one-archive-rather-than-two-lists) | One list of everything the tree no longer shows, ordered by when it left | -  keeping the finished and deleted lists apart<br>-  one list with a badge saying which kind of gone<br>-  a separate `archived_at` field on the op |
 | [A note beside the list](#14-a-note-beside-the-list-rather-than-instead-of-it) | One route drawing two panes, the list derived from the note | -  a second route carrying both ids<br>-  the pane as device-local state beside the route<br>-  splitting every kind, not just notes<br>-  a preview popover over the row |
+| [Retiring the cloud-app launcher](#16-retiring-the-cloud-app-launcher) | Remove X-17 outright — no catalog, no stored provider, no launch capability | -  keeping the button and dropping only the picker<br>-  a free-text command instead of a catalog<br>-  detecting the provider from the folder's path |
 
 ---
 
@@ -512,3 +513,50 @@ independent scales the question becomes a type system rather than a sidebar sett
 become a set of named steps that several rules draw from.
 
 A step beyond `maximal` is not a reopener; it is a catalog line and a CSS block, which is the property A was chosen for.
+
+## 16. Retiring the cloud-app launcher
+
+X-17 put a cloud client on the settings screen: a picker naming which of six apps keeps this device's folder in sync,
+and a button that started it. The reasoning was a real failure — a row typed on the phone is in the folder and not yet
+in the cloud, because the provider's client has not run — and the button was the shortest way from noticing that to
+fixing it.
+
+What it cost was out of proportion to one tap. `src/core/providers.ts` held six other people's Android package names and
+six desktop command names, `src/app/provider.ts` stored the choice per device, `ShellActions` carried an `openApp` both
+platform shells had to implement, the loopback helper grew an endpoint that resolves a command on `PATH` and starts a
+process, and the Android manifest listed six packages in `<queries>` so Android 11 would admit they exist. Six places to
+edit for a seventh provider, and a unit test whose only job was to keep two of those six lists in step.
+
+None of it is reachable from anything else in the app, and that is the point rather than a defence: nothing in the
+merge, the adapter or the file format may know which provider is under the folder —
+[requirements.md §7.3 Fixed constraints](requirements.md#73-fixed-constraints) — so the catalog could never grow a
+second reader. It was one button's worth of data wearing a module's clothes.
+
+### 16.1 The options
+
+| # | Option | What it costs |
+| --- | --- | --- |
+| A | **Remove it outright** — the catalog, the stored label, `openApp`, the helper's command runner, the manifest queries | The one tap goes back to the phone's launcher and the desktop's taskbar. A device that relied on the button has to leave the app to start an app |
+| B | Keep the button, drop the picker, and infer the provider | Nothing to infer from: the folder is a granted SAF tree or a `--folder` path, and neither names the client that syncs it. Guessing from a path is a string match on directory names, which is worse than asking |
+| C | A free-text command instead of a catalog | Removes the six-line list and keeps everything underneath it — the shell capability, the helper's process runner, the stored value — while handing the page the ability to name an arbitrary command. The narrow one it had was the only thing making the endpoint acceptable |
+| D | Leave it alone | Six edit sites and a seam test held for a button that duplicates the operating system's own launcher |
+
+**A was taken.** B and C both keep the expensive half — a page that can start processes — to save the cheap half, and
+the expensive half is what the loopback helper is careful about
+([architecture.md §4.1 Shell actions, beside the adapter](architecture.md#41-shell-actions-beside-the-adapter)). Losing
+the endpoint means the helper opens exactly one thing, the folder it was launched with, which is a smaller thing to
+argue about than a command allowlist.
+
+The settings screen keeps what the section was for: what this device writes to, how to look inside it, whether anything
+else has read it, and how to point it somewhere else — X-15, X-16 and X-18.
+
+### 16.2 What reopens it
+
+Evidence that the client not running is a recurring failure rather than a rare one, which is
+[test.md §3.6 Platform](test.md#36-platform)'s to produce and has never been run. Even then the launcher is one answer
+of several: the sidebar already warns when this device reaches no folder, and a line saying how long ago a peer's file
+last changed would name the same failure without starting anything.
+
+A shell that offers a *documented, provider-independent* "sync now" — an Android intent every client honours, say —
+reopens it as a different feature. That is a capability of the shell rather than a catalog of apps, and it would arrive
+with no list to keep in step.

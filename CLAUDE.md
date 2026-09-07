@@ -139,7 +139,8 @@ lower this device's top counter, or every peer reads the file as a partial downl
 
 Never in a file, always `localStorage`: the device id, collapse state, the drawer's state, the sidebar's and the note
 pane's widths, which folder this device chose, which cloud app it belongs to, the chosen theme, how large the sidebar's
-type is, the tag filter, and dismissed conflict rows. The File System Access handle is the exception, and only because it is an object: IndexedDB.
+type is, the tag filter, and dismissed conflict rows. The File System Access handle is the exception, and only because
+it is an object: IndexedDB.
 
 ### Component catalog
 
@@ -285,10 +286,11 @@ scans the materialised tree per query and stores no index at all (F-4).
 `#/settings` (`src/ui/SettingsPage.svelte`) is everything about *this device* rather than about the tree — X-12 — and it
 is the third and last nav entry, beside Search and Done. Five things sit on it, and only the device name writes an op:
 
-- **The sync folder** (X-15 to X-17). What this device writes to, a button that opens it, a button that starts the
-  provider's app, and a way to point the device at another folder. None of it is a fourth adapter method:
-  `src/app/shell.ts` asks the *shell* — the Android bridge, the loopback helper's `/shell/open`, the browser — what it
-  can do, and a capability this shell lacks is an absent button. architecture.md §4.1.
+- **The sync folder** (X-15, X-16). What this device writes to, a button that opens it, and a way to point the device at
+  another folder. None of it is a fourth adapter method: `src/app/shell.ts` asks the *shell* — the Android bridge, the
+  loopback helper's `/shell/open`, the browser — what it can do, and a capability this shell lacks is an absent button.
+  X-17's cloud-app picker was here and is withdrawn: nothing in this app may know which provider is under the folder, so
+  the catalog could never have a second reader — architecture.md §4.1, past_decision.md §16.
 
 - **The device name** (D-1). The one editor for it; `#/devices` lists what every device calls itself and edits none of
   them, including this one. A device arrives already named (D-5): `src/core/device-name.ts` shapes
@@ -306,9 +308,9 @@ is the third and last nav entry, beside Search and Done. Five things sit on it, 
   multiplier per id, and `src/app/sidebar-size.svelte.ts` applies it as `data-sidebar-size` on the root. **The type
   only, never the width** — the width is X-20's grip, and a preset that moved it would undo a drag the reader made.
   `.sidebar-text`, `.sidebar-note` and `.sidebar-icon` all `calc()` off the one multiplier, which is why a fifth step
-  would be a CSS block and a catalog line. It is deliberately *not* a theme: §10.1 holds a theme to fourteen colours
-  and to never changing a size, and that is the rule letting the smoke run assert every palette draws the identical
-  DOM. The two share only the boot line, for X-14's reason applied to a size.
+  would be a CSS block and a catalog line. It is deliberately *not* a theme: §10.1 holds a theme to fourteen colours and
+  to never changing a size, and that is the rule letting the smoke run assert every palette draws the identical DOM. The
+  two share only the boot line, for X-14's reason applied to a size.
 
 ### What the merge decided without asking
 

@@ -1,12 +1,11 @@
-// What the shell around the page can do besides hold the folder — X-15 to X-17,
-// architecture.md §4.1.
+// What the shell around the page can do besides hold the folder — X-15 and
+// X-16, architecture.md §4.1.
 //
 // This is deliberately *not* the folder adapter. The adapter is three methods
 // and stays three, because a fourth exists for one shell and is a stub in the
-// other five — code-standard.md §3. Opening a folder window, launching the
-// provider's app and re-picking the folder are none of the adapter's business,
-// nothing in the sync path calls any of them, and a shell that offers none at
-// all syncs identically.
+// other five — code-standard.md §3. Opening a folder window and re-picking the
+// folder are none of the adapter's business, nothing in the sync path calls
+// either of them, and a shell that offers neither syncs identically.
 //
 // A capability this shell does not have is `null` rather than a function that
 // fails: the settings screen renders the buttons it is given, so an absent
@@ -15,7 +14,6 @@
 import { bridge } from '../adapters/android-folder';
 import { supported } from '../adapters/fsaa-folder';
 import { grantFolder, type FolderSource } from './folder-choice';
-import type { Provider } from '../core/providers';
 
 /** The loopback helper's own prefix, beside `/folder` — packaging/windows/serve.py. */
 const SHELL_BASE = '/shell';
@@ -23,8 +21,6 @@ const SHELL_BASE = '/shell';
 export interface ShellActions {
   /** Show the folder in whatever the system opens folders with. */
   openFolder: (() => Promise<void>) | null;
-  /** Launch the provider's own client, so it can carry what this device wrote. */
-  openApp: ((provider: Provider) => Promise<void>) | null;
   /**
    * Point this device at a different folder. It reloads the page: the tree is
    * read from the folder at startup and nowhere else, so a new folder is a new
@@ -35,7 +31,7 @@ export interface ShellActions {
   changeNote: string | null;
 }
 
-const NONE: ShellActions = { openFolder: null, openApp: null, changeFolder: null, changeNote: null };
+const NONE: ShellActions = { openFolder: null, changeFolder: null, changeNote: null };
 
 /** The bridge's contract: an empty string, or a message the page shows. */
 function orThrow(failure: string | undefined): void {
@@ -72,9 +68,6 @@ export function shellActions(source: FolderSource): ShellActions {
       if (!android) return NONE;
       return {
         openFolder: android.openFolder ? async () => orThrow(android.openFolder?.()) : null,
-        openApp: android.openApp
-          ? async (provider) => orThrow(android.openApp?.(provider.android))
-          : null,
         // The system picker takes over from here and the page reloads once a
         // folder comes back, so this resolves without having changed anything.
         changeFolder: async () => android.pickFolder(),
@@ -84,13 +77,12 @@ export function shellActions(source: FolderSource): ShellActions {
     case 'http':
       return {
         openFolder: () => askHelper({ what: 'folder' }),
-        openApp: (provider) => askHelper({ what: 'app', command: provider.command }),
         changeFolder: null,
         changeNote: 'the folder is the one this device was launched with — `--folder` on the launcher',
       };
     case 'fsaa':
       // A page holds a directory handle, not a window: there is no folder to
-      // show and no app to start. The picker is the one thing a browser has.
+      // show. The picker is the one thing a browser has.
       return { ...NONE, changeFolder: pickAndReload };
     case 'local':
       // No button can reach a folder the shell is not holding, and one it *is*

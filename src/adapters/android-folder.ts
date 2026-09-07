@@ -23,12 +23,10 @@ export interface AndroidBridge {
    * with. Returns an empty string, or a message the page can show — a bridge
    * cannot throw across into JavaScript.
    *
-   * Optional: an APK built before X-15 has neither this nor `openApp`, and the
-   * settings screen feature-detects rather than assuming — architecture.md §4.1.
+   * Optional: an APK built before X-15 does not have it, and the settings
+   * screen feature-detects rather than assuming — architecture.md §4.1.
    */
   openFolder?(): string;
-  /** X-17. Launches an installed app by package name, same return contract. */
-  openApp?(packageName: string): string;
   list(): string;
   read(name: string): string | null;
   /** An error message, or an empty string. The bridge cannot throw across it. */

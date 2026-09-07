@@ -851,12 +851,12 @@ async function main() {
         (await page.locator('[data-testid="log-link"]').isVisible()),
     );
 
-    // --- X-15 to X-17: the sync folder section -------------------------------
+    // --- X-15, X-16: the sync folder section ----------------------------------
     // This run reaches its folder through `local-folder`, which is the browser
-    // itself: there is no folder to show and no client to start, so what is
-    // asserted is that the section names what this device writes to and that a
-    // capability this shell does not have is an absent button rather than a
-    // dead one — requirements.md §10.2.
+    // itself: there is no folder to show, so what is asserted is that the
+    // section names what this device writes to and that a capability this shell
+    // does not have is an absent button rather than a dead one —
+    // requirements.md §10.2.
     const folderSection = await page.locator('[data-testid="settings-folder-label"]').innerText();
     // The sidebar keeps one line about the folder and only while it is the
     // unsynced fallback, which is what this run is — architecture.md §4.
@@ -869,13 +869,14 @@ async function main() {
     check(
       'a browser that cannot open a folder offers no button, only the picker — §10.2',
       (await page.locator('[data-testid="open-folder"]').count()) === 0 &&
-        (await page.locator('[data-testid="open-provider"]').count()) === 0 &&
         (await page.locator('[data-testid="change-folder"]').isVisible()),
     );
+    // X-17 was withdrawn: the screen names no cloud app at all, and nothing on
+    // it starts one — past_decision.md §16.
     check(
-      'the provider catalog is offered, and nothing is chosen by default — X-17',
-      (await page.locator('[data-testid="provider"]').inputValue()) === '' &&
-        (await page.locator('[data-testid="provider"] option').count()) === 7,
+      'the settings screen names no cloud app — X-17 withdrawn',
+      (await page.locator('[data-testid="provider"]').count()) === 0 &&
+        (await page.locator('[data-testid="open-provider"]').count()) === 0,
     );
 
     // --- X-13, X-14: themes -------------------------------------------------

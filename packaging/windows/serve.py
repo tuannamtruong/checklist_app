@@ -25,8 +25,8 @@ HTTP because that is what a page can call: list, read, write. It is the other
 side of src/adapters/http-folder.ts and it grows no fourth method.
 
 /shell/open is beside that API rather than part of it -- architecture.md 4.1. It
-opens the folder in the desktop's file manager and starts the cloud client, both
-of which are things a page cannot do and neither of which the sync path calls.
+opens the folder in the desktop's file manager, which is a thing a page cannot
+do and which the sync path never calls.
 """
 
 from __future__ import annotations
@@ -35,7 +35,6 @@ import argparse
 import json
 import os
 import re
-import shutil
 import socket
 import subprocess
 import sys
@@ -70,15 +69,12 @@ SEGMENT = re.compile(r"^[A-Za-z0-9._-]{1,120}$")
 
 # --------------------------------------------------------------- the shell
 
-# X-15 and X-17 -- architecture.md 4.1. The page may ask for two things beyond
-# the folder API: show me the folder, and start the cloud client.
-#
-# It names a *command*, never a path, and the pattern is the same narrow one the
-# folder API uses. The command is resolved on PATH and run with no arguments and
-# no shell, so the page can say what to start and can never say where to start it
-# from. The one path this endpoint will ever open is the folder, which came from
-# --folder on the command line rather than from the page.
-COMMAND = re.compile(r"^[A-Za-z0-9._-]{1,40}$")
+# X-15 -- architecture.md 4.1. The page may ask for one thing beyond the folder
+# API: show me the folder. It names nothing at all in the asking, and the one
+# path this endpoint will ever open is the folder, which came from --folder on
+# the command line rather than from the page. It took a command to start the
+# cloud client too, while X-17 stood; a helper that starts no process the page
+# named is a smaller thing to leave listening on loopback.
 
 
 def open_with_desktop(target: str) -> None:
@@ -93,20 +89,6 @@ def open_with_desktop(target: str) -> None:
         except OSError:
             continue
     raise FolderError(500, "no file manager on this desktop")
-
-
-def start_app(command: str) -> None:
-    if not COMMAND.match(command):
-        raise FolderError(400, f"bad command: {command!r}")
-    found = shutil.which(command)
-    if found is None:
-        # Not an error in the app: the client is simply not installed here, or
-        # not on PATH, and the page says so rather than showing a status.
-        raise FolderError(404, f"{command} was not found on this device")
-    try:
-        subprocess.Popen([found], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except OSError as exc:
-        raise FolderError(500, f"could not start {command}: {exc}") from exc
 
 
 SERVER: ThreadingHTTPServer | None = None
@@ -276,7 +258,7 @@ class Handler(BaseHTTPRequestHandler):
         self._json(405, {"error": "method not allowed"})
 
     def _open(self) -> None:
-        """X-15 and X-17: the folder, or the cloud client, whichever was asked."""
+        """X-15: the folder, which is the only thing this endpoint opens."""
         if self.command != "POST":
             return self._json(405, {"error": "method not allowed"})
         length = int(self.headers.get("Content-Length") or 0)
@@ -290,9 +272,6 @@ class Handler(BaseHTTPRequestHandler):
         what = asked.get("what")
         if what == "folder":
             open_with_desktop(str(self._folder().root))
-            return self._json(200, {"ok": True})
-        if what == "app":
-            start_app(str(asked.get("command", "")))
             return self._json(200, {"ok": True})
         raise FolderError(400, f"nothing to open: {what!r}")
 

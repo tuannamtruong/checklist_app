@@ -95,10 +95,9 @@ the rule is [sync-flow.md §4.8 The compaction cut](sync-flow.md#48-the-compacti
 Device-local state, held in `localStorage` and never written to a shared file: the device id, collapse/expand state
 (T-8), the sync cadence (S-19), which folder this device reaches the tree through
 ([architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter)), dismissed conflict notices (C-6), the
-chosen theme (X-14), how large the sidebar's type is (X-25), which cloud provider this device's folder belongs to
-(X-17), which tags the tree is filtered by (A-5), how wide the sidebar and the note pane have been dragged (X-20, X-24),
-and any filter the Done view grows (T-12). Anything the user would not want to converge across devices belongs here
-rather than in the tree.
+chosen theme (X-14), how large the sidebar's type is (X-25), which tags the tree is filtered by (A-5), how wide the
+sidebar and the note pane have been dragged (X-20, X-24), and any filter the Done view grows (T-12). Anything the user
+would not want to converge across devices belongs here rather than in the tree.
 
 The **search index** is not state at all, in the same sense the Done view is not: F-4 scans the materialised tree on
 each keystroke, so there is nothing to store, nothing to invalidate and nothing to sync.
@@ -671,7 +670,7 @@ to empty, and a dismissal is only for a row the user is content to leave as it l
 | X-14 | The theme is device-local and takes effect before the first paint | ✅ | `src/app/theme.svelte.ts` — the id in `localStorage` and `data-theme` on the document root, set by a boot line in `index.html` so a dark theme never flashes light. Never in a file, never synced — [§2.3 What is never in the Sync Folder](#23-what-is-never-in-the-sync-folder) |
 | X-15 | The settings screen names the folder this device syncs through, and opens it in the system's file manager where the shell can | ✅ | `src/ui/SettingsPage.svelte`, over `src/app/shell.ts`. Opening a folder is not a fourth adapter method and never becomes one — [architecture.md §4.1 Shell actions, beside the adapter](architecture.md#41-shell-actions-beside-the-adapter) |
 | X-16 | The settings screen points this device at a different folder, and names who decides when it cannot | ✅ | `changeFolder` in `src/app/shell.ts`, which re-enters [architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter)'s picker and reloads. The rows already written do not follow the device to the new folder, and the screen says so before the picker opens |
-| X-17 | The settings screen launches the cloud provider's own app, and which provider that is stays on this device | ✅ | `src/core/providers.ts` is the catalog; the choice is `localStorage`, per [§2.3 What is never in the Sync Folder](#23-what-is-never-in-the-sync-folder). A shell that cannot launch an app says so rather than offering a button that does nothing |
+| X-17 | The settings screen launches the cloud provider's own app, and which provider that is stays on this device | ✗ **Withdrawn** | Built in M5 and taken out again: a catalog of six cloud clients, a picker on the settings screen, a launch capability in both shells and a `<queries>` block in the manifest, for one button that started an app the phone's own launcher starts — [§10.2 The sync folder, on the settings screen](#102-the-sync-folder-on-the-settings-screen) and [past_decision.md §16 Retiring the cloud-app launcher](past_decision.md#16-retiring-the-cloud-app-launcher) |
 | X-18 | A device on the browser-only fallback takes the folder its own launcher is holding, rather than keeping an answer it gave before there was one | ✅ | `chooseFolder` in `src/app/folder-choice.ts`: the two shells that hand a folder in unasked are asked before a stored `local` is honoured, and nothing is written when one is taken — [architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter). `folder-choice.test.ts`; a real Firefox is [test.md §3.6 Platform](test.md#36-platform) check 3b. Without it, "this browser only" is a one-way door on the one browser the helper exists for |
 | X-19 | The sidebar's type is a fifth larger than the page beside it | ✅ | `.sidebar-text` and `.sidebar-note` in `src/app.css`, read by `src/ui/Shell.svelte` and `src/ui/SidebarLinks.svelte`. One rule rather than a size named per component, and unlayered so it wins over the `text-sm` it replaces — the icons scale with it so the column keeps its proportions |
 | X-20 | The sidebar's width is dragged by its right edge, and the width is this device's own | ✅ | `src/ui/WidthGrip.svelte` over `sidebarWidth` in `src/app/view-state.svelte.ts`, bounded there rather than at the grip. Pointer events, for T-14's reason — a tablet is wide enough for the `md` layout and has no mouse. Above `md` only: below it the sidebar is a drawer over the page, where a width takes room from nothing. `view-state.svelte.test.ts`, `scripts/ui-smoke.mjs` |
@@ -769,19 +768,19 @@ holding. It is `localStorage`, beside the collapse state (T-8) that is device-lo
 ### 10.2 The sync folder, on the settings screen
 
 X-12 gathered what is about *this device* rather than about the tree, and the folder is the oldest thing on that list:
-it is chosen once, on the setup screen, and then never mentioned again except as a line in the footer. X-15 to X-17 give
-it a section — what this device writes to, how to look inside it, and how to point the device somewhere else.
+it is chosen once, on the setup screen, and then never mentioned again except as a line in the footer. X-15 and X-16
+give it a section — what this device writes to, how to look inside it, and how to point the device somewhere else.
 
 **Opening a folder is not something the folder adapter does.** The adapter is three methods and stays three —
-[code-standard.md §3 Module boundaries](code-standard.md#3-module-boundaries) — so the three buttons are a separate,
+[code-standard.md §3 Module boundaries](code-standard.md#3-module-boundaries) — so the two buttons are a separate,
 optional capability of the *shell*, and each shell answers for itself:
 
-| Shell | Open the folder | Launch the provider's app | Point at another folder |
-| --- | --- | --- | --- |
-| Android (`android-folder`) | The system's file viewer, on the granted tree | The provider's launch intent, by package name | The system picker, then a reload |
-| Windows helper (`http-folder`) | The desktop's own file manager, from the process that already holds the folder | The provider's command, found on `PATH` and run with no arguments | Not offered: the launcher's `--folder` decides, and the screen says so |
-| Chrome/Edge (`fsaa-folder`) | Not offered: a page holds a directory handle, not a window | Not offered | The File System Access picker, then a reload |
-| This browser only (`local-folder`) | Nothing to open — there is no folder | Not offered | The picker, where the browser has one. A folder the *shell* is holding was taken at startup and never reaches this screen — X-18 |
+| Shell | Open the folder | Point at another folder |
+| --- | --- | --- |
+| Android (`android-folder`) | The system's file viewer, on the granted tree | The system picker, then a reload |
+| Windows helper (`http-folder`) | The desktop's own file manager, from the process that already holds the folder | Not offered: the launcher's `--folder` decides, and the screen says so |
+| Chrome/Edge (`fsaa-folder`) | Not offered: a page holds a directory handle, not a window | The File System Access picker, then a reload |
+| This browser only (`local-folder`) | Nothing to open — there is no folder | The picker, where the browser has one. A folder the *shell* is holding was taken at startup and never reaches this screen — X-18 |
 
 A button that a shell cannot honour is absent rather than disabled-with-a-tooltip: the row above it already says what
 this device reaches its folder through, so an absent button reads as "not here" rather than as a fault.
@@ -810,10 +809,15 @@ its helper falls back to the browser rather than to a setup screen, and the rows
 `localStorage` for it to find. Those rows do not follow it to the folder — the same rule every other folder change obeys
 — which is the one cost of doing this without asking, and it is the cost of the fallback itself rather than of the fix.
 
-**The provider is a device-local label, not a code path.** Nothing in the merge, the adapter or the file format knows
-which provider is under the folder — [§7.3 Fixed constraints](#73-fixed-constraints) — so the catalog in
-`src/core/providers.ts` buys exactly one thing: a button that opens the app whose client is keeping this folder in sync.
-A device that has not named one has no button, which is what an unnamed provider means.
+**The screen no longer names a cloud app at all — X-17 is withdrawn.** It named one for one reason: a button that
+started the client keeping this folder in sync, for the times when "why has my phone not seen that row" is "the client
+has not run today". Behind that button were a catalog of six providers, a stored label on every device, a launch
+capability in both shells, and a `<queries>` block in the Android manifest naming six packages — and nothing else in the
+app ever read any of it, because nothing else may: no merge, no adapter and no file knows which provider is under the
+folder ([§7.3 Fixed constraints](#73-fixed-constraints)). The phone's own launcher starts that app, and the desktop's
+own taskbar does, so the app was carrying a catalog of other people's software to save one tap outside itself. The
+folder rows above it are what this section is actually for, and they say what this device reaches and how far it has got
+— [past_decision.md §16 Retiring the cloud-app launcher](past_decision.md#16-retiring-the-cloud-app-launcher).
 
 ### 10.3 A note beside the list
 
