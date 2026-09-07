@@ -178,7 +178,11 @@ export function peerLog(device = PEER) {
     // K-1. A kind this build no longer has, written by a peer that still does.
     // It has to arrive as a folder rather than as a line that will not parse,
     // or upgrading one device would lose a row on every other — past_decision.md §11.
-    { op: 'create', id: 'n_peer0002', parent: 'root', kind: 'list', order: 'a9', c: 4, at: at + 3_000 },
+    // `az` rather than the next key up: the run adds rows of its own at the
+    // root, and a peer landing on the key one of them has just been minted is a
+    // C-3 order conflict the run never meant to raise — the checks that follow
+    // expect the one title race and nothing else.
+    { op: 'create', id: 'n_peer0002', parent: 'root', kind: 'list', order: 'az', c: 4, at: at + 3_000 },
     { op: 'set', id: 'n_peer0002', title: 'Garage', c: 5, at: at + 4_000 },
   ].map((line) => JSON.stringify(line));
   const header = JSON.stringify({ v: 1, dev: device, clock: { [device]: 5 } });

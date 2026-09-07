@@ -64,14 +64,22 @@
   }
 
   /**
-   * K-10. A kind button makes an untitled row of that kind and hands it the
-   * caret, which is what its button under the list always did — the row names
-   * itself in its own title field.
+   * K-11. One group is one control, so a kind button makes a row of that kind
+   * out of whatever is in the line: a title and `+ Note` is one note carrying
+   * it. The caret stays here, exactly as `Enter` leaves it.
+   *
+   * An empty line is the button as it always was under the list: an untitled
+   * row of that kind, holding the caret in its own title field, because a row
+   * with no title yet is a row about to be named.
    */
   function addKind(kind: Kind): void {
+    const title = draft.trim();
     const tags = [...view.tagFilter];
-    const ops = session.run((tree, ctx) => createLastChild(tree, ctx, parent, { kind, tags }));
-    if (ops[0]) focus.request(ops[0].id);
+    draft = '';
+    const ops = session.run((tree, ctx) =>
+      createLastChild(tree, ctx, parent, title === '' ? { kind, tags } : { kind, title, tags }),
+    );
+    if (title === '' && ops[0]) focus.request(ops[0].id);
   }
 
   /**

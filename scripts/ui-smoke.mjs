@@ -336,6 +336,26 @@ async function main() {
       addGroup.pinned,
     );
 
+    // --- K-11: the typed title is the kind button's title ------------------
+    await quickAdd.fill('Packing tips');
+    await page.locator('[data-testid="add-note"]').first().click();
+    const typedNote = await rowByTitle(page, 'Packing tips');
+    check(
+      'a title typed in the line and “+ Note” pressed is one note carrying it — K-11',
+      (await typedNote.getAttribute('data-kind')) === 'note' &&
+        !(await titlesOf(page)).includes(''),
+      String(await typedNote.getAttribute('data-kind')),
+    );
+    check(
+      'and the line is empty again, with nothing written as a task on the way',
+      (await quickAdd.inputValue()) === '' &&
+        (await page.locator('[data-testid="row"][data-kind="task"] [data-testid="title"]')
+          .evaluateAll((inputs) => inputs.map((input) => input.value))).filter(
+          (title) => title === 'Packing tips',
+        ).length === 0,
+      await quickAdd.inputValue(),
+    );
+
     // --- A-1 to A-6: tags, the flag and the filter -------------------------
     const milkRow2 = await rowByTitle(page, 'Milk');
     const flag = milkRow2.locator('[data-testid="priority"]');

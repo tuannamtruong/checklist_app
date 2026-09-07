@@ -225,6 +225,7 @@ something.
 | K-8 | Every list page opens with a line where typing a title and pressing Enter makes a **task** at the end of the list, and leaves the line ready for the next one | ✅ | `src/ui/QuickAdd.svelte`, over `createLastChild` with no kind — which is `task`, the default every other creation path already used. `src/ui/NodePage.svelte` gives it the page header, narrow and above the breadcrumbs; `src/ui/NotePane.svelte` gives the note's own children the same line directly above them, because a pane that opened with an input rather than with the note's text would be a note you cannot read — X-21. The other two kinds have their buttons beside the line rather than under the list — K-10 |
 | K-9 | A paste into that line carrying line breaks makes one row per line, all at the end of the list | ✅ | `src/core/paste.ts` is the only place the split is spelled, `createLastChildren` in `src/core/edit.ts` mints the keys, and `src/ui/QuickAdd.svelte` is the one caller. `paste.test.ts`, `edit.test.ts`, `scripts/ui-smoke.mjs` |
 | K-10 | The line and the two kind buttons are one group, at the top of the list rather than an input above it and buttons under it | ✅ | `src/ui/QuickAdd.svelte` draws all three and owns the one draft between them; `src/ui/NodePage.svelte` puts the group in the page header and `src/ui/NotePane.svelte` above the note's own children. `src/ui/TreeView.svelte` draws rows and nothing else. Pinned there rather than scrolling with the list — X-26 |
+| K-11 | Whatever is typed in the line is the title of the row a kind button makes: a title and `+ Note` is one **note** carrying it, rather than a task and an untitled note | ✅ | `addKind` in `src/ui/QuickAdd.svelte` — the `createLastChild` the line already calls, with the kind named. An empty line still makes an untitled row and hands it the caret, which is what the button under the list always did. `scripts/ui-smoke.mjs` |
 
 **There were four kinds and there are three — `list` is gone.** A `list` and a `folder` differed by an icon and by
 nothing else: both were containers, both could hold any kind (K-4 and T-1 make that true of every kind), and neither was
@@ -272,6 +273,19 @@ on the list long enough to want one. Adding is one group in one place now, which
 and the group is the input with the two buttons after it — the input first, because a task is what the line makes with
 no button pressed at all. `TreeView` is left drawing rows, which is the whole of what a list of rows is for, and the one
 draft is the component's rather than shared between two of them.
+
+**A kind button reads the line — K-11.** One group is one control, so the text in it is the title of whatever the group
+is asked to make: typing `Packing list` and pressing `+ Note` is a note called `Packing list`, where it used to be a
+task called `Packing list` and an untitled note underneath it. Nothing else about the button changes — an empty line
+still makes an untitled row of that kind and hands it the caret, because a row that has no title yet is a row about to
+be named. What the two share is where the caret ends up: the line keeps it either way, exactly as K-8's `Enter` does,
+because the person is filling a list rather than editing one row.
+
+The event order is the whole of the implementation. An input that commits on blur, pressed beside a button, loses the
+caret on the way to the click: the blur would write the typed title as a task and the button would then add a second,
+untitled row — the one outcome the group exists to prevent. Preventing `pointerdown`'s default is what keeps the focus
+in the line on every pointer, including a thumb, and the blur's own `relatedTarget` guard is the second answer for a
+browser that focuses anyway.
 
 **A pasted paragraph is a list somebody has already written — K-9.** Typing `Enter` after each of fifteen lines is work
 the line breaks already did, so a paste carrying one is fifteen rows at the end of the list rather than one row holding
