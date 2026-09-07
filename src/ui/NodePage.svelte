@@ -34,11 +34,15 @@
      added — requirements.md §4. Narrow, because a full-width input across a
      header reads as a search bar, and at the head of the page's own column
      rather than in the middle of the header, so it does not move sideways when
-     the note pane opens beside it — X-23. -->
-<header class="border-b border-line px-4 py-3" data-testid="page-header">
+     the note pane opens beside it — X-23.
+
+     K-10 puts the two kind buttons in it, and X-26 pins the header to the top of
+     the window: one `sticky` and an opaque surface, so the one control the app is
+     mostly used for is where it was however far the list has scrolled. -->
+<header class="sticky top-0 z-20 border-b border-line bg-surface px-4 py-3" data-testid="page-header">
   <div class="flex max-w-3xl">
-    <div class="flex max-w-sm flex-1">
-      <QuickAdd {session} {view} {parent} />
+    <div class="flex max-w-xl flex-1">
+      <QuickAdd {session} {view} {focus} {parent} />
     </div>
   </div>
 </header>

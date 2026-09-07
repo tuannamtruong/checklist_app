@@ -128,8 +128,8 @@
          its content" mean nothing. Above `lg` there is no peek and the list is
          always here — §10.3. -->
     <div class="flex-col gap-4 {expanded ? 'flex' : 'hidden'} lg:flex" data-testid="note-children">
-      <div class="flex max-w-sm">
-        <QuickAdd {session} {view} parent={id} />
+      <div class="flex max-w-xl">
+        <QuickAdd {session} {view} {focus} parent={id} />
       </div>
 
       <TreeView {session} {view} {focus} parent={id} />

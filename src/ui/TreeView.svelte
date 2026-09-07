@@ -4,10 +4,9 @@
   // Flat rather than recursive because the keyboard model works on what the
   // user can see: `↑` from the first child of a collapsed-away subtree has to
   // land on the row above it, whatever their depths — rows.ts.
-  import { createFirstChild, createLastChild } from '../core/edit';
   import { filteredIds } from '../core/filter';
   import { childrenOf } from '../core/tree';
-  import type { Kind, ParentId } from '../core/types';
+  import type { ParentId } from '../core/types';
   import type { Session } from '../app/Session.svelte';
   import type { ViewState } from '../app/view-state.svelte';
   import type { RowFocus } from './focus.svelte';
@@ -39,18 +38,6 @@
     ),
   );
   const isEmpty = $derived(childrenOf(session.tree, parent).length === 0);
-
-  // A-6. A row created under a filter carries that filter's tags, or it would
-  // vanish as it was created — requirements.md §4.1.
-  function add(kind: Kind): void {
-    const tags = [...view.tagFilter];
-    const ops = session.run((tree, ctx) =>
-      isEmpty
-        ? createFirstChild(tree, ctx, parent, { kind, tags })
-        : createLastChild(tree, ctx, parent, { kind, tags }),
-    );
-    if (ops[0]) focus.request(ops[0].id);
-  }
 </script>
 
 <div class="flex flex-col" data-testid="tree">
@@ -75,25 +62,7 @@
   </p>
 {/if}
 
-<!-- The two kinds that are not a task. K-8's line is not here: it is in the
-     page header, at a fixed place rather than wherever the last row leaves it —
-     requirements.md §4. These stay under the list, one click away, because
-     picking a kind is a decision worth a button rather than a mode. -->
-<div class="mt-2 flex flex-wrap gap-2 px-2">
-  <button
-    type="button"
-    class="rounded-md border border-line px-2.5 py-1.5 text-sm text-ink-muted hover:border-accent hover:text-accent"
-    data-testid="add-note"
-    onclick={() => add('note')}
-  >
-    + Note
-  </button>
-  <button
-    type="button"
-    class="rounded-md border border-line px-2.5 py-1.5 text-sm text-ink-muted hover:border-accent hover:text-accent"
-    data-testid="add-folder"
-    onclick={() => add('folder')}
-  >
-    + Folder
-  </button>
-</div>
+<!-- K-10. Nothing is added from down here any more: the two kind buttons went
+     up to the group at the top of the list, beside the line that was already
+     there — requirements.md §4. This draws rows, and that is all a list of rows
+     has ever needed to do. -->

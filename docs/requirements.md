@@ -222,8 +222,9 @@ something.
 | K-5 | Any row can be converted to any kind after the fact ("Turn into") | ✅ | `turnInto` in `src/core/edit.ts`, in the row menu. Two devices converting one row differently resolve by `(at, device id)`, with a notice — [§9 Conflict presentation](#9-conflict-presentation) |
 | K-6 | ~~A note can be promoted to a checklist from its own page~~ | ✗ **Withdrawn** | Built in M1 and taken out again: it was a second control for the one op K-5 already offers, and the only one that changed a kind from outside the row menu. Nothing replaces it — `turnInto` is unchanged and the row menu still reaches every kind |
 | K-7 | Note body saves are debounced (1 s) so typing is not one op per keystroke | ✅ | `src/ui/NoteBody.svelte`. The 1 s debounce governs the store; an **op** is emitted on blur, on navigating away, or after 60 s of continuous editing — S-20 |
-| K-8 | Every list page opens with a line where typing a title and pressing Enter makes a **task** at the end of the list, and leaves the line ready for the next one | ✅ | `src/ui/QuickAdd.svelte`, over `createLastChild` with no kind — which is `task`, the default every other creation path already used. `src/ui/NodePage.svelte` gives it the page header, narrow and above the breadcrumbs; `src/ui/NotePane.svelte` gives the note's own children the same line directly above them, because a pane that opened with an input rather than with the note's text would be a note you cannot read — X-21. The other two kinds keep their buttons under the list |
+| K-8 | Every list page opens with a line where typing a title and pressing Enter makes a **task** at the end of the list, and leaves the line ready for the next one | ✅ | `src/ui/QuickAdd.svelte`, over `createLastChild` with no kind — which is `task`, the default every other creation path already used. `src/ui/NodePage.svelte` gives it the page header, narrow and above the breadcrumbs; `src/ui/NotePane.svelte` gives the note's own children the same line directly above them, because a pane that opened with an input rather than with the note's text would be a note you cannot read — X-21. The other two kinds have their buttons beside the line rather than under the list — K-10 |
 | K-9 | A paste into that line carrying line breaks makes one row per line, all at the end of the list | ✅ | `src/core/paste.ts` is the only place the split is spelled, `createLastChildren` in `src/core/edit.ts` mints the keys, and `src/ui/QuickAdd.svelte` is the one caller. `paste.test.ts`, `edit.test.ts`, `scripts/ui-smoke.mjs` |
+| K-10 | The line and the two kind buttons are one group, at the top of the list rather than an input above it and buttons under it | ✅ | `src/ui/QuickAdd.svelte` draws all three and owns the one draft between them; `src/ui/NodePage.svelte` puts the group in the page header and `src/ui/NotePane.svelte` above the note's own children. `src/ui/TreeView.svelte` draws rows and nothing else. Pinned there rather than scrolling with the list — X-26 |
 
 **There were four kinds and there are three — `list` is gone.** A `list` and a `folder` differed by an icon and by
 nothing else: both were containers, both could hold any kind (K-4 and T-1 make that true of every kind), and neither was
@@ -251,8 +252,8 @@ edit already lives and which a phone can reach.
 
 **The quick-add line makes a task and nothing else, and that is the whole of K-8.** A checklist is mostly tasks, so the
 one path that costs no decision has to produce the kind the person was already going to pick — `createLastChild` with no
-kind, which has meant `task` since M1. The other two kinds keep their buttons under the list, one click away, because
-picking a kind is a decision worth a button rather than a mode.
+kind, which has meant `task` since M1. The other two kinds keep their buttons, one click away, because picking a kind is
+a decision worth a button rather than a mode.
 
 **The line sits in the page header rather than at the end of the list.** Where it goes and where the row lands are two
 questions, and only the second one is the merge's: the row is still appended, so `createLastChild` and every test over
@@ -264,6 +265,13 @@ it sits at the left edge of the page's own column rather than in the middle of t
 sideways when the note pane opens beside it. The header belongs to the node page alone — Search, Done and Settings have
 no list to add to, so they have no line. The note pane is the one place the line is not a page header: there it sits
 immediately above the children it adds to, under the body — X-21.
+
+**The two kind buttons came up to sit beside it — K-10.** They were under the list, which was the same argument the line
+had already lost: the end of a long list is below the fold, so "+ Note" was reachable on a short list and a scroll away
+on the list long enough to want one. Adding is one group in one place now, whichever of the three kinds is being added,
+and the group is the input with the two buttons after it — the input first, because a task is what the line makes with
+no button pressed at all. `TreeView` is left drawing rows, which is the whole of what a list of rows is for, and the one
+draft is the component's rather than shared between two of them.
 
 **A pasted paragraph is a list somebody has already written — K-9.** Typing `Enter` after each of fifteen lines is work
 the line breaks already did, so a paste carrying one is fifteen rows at the end of the list rather than one row holding
@@ -658,6 +666,7 @@ to empty, and a dismissal is only for a row the user is content to leave as it l
 | X-23 | A page's column sits at the left edge of the page area rather than centred, whether or not a note is open | ✅ | `src/ui/NodePage.svelte`. A centred column would slide sideways the moment the note pane appeared, so every open and close would move the list the user is reading |
 | X-24 | The divider between the list and the note pane is dragged, and the width is this device's own | ✅ | `src/ui/WidthGrip.svelte` over `notePaneWidth` in `src/app/view-state.svelte.ts` — X-20's grip with the sign flipped, since the pane's edge is its left one. Above `lg` only: below it the pane is X-22's sheet and its width is the viewport's. `view-state.svelte.test.ts`, `scripts/ui-smoke.mjs` |
 | X-25 | The sidebar's type size is a four-step choice on the settings screen: normal, a fifth smaller, a fifth larger, two fifths larger | ✅ | `src/core/sidebar-size.ts` is the catalog and `src/app.css` holds one `--sidebar-type` multiplier per id, applied by `src/app/sidebar-size.svelte.ts` as `data-sidebar-size` on the document root. It scales X-19's two type rules and the icons beside them and nothing else — not the column's width, which is X-20's and stays where the grip left it. Device-local and set before the first paint, for X-14's reasons. `sidebar-size.test.ts`, `scripts/ui-smoke.mjs` |
+| X-26 | The add group is pinned to the top of the list's column, so it stays on screen however far the list is scrolled | ✅ | `src/ui/NodePage.svelte` — `sticky top-0` over the page's own surface, which is the same argument K-8 made for leaving the end of the list and made once more against the top of a page that scrolls away. It costs no measurement and no scroll listener |
 
 Packaging decides which of these are reachable, and it answers them per target rather than once — see
 [architecture.md §7 Packaging](architecture.md#7-packaging). X-3 in particular is a PWA install on Chromium and an APK

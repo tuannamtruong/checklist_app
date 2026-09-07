@@ -313,6 +313,29 @@ async function main() {
       `${await page.locator('[data-testid="row"]').count()} rows, was ${rowsBeforeEscape}`,
     );
 
+    // --- K-10 and X-26: one add group, at the top of the list and pinned ---
+    const addGroup = await page.evaluate(() => {
+      const header = document.querySelector('[data-testid="page-header"]');
+      const tree = document.querySelector('[data-testid="tree"]');
+      const buttons = [...document.querySelectorAll('[data-testid="add-note"]')];
+      return {
+        inHeader: header.querySelectorAll('[data-testid="add-row"] [data-testid="add-note"]').length,
+        grouped: buttons.every((button) => button.closest('[data-testid="add-row"]') !== null),
+        aboveTheList: tree.getBoundingClientRect().top >= header.getBoundingClientRect().bottom,
+        pinned: getComputedStyle(header).position,
+      };
+    });
+    check(
+      'the two kind buttons are in the group at the top, not under the list — K-10',
+      addGroup.inHeader === 1 && addGroup.grouped && addGroup.aboveTheList,
+      `${addGroup.inHeader} in the header, grouped ${addGroup.grouped}`,
+    );
+    check(
+      'and the group is pinned there rather than scrolling away — X-26',
+      addGroup.pinned === 'sticky',
+      addGroup.pinned,
+    );
+
     // --- A-1 to A-6: tags, the flag and the filter -------------------------
     const milkRow2 = await rowByTitle(page, 'Milk');
     const flag = milkRow2.locator('[data-testid="priority"]');

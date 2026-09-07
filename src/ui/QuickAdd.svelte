@@ -11,17 +11,23 @@
   // K-9 is the same line asked for several rows at once: a paste with a line
   // break in it is a list somebody already wrote, and typing Enter after each
   // line of it is work the paste already did.
+  //
+  // K-10 puts the other two kinds here as well. They were buttons under the
+  // list, a scroll away on any list long enough to want one, and one group is
+  // what makes adding one place on the page whichever kind is being added.
   import { createLastChild, createLastChildren } from '../core/edit';
   import { splitPastedTitles } from '../core/paste';
-  import type { ParentId } from '../core/types';
+  import type { Kind, ParentId } from '../core/types';
   import type { Session } from '../app/Session.svelte';
   import type { ViewState } from '../app/view-state.svelte';
+  import type { RowFocus } from './focus.svelte';
 
   let {
     session,
     view,
+    focus,
     parent,
-  }: { session: Session; view: ViewState; parent: ParentId } = $props();
+  }: { session: Session; view: ViewState; focus: RowFocus; parent: ParentId } = $props();
 
   let draft = $state('');
   let input = $state<HTMLInputElement | null>(null);
@@ -57,6 +63,34 @@
     session.run((tree, ctx) => createLastChildren(tree, ctx, parent, titles, { tags }));
   }
 
+  /**
+   * K-10. A kind button makes an untitled row of that kind and hands it the
+   * caret, which is what its button under the list always did — the row names
+   * itself in its own title field.
+   */
+  function addKind(kind: Kind): void {
+    const tags = [...view.tagFilter];
+    const ops = session.run((tree, ctx) => createLastChild(tree, ctx, parent, { kind, tags }));
+    if (ops[0]) focus.request(ops[0].id);
+  }
+
+  /**
+   * The buttons sit beside an input that commits on blur, so pressing one must
+   * not take the caret out of the line on its way to the click: that blur would
+   * write the typed title as a task and the button would then add a second row.
+   * Preventing `pointerdown`'s default suppresses the focus change on every
+   * pointer, and the blur guard is what catches a browser that focuses anyway.
+   */
+  function keepCaret(event: PointerEvent): void {
+    event.preventDefault();
+  }
+
+  function onBlur(event: FocusEvent): void {
+    const next = event.relatedTarget;
+    if (next instanceof HTMLElement && next.closest('[data-testid="add-row"]')) return;
+    commit();
+  }
+
   function onKeyDown(event: KeyboardEvent): void {
     if (event.key === 'Enter') {
       event.preventDefault();
@@ -70,14 +104,36 @@
   }
 </script>
 
-<input
-  bind:this={input}
-  bind:value={draft}
-  class="min-w-0 flex-1 rounded-md border border-line bg-transparent px-2.5 py-1.5 text-sm outline-none placeholder:text-ink-faint focus:border-accent"
-  placeholder="Add a task — type and press Enter"
-  aria-label="Add a task"
-  data-testid="quick-add"
-  onkeydown={onKeyDown}
-  onpaste={onPaste}
-  onblur={commit}
-/>
+<!-- K-10. One group: the line first, because a task is what it makes with no
+     button pressed at all, then the two kinds that need one. -->
+<div class="flex min-w-0 flex-1 items-center gap-2" data-testid="add-row">
+  <input
+    bind:this={input}
+    bind:value={draft}
+    class="min-w-0 flex-1 rounded-md border border-line bg-transparent px-2.5 py-1.5 text-sm outline-none placeholder:text-ink-faint focus:border-accent"
+    placeholder="Add a task — type and press Enter"
+    aria-label="Add a task"
+    data-testid="quick-add"
+    onkeydown={onKeyDown}
+    onpaste={onPaste}
+    onblur={onBlur}
+  />
+  <button
+    type="button"
+    class="shrink-0 rounded-md border border-line px-2.5 py-1.5 text-sm text-ink-muted hover:border-accent hover:text-accent"
+    data-testid="add-note"
+    onpointerdown={keepCaret}
+    onclick={() => addKind('note')}
+  >
+    + Note
+  </button>
+  <button
+    type="button"
+    class="shrink-0 rounded-md border border-line px-2.5 py-1.5 text-sm text-ink-muted hover:border-accent hover:text-accent"
+    data-testid="add-folder"
+    onpointerdown={keepCaret}
+    onclick={() => addKind('folder')}
+  >
+    + Folder
+  </button>
+</div>
