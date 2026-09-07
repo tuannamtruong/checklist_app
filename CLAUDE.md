@@ -138,8 +138,8 @@ lower this device's top counter, or every peer reads the file as a partial downl
 §4.8.
 
 Never in a file, always `localStorage`: the device id, collapse state, the drawer's state, the sidebar's and the note
-pane's widths, which folder this device chose, which cloud app it belongs to, the chosen theme, the tag filter, and
-dismissed conflict rows. The File System Access handle is the exception, and only because it is an object: IndexedDB.
+pane's widths, which folder this device chose, which cloud app it belongs to, the chosen theme, how large the sidebar's
+type is, the tag filter, and dismissed conflict rows. The File System Access handle is the exception, and only because it is an object: IndexedDB.
 
 ### Component catalog
 
@@ -283,7 +283,7 @@ scans the materialised tree per query and stores no index at all (F-4).
 ### Settings
 
 `#/settings` (`src/ui/SettingsPage.svelte`) is everything about *this device* rather than about the tree — X-12 — and it
-is the third and last nav entry, beside Search and Done. Four things sit on it, and only the device name writes an op:
+is the third and last nav entry, beside Search and Done. Five things sit on it, and only the device name writes an op:
 
 - **The sync folder** (X-15 to X-17). What this device writes to, a button that opens it, a button that starts the
   provider's app, and a way to point the device at another folder. None of it is a fourth adapter method:
@@ -300,6 +300,15 @@ is the third and last nav entry, beside Search and Done. Four things sit on it, 
   id under `[data-theme='…']`, and `src/app/theme.svelte.ts` applies it. `themes.test.ts` fails if catalog and
   stylesheet drift. **No component ever names a colour** — that is what makes a seventh theme a CSS block and nothing
   else. The id is applied by a boot line in `index.html` so a dark theme never flashes light, and it never syncs (X-14).
+
+- **The sidebar's type size** (X-25). X-19's fifth, made a per-device choice in four steps — small, normal, large,
+  maximal, at 0.8/1/1.2/1.4. `src/core/sidebar-size.ts` is the catalog, `src/app.css` holds one `--sidebar-type`
+  multiplier per id, and `src/app/sidebar-size.svelte.ts` applies it as `data-sidebar-size` on the root. **The type
+  only, never the width** — the width is X-20's grip, and a preset that moved it would undo a drag the reader made.
+  `.sidebar-text`, `.sidebar-note` and `.sidebar-icon` all `calc()` off the one multiplier, which is why a fifth step
+  would be a CSS block and a catalog line. It is deliberately *not* a theme: §10.1 holds a theme to fourteen colours
+  and to never changing a size, and that is the rule letting the smoke run assert every palette draws the identical
+  DOM. The two share only the boot line, for X-14's reason applied to a size.
 
 ### What the merge decided without asking
 

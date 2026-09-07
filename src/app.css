@@ -196,21 +196,66 @@ body {
   touch-action: none;
 }
 
+/* X-25: how far the reader sits from the screen is not a property of the app,
+   so X-19's fifth is a multiplier rather than a constant — requirements.md
+   §10.4. One number, and the three rules below multiply by it, which is X-19's
+   own argument carried forward: a fifth step is a block here and no component
+   change. Keyed on an attribute rather than on `:root` so a button on the
+   settings screen can carry `data-sidebar-size` and preview the step it names,
+   and unlayered for `[data-theme]`'s reason.
+
+   `:root` carries the default for the document nobody has set the attribute on —
+   a first launch, or storage the boot line could not read. `normal` re-declares
+   it anyway, because a preview that inherited would show every step as the
+   current one. */
+:root {
+  --sidebar-type: 1;
+}
+
+[data-sidebar-size='small'] {
+  --sidebar-type: 0.8;
+}
+
+[data-sidebar-size='normal'] {
+  --sidebar-type: 1;
+}
+
+[data-sidebar-size='large'] {
+  --sidebar-type: 1.2;
+}
+
+[data-sidebar-size='maximal'] {
+  --sidebar-type: 1.4;
+}
+
 /* X-19: the sidebar reads a fifth larger than the page beside it. It is
    navigation glanced at from across a desk rather than text being edited, and
    at `text-sm` it was the smallest type on a screen whose whole job is to be
    aimed at. One rule rather than a size named in six components: `sidebar-text`
    is Tailwind's `text-sm` × 1.2 and `sidebar-note` is `text-xs` × 1.2, so the
    proportions inside the column are the ones they always were. Unlayered, so
-   they win over the utility they replace. */
+   they win over the utility they replace.
+
+   `.sidebar-icon` is the third rule, and it is new: the size was `size-[1.2rem]`
+   written out five times across the two sidebar components, and it is here so
+   the icons scale with the type they sit beside rather than staying behind at
+   `maximal`. The same literal outside the sidebar — a row's icon, the Done
+   view's — is untouched, because those are not the column this setting is
+   about. */
 .sidebar-text {
-  font-size: 1.05rem;
-  line-height: 1.5rem;
+  font-size: calc(1.05rem * var(--sidebar-type));
+  line-height: calc(1.5rem * var(--sidebar-type));
 }
 
 .sidebar-note {
-  font-size: 0.9rem;
-  line-height: 1.25rem;
+  font-size: calc(0.9rem * var(--sidebar-type));
+  line-height: calc(1.25rem * var(--sidebar-type));
+}
+
+.sidebar-icon {
+  width: calc(1.2rem * var(--sidebar-type));
+  height: calc(1.2rem * var(--sidebar-type));
+  flex-shrink: 0;
 }
 
 /* X-20: a pointer that starts on the sidebar's grip is a resize, never a

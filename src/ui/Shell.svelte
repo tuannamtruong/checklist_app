@@ -96,7 +96,7 @@
         data-testid="search-link"
         onclick={() => view.setDrawer(false)}
       >
-        <span class="size-[1.2rem] shrink-0 text-center" aria-hidden="true">⌕</span>
+        <span class="sidebar-icon text-center" aria-hidden="true">⌕</span>
         <span class="truncate">Search</span>
         <span class="sidebar-note ml-auto shrink-0 text-ink-faint">/</span>
       </a>
@@ -109,7 +109,7 @@
         data-testid="done-link"
         onclick={() => view.setDrawer(false)}
       >
-        <span class="size-[1.2rem] shrink-0 text-center" aria-hidden="true">☑</span>
+        <span class="sidebar-icon text-center" aria-hidden="true">☑</span>
         <span class="truncate">Done</span>
       </a>
 
@@ -122,7 +122,7 @@
           data-testid="conflicts-link"
           onclick={() => view.setDrawer(false)}
         >
-          <span class="size-[1.2rem] shrink-0 text-center" aria-hidden="true">⚡</span>
+          <span class="sidebar-icon text-center" aria-hidden="true">⚡</span>
           <span class="truncate">Merged</span>
           {#if pending > 0}
             <span class="sidebar-note ml-auto rounded-full bg-accent-soft px-1.5 text-accent">
@@ -156,7 +156,7 @@
           data-testid="settings-link"
           onclick={() => view.setDrawer(false)}
         >
-          <span class="size-[1.2rem] shrink-0 text-center" aria-hidden="true">⚙</span>
+          <span class="sidebar-icon text-center" aria-hidden="true">⚙</span>
           <span class="truncate">Settings</span>
         </a>
         {#if synced}

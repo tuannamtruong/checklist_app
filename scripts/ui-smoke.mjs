@@ -836,6 +836,70 @@ async function main() {
     );
     await page.locator('[data-theme-id="light"]').click();
 
+    // --- X-25: the sidebar's type size --------------------------------------
+    // Three things a unit test cannot reach: that the multiplier arrives at the
+    // rule rather than only at the attribute, that it survives a reload, and —
+    // the one that matters most — that it leaves X-20's width alone.
+    const sizeIds = await page
+      .locator('[data-testid="sidebar-size-option"]')
+      .evaluateAll((buttons) => buttons.map((button) => button.dataset.sidebarSize));
+    check(
+      'every sidebar size in the catalog is offered — X-25',
+      sizeIds.join('|') === 'small|normal|large|maximal',
+      sizeIds.join('|'),
+    );
+    const sidebarType = () =>
+      page
+        .locator('[data-testid="settings-link"]')
+        .evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+    const sidebarBox = async () =>
+      Math.round((await page.locator('[data-testid="sidebar"]').boundingBox()).width);
+    const normalType = await sidebarType();
+    const widthBefore = await sidebarBox();
+
+    await page.locator('[data-testid="sidebar-size-option"][data-sidebar-size="maximal"]').click();
+    await page.waitForTimeout(100);
+    const maximalType = await sidebarType();
+    check(
+      'picking a size sets it on the document root and scales the type — X-25',
+      (await page.evaluate(() => document.documentElement.dataset.sidebarSize)) === 'maximal' &&
+        Math.abs(maximalType - normalType * 1.4) < 0.5,
+      `${normalType} -> ${maximalType}`,
+    );
+    // §10.4: the type only. The width is the grip's, and a setting that moved it
+    // would undo a drag the reader made by hand.
+    check(
+      'the sidebar type size leaves the dragged width alone — X-25',
+      (await sidebarBox()) === widthBefore,
+      `${widthBefore} -> ${await sidebarBox()}`,
+    );
+    await page.screenshot({ path: join(shots, 'sidebar-size-maximal.png'), fullPage: true });
+
+    await page.locator('[data-testid="sidebar-size-option"][data-sidebar-size="small"]').click();
+    await page.waitForTimeout(100);
+    const smallType = await sidebarType();
+    check(
+      'small is a fifth under normal — X-25',
+      Math.abs(smallType - normalType * 0.8) < 0.5,
+      `${normalType} -> ${smallType}`,
+    );
+    await page.screenshot({ path: join(shots, 'sidebar-size-small.png'), fullPage: true });
+
+    await page.goto(`${BASE_URL}#/settings`);
+    await page.waitForSelector('[data-testid="settings-page"]');
+    check(
+      'the sidebar size survives a reload, and is set before the first paint — X-25',
+      (await page.evaluate(() => document.documentElement.dataset.sidebarSize)) === 'small' &&
+        (await page.locator('[data-testid="sidebar-size-option"][data-sidebar-size="small"]').getAttribute('aria-pressed')) === 'true',
+    );
+    await page.locator('[data-testid="sidebar-size-option"][data-sidebar-size="normal"]').click();
+    await page.waitForTimeout(100);
+    check(
+      'normal is X-19s own size, returned to — X-25',
+      Math.abs((await sidebarType()) - normalType) < 0.5,
+      `${normalType} -> ${await sidebarType()}`,
+    );
+
     // --- D-5: the name the device gave itself ------------------------------
     // Nothing has typed into this field yet, and it is not empty: the shape is
     // platform-browser-id4, and the last four are the first four of the id
@@ -970,6 +1034,31 @@ async function main() {
     await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
     await page.screenshot({ path: join(shots, 'phone-drawer-dark.png') });
     await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'));
+
+    // X-25 on a phone, which is the half the settings screen cannot show: the
+    // drawer *is* the sidebar below `md`, so the multiplier has to reach it —
+    // the requirement was asked for desktop and Android alike. The width is the
+    // drawer's own `w-64` here and X-20 does not apply, so this is the one place
+    // "the type only" has to be checked against a width nobody can drag.
+    const drawerType = () =>
+      page
+        .locator('[data-testid="settings-link"]')
+        .evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+    const drawerBox = async () =>
+      Math.round((await page.locator('[data-testid="sidebar"]').boundingBox()).width);
+    const phoneNormal = await drawerType();
+    const phoneWidth = await drawerBox();
+    await page.evaluate(() => document.documentElement.setAttribute('data-sidebar-size', 'maximal'));
+    await page.waitForTimeout(100);
+    check(
+      'the drawer scales with the sidebar size too, and keeps its width — X-25',
+      Math.abs((await drawerType()) - phoneNormal * 1.4) < 0.5 && (await drawerBox()) === phoneWidth,
+      `${phoneNormal} -> ${await drawerType()} at ${await drawerBox()}px`,
+    );
+    await page.screenshot({ path: join(shots, 'phone-drawer-maximal.png') });
+    await page.evaluate(() =>
+      document.documentElement.setAttribute('data-sidebar-size', 'normal'),
+    );
     // Away from the drawer itself, which sits above the backdrop on purpose.
     await page.locator('[data-testid="drawer-backdrop"]').click({ position: { x: 340, y: 500 } });
     await page.waitForTimeout(300);

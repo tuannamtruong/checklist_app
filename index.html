@@ -13,9 +13,17 @@
       // the key `src/app/theme.svelte.ts` writes and sets the attribute
       // `src/app.css` keys its palettes on; anything unreadable falls through to
       // the light default already in the stylesheet.
+      //
+      // X-25 rides the same line for the same reason: a sidebar that renders at
+      // normal and then jumps to maximal is the flash this exists to prevent,
+      // and it is one more read to prevent it. The two are otherwise strangers —
+      // past_decision.md §15.3.
       try {
+        var root = document.documentElement;
         var t = localStorage.getItem('checklist.theme');
-        if (t) document.documentElement.setAttribute('data-theme', t);
+        if (t) root.setAttribute('data-theme', t);
+        var s = localStorage.getItem('checklist.sidebarsize');
+        if (s) root.setAttribute('data-sidebar-size', s);
       } catch (e) {}
     </script>
   </head>

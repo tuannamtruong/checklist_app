@@ -95,9 +95,10 @@ the rule is [sync-flow.md §4.8 The compaction cut](sync-flow.md#48-the-compacti
 Device-local state, held in `localStorage` and never written to a shared file: the device id, collapse/expand state
 (T-8), the sync cadence (S-19), which folder this device reaches the tree through
 ([architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter)), dismissed conflict notices (C-6), the
-chosen theme (X-14), which cloud provider this device's folder belongs to (X-17), which tags the tree is filtered by
-(A-5), how wide the sidebar and the note pane have been dragged (X-20, X-24), and any filter the Done view grows (T-12).
-Anything the user would not want to converge across devices belongs here rather than in the tree.
+chosen theme (X-14), how large the sidebar's type is (X-25), which cloud provider this device's folder belongs to
+(X-17), which tags the tree is filtered by (A-5), how wide the sidebar and the note pane have been dragged (X-20, X-24),
+and any filter the Done view grows (T-12). Anything the user would not want to converge across devices belongs here
+rather than in the tree.
 
 The **search index** is not state at all, in the same sense the Done view is not: F-4 scans the materialised tree on
 each keystroke, so there is nothing to store, nothing to invalidate and nothing to sync.
@@ -656,6 +657,7 @@ to empty, and a dismissal is only for a row the user is content to leave as it l
 | X-22 | Below `lg`, that same route lays the note **over** the list as a sheet, as tall as its own content and never taller than 60% of the viewport; a second tap anywhere on it opens it fully | ✅ | `src/ui/NotePane.svelte`. The height is a `max-height` over content height rather than a measurement, so "short enough shows all of it" is one CSS rule and no arithmetic. The peek is covered by one transparent layer, which is what keeps the tap out of the body's always-mounted textarea — B-3 |
 | X-23 | A page's column sits at the left edge of the page area rather than centred, whether or not a note is open | ✅ | `src/ui/NodePage.svelte`. A centred column would slide sideways the moment the note pane appeared, so every open and close would move the list the user is reading |
 | X-24 | The divider between the list and the note pane is dragged, and the width is this device's own | ✅ | `src/ui/WidthGrip.svelte` over `notePaneWidth` in `src/app/view-state.svelte.ts` — X-20's grip with the sign flipped, since the pane's edge is its left one. Above `lg` only: below it the pane is X-22's sheet and its width is the viewport's. `view-state.svelte.test.ts`, `scripts/ui-smoke.mjs` |
+| X-25 | The sidebar's type size is a four-step choice on the settings screen: normal, a fifth smaller, a fifth larger, two fifths larger | ✅ | `src/core/sidebar-size.ts` is the catalog and `src/app.css` holds one `--sidebar-type` multiplier per id, applied by `src/app/sidebar-size.svelte.ts` as `data-sidebar-size` on the document root. It scales X-19's two type rules and the icons beside them and nothing else — not the column's width, which is X-20's and stays where the grip left it. Device-local and set before the first paint, for X-14's reasons. `sidebar-size.test.ts`, `scripts/ui-smoke.mjs` |
 
 Packaging decides which of these are reachable, and it answers them per target rather than once — see
 [architecture.md §7 Packaging](architecture.md#7-packaging). X-3 in particular is a PWA install on Chromium and an APK
@@ -836,6 +838,47 @@ opening the note would shift the list under the pointer and closing it would shi
 where it was before the note opened and where it will be after, and the note pane is what appears and goes. That is why
 X-23 says "whether or not a note is open": a rule that only applied while the pane was there would be the jump it exists
 to prevent.
+
+### 10.4 The sidebar's type size
+
+X-19 settled that the sidebar reads a fifth larger than the page beside it, and settled it as one number for every
+device. X-25 makes that number a choice, in four steps: **normal** is X-19's, **small** is a fifth under it, **large** a
+fifth over, and **maximal** two fifths over. The sidebar is navigation aimed at from across a desk, and how far away
+that desk is differs by device — the laptop is at arm's length, the phone is held, and neither of those is the monitor
+across the room the app is glanced at on.
+
+| Id | Multiplier | `sidebar-text` | `sidebar-note` | The icon beside them |
+| --- | --- | --- | --- | --- |
+| `small` | 0.8 | 0.84rem | 0.72rem | 0.96rem |
+| `normal` | 1 | 1.05rem | 0.9rem | 1.2rem |
+| `large` | 1.2 | 1.26rem | 1.08rem | 1.44rem |
+| `maximal` | 1.4 | 1.47rem | 1.26rem | 1.68rem |
+
+**It is one multiplier, not four sets of sizes.** `--sidebar-type` is a number on the document root, and X-19's rules
+became `calc(1.05rem * var(--sidebar-type))` rather than gaining a variant apiece. That is X-19's own argument carried
+forward: one rule rather than a size named per component, so a fifth step is one CSS line and no component change. The
+icons joined the rules for the same reason — `size-[1.2rem]` was a literal written out five times across the two sidebar
+components and is now `.sidebar-icon`, which multiplies like everything else, so the column keeps the proportions X-19
+gave it at every step. The same literal elsewhere — a row's icon, the Done view's — is untouched: this setting is about
+one column, not about every icon in the app.
+
+**The type only, never the width.** The column's width is X-20's and is dragged; changing it here would move a divider
+the user placed by hand, and on a phone it would resize a drawer that takes room from nothing. The two are independent
+on purpose: `maximal` in a narrow column truncates more titles, and that is the reader's trade to make with the grip
+that is already there. A device that wants both makes both gestures.
+
+**This is not a theme, and cannot become one.** [§10.1 Themes](#101-themes) holds a theme to fourteen colour tokens and
+says a theme never changes a layout, a size or a font. A size setting that rode on `data-theme` would break that in one
+move and cost the smoke run its "no theme moves anything" check, so it is a second attribute with a catalog and a class
+of its own. The two are read from the same boot line in `index.html` and are otherwise strangers.
+
+It is `localStorage`, never a file, for X-14's reason exactly: the phone is read in bed and the laptop in an office, and
+a size that converged across them would be one the user has to fight on whichever device they are not holding. It is set
+before the first paint by the same boot line the theme uses — a sidebar that renders at normal and then jumps to maximal
+is the reflow that boot line exists to prevent, and it costs one more line to prevent it here too.
+
+The four buttons on the settings screen each carry `data-sidebar-size` themselves, so each one previews the step it
+names in the sample inside it — X-13's swatch, applied to type rather than to colour.
 
 ## 11. Import, export and backup
 

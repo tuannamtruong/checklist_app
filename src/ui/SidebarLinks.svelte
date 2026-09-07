@@ -43,7 +43,7 @@
     data-row-id={id}
     onclick={() => onNavigate?.()}
   >
-    <KindIcon kind={node.kind} class="size-[1.2rem] shrink-0" />
+    <KindIcon kind={node.kind} class="sidebar-icon" />
     <span class="truncate">{node.title || 'Untitled'}</span>
   </a>
 {/each}

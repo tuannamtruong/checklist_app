@@ -4,23 +4,33 @@
   //
   // Four things share it and they are the same kind of thing: which folder this
   // device syncs through (X-15 to X-17), what it calls itself (D-1), what it has
-  // written (D-4), and how it looks (X-13). Only the name writes an op; the rest
-  // is device-local, which is why none of this needed a nav entry of its own
-  // before there was a screen to gather them onto.
+  // written (D-4), and how it looks — the theme (X-13) and the size of the
+  // sidebar's type (X-25), which are two settings rather than one because a
+  // theme is fourteen colours and never a size (§10.1). Only the name writes an
+  // op; the rest is device-local, which is why none of this needed a nav entry
+  // of its own before there was a screen to gather them onto.
   import { PROVIDERS, isProviderId } from '../core/providers';
   import { THEMES } from '../core/themes';
+  import { SIDEBAR_SIZES } from '../core/sidebar-size';
   import type { OpenFolder } from '../app/folder-choice';
   import { rememberProvider, storedProvider } from '../app/provider';
   import { shellActions } from '../app/shell';
   import type { Theme } from '../app/theme.svelte';
+  import type { SidebarSize } from '../app/sidebar-size.svelte';
   import type { Session } from '../app/Session.svelte';
   import { DEVICES_HREF, LOGS_HREF } from '../app/router.svelte';
 
   let {
     session,
     theme,
+    sidebarSize,
     folder,
-  }: { session: Session; theme: Theme; folder: OpenFolder } = $props();
+  }: {
+    session: Session;
+    theme: Theme;
+    sidebarSize: SidebarSize;
+    folder: OpenFolder;
+  } = $props();
 
   const self = $derived(session.devices.find((device) => device.self));
   const peers = $derived(session.devices.length - 1);
@@ -65,7 +75,7 @@
     <h1 class="text-2xl font-semibold" data-testid="page-title">Settings</h1>
     <p class="text-sm text-ink-muted">
       This device: which folder it syncs through, what it is called, what it has written, and how it
-      looks. Only the name travels to the other devices — the rest is this device's own.
+      looks and reads. Only the name travels to the other devices — the rest is this device's own.
     </p>
   </header>
 
@@ -205,6 +215,41 @@
           </span>
         </button>
       {/each}
+    </div>
+
+    <!-- X-25. The sidebar's type, not its width: the width is dragged by the
+         grip on the column's own edge (X-20), and a preset here would undo a
+         drag the reader made — §10.4. Each button carries `data-sidebar-size`
+         itself, so the sample inside it is drawn at the step it names — X-13's
+         swatch, applied to type rather than to colour. -->
+    <div class="flex flex-col gap-2" data-testid="settings-sidebar-size">
+      <div class="flex flex-col gap-0.5">
+        <h3 class="text-sm font-medium">Sidebar text</h3>
+        <p class="text-xs text-ink-faint">
+          How large the navigation column reads. The width is the column's own edge, dragged.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {#each SIDEBAR_SIZES as choice (choice.id)}
+          <button
+            type="button"
+            class="row-control flex items-center gap-2 rounded-md border px-2 py-2 text-left hover:bg-surface-sunken"
+            class:border-accent={sidebarSize.current === choice.id}
+            class:border-line={sidebarSize.current !== choice.id}
+            data-testid="sidebar-size-option"
+            data-sidebar-size={choice.id}
+            aria-pressed={sidebarSize.current === choice.id}
+            onclick={() => sidebarSize.set(choice.id)}
+          >
+            <span class="sidebar-text truncate" aria-hidden="true">Aa</span>
+            <span class="flex min-w-0 flex-col">
+              <span class="truncate text-sm">{choice.label}</span>
+              <span class="truncate text-xs text-ink-faint">{choice.note}</span>
+            </span>
+          </button>
+        {/each}
+      </div>
     </div>
   </section>
 

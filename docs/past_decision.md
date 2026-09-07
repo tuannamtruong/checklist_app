@@ -248,6 +248,11 @@ statements and duplicates nothing: it reads the same `localStorage` key the clas
 it is a theme that changes more than colour — a compact density, a larger type scale — because that is no longer a
 palette and A has nothing to say about it.
 
+**A type scale was asked for, and it did not reopen this.** X-25 is exactly the case above, and the answer was a second
+attribute rather than a wider theme: see [§15 A size for the sidebar's type](#15-a-size-for-the-sidebars-type). What
+that settles for A is that the boundary holds — a theme is still fourteen colours, and the thing that was not a colour
+got its own catalog, its own attribute and its own line in the same boot script.
+
 ## 10. Tags as one field
 
 A-1 makes `tags` a set on a node, and the merge treats the whole set as one field: the later write wins, and the set
@@ -452,3 +457,58 @@ A device that is wide *and* touch-only, where the peek's tap-to-expand and the s
 what a tap on a note means — the breakpoint answers that today by assuming width implies a pointer. The other opening is
 a second kind worth splitting: D stays refused for folders, but a `task` that grew a body would be K-3's question again
 rather than this one.
+
+## 15. A size for the sidebar's type
+
+**Four steps on one multiplier, applied as a second attribute on the document root.** X-19 had already decided the
+sidebar reads a fifth larger than the page, and had decided it once for every device. X-25 is the same question asked
+per device, because the distance to the screen is not a property of the app: normal, a fifth under, a fifth over, two
+fifths over.
+
+### 15.1 What the setting moves
+
+The first fork was what "size of the sidebar" means, and there were three readings.
+
+| Option | The idea | Its cost | Would have won if |
+| --- | --- | --- | --- |
+| **A — the type only (chosen)** | Scale X-19's two rules and the icons beside them; the width is untouched | `maximal` in a narrow column truncates more titles, and the reader has to reach for X-20's grip to fix it | — |
+| B — the width only | Four presets over the column's width | X-20 already drags the width, so this is a second control for one number — and the one that is not the pointer would lose every argument with the one that is. Below `md` the sidebar is a drawer, where a width takes room from nothing, so it would also do nothing on a phone | X-20 did not exist, and the width needed a control that was not a drag |
+| C — both, as one scale | One multiplier over type and width together, so the column keeps its proportions | Same collision with X-20, plus the reader can no longer have big type in a narrow column or small type in a wide one — the two wants that are least alike are the ones it fuses | The sidebar had a fixed width, where "size" would have had exactly one meaning |
+
+B and C both die on the same point: the width already has a gesture, and it is a *direct* one. A preset that fights a
+drag is a preference the user has to re-assert every time they touch the grip. The type had no control at all, which is
+what made it the half worth adding.
+
+### 15.2 One multiplier rather than four sets of sizes
+
+`--sidebar-type` is a number and X-19's rules multiply by it, so `small` is `[data-sidebar-size='small'] {
+--sidebar-type: 0.8 }` and nothing else. The alternative was a rule per step per class — eight declarations to say what
+one number says — and it fails the test X-19 set for itself: one rule rather than a size named per component. It is also
+what let the icons in, which were `size-[1.2rem]` written out five times across the two sidebar components and are now
+`.sidebar-icon`; without the multiplier each of those would have needed four variants to keep the column's proportions.
+
+`normal` gets a block of its own even though it re-declares the `:root` default, for the reason `[data-theme='light']`
+does: the settings screen previews each step by putting the attribute on the button, and a `normal` that inherited would
+preview whatever the page is already wearing.
+
+### 15.3 Why it is not a seventh theme, or a field in the theme
+
+Folding it into `data-theme` would have been fewer files, and it is refused on
+[requirements.md §10.1 Themes](requirements.md#101-themes)'s own terms: a theme is fourteen colour tokens and never
+changes a layout, a size or a font. That rule is load-bearing rather than decorative — it is what lets the smoke run
+assert that every palette renders the identical DOM, which is the check that catches a palette breaking a layout. A
+theme that could resize things makes that check meaningless, and the six palettes would then be six layouts to test.
+
+The two do share the boot line in `index.html`, and that is the whole overlap. Both are read before the module loads for
+X-14's reason — a sidebar that renders at normal and jumps to maximal is the same flash a dark theme has, and it is one
+more `try`/`getItem`/`setAttribute` to prevent.
+
+### 15.4 What reopens it
+
+A second surface wanting the same treatment. The setting is deliberately about the sidebar rather than about the app: a
+global type scale is the browser's own zoom, which already works here and needs nothing from us. What we would have no
+answer to is a *specific* second ask — the note body at a reading size while the tree stays dense — because at two
+independent scales the question becomes a type system rather than a sidebar setting, and `--sidebar-type` would want to
+become a set of named steps that several rules draw from.
+
+A step beyond `maximal` is not a reopener; it is a catalog line and a CSS block, which is the property A was chosen for.

@@ -157,6 +157,13 @@ asserted — it is a screenshot per theme, which is what a person can check and 
 assert about the rest of the palette is that no theme changes the layout: the app is measured for horizontal overflow
 under the widest one, and every theme renders the same DOM.
 
+X-25 puts a third check on that screen, and it is the same shape as the theme's without being the theme's: every step in
+the catalog is offered, picking one sets `data-sidebar-size` on the document root, and the sidebar's type is measurably
+larger afterwards — the computed `font-size` of a sidebar link, which is the only thing that can say the multiplier
+reached the rule rather than only the attribute. It survives a reload, for X-14's reason applied to a size. The check
+that matters most is the negative one: the *width* of the sidebar does not move when the type does, because that width
+is X-20's and a setting that quietly resized the column would undo a drag the reader made.
+
 D-5 puts one more check on that screen, and it is a check about a field nobody has touched: the device name is already
 filled in on a first launch, it matches `platform-browser-id4`, and its last four characters are the first four of the
 device id shown beside it. The mapping itself is a unit test — `src/core/device-name.test.ts` over a table of real

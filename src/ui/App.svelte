@@ -14,6 +14,7 @@
   import { Router } from '../app/router.svelte';
   import { Session } from '../app/Session.svelte';
   import { Theme } from '../app/theme.svelte';
+  import { SidebarSize } from '../app/sidebar-size.svelte';
   import { SyncCadence } from '../app/sync-cadence';
   import { ViewState } from '../app/view-state.svelte';
   import { RowFocus } from './focus.svelte';
@@ -35,6 +36,9 @@
   // X-14. Constructed here rather than in the settings screen: the theme is the
   // whole app's, and the screen that changes it is one of the pages wearing it.
   const theme = new Theme();
+  // X-25. Beside the theme and for its reasons: the size is the sidebar's, which
+  // every page is drawn next to, and the screen that changes it is one of them.
+  const sidebarSize = new SidebarSize();
   const focus = new RowFocus();
   const dismissals = new Dismissals();
 
@@ -176,7 +180,7 @@
     {:else if searchOpen}
       <SearchPage {session} {query} onquery={setQuery} />
     {:else if settingsOpen}
-      <SettingsPage {session} {theme} {folder} />
+      <SettingsPage {session} {theme} {sidebarSize} {folder} />
     {:else if devicesOpen}
       <DevicesPage {session} />
     {:else if logsOpen}
