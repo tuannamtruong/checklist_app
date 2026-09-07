@@ -7,7 +7,7 @@
   // Every row carries the path it sat on, since a bare title out of its list is
   // not enough to recognise: three lists can each hold a "Milk".
   import { deletedRows, finishedRows, type ArchivedRow } from '../core/done';
-  import { toggleDone } from '../core/edit';
+  import { restore, toggleDone } from '../core/edit';
   import type { Session } from '../app/Session.svelte';
   import { nodeHref } from '../app/router.svelte';
   import KindIcon from './KindIcon.svelte';
@@ -82,6 +82,17 @@
         <span class="shrink-0 truncate text-xs text-ink-faint" data-testid="archived-path">
           {pathLabel(row)}
         </span>
+        <!-- T-13. One op, and the subtree comes back with it: T-7 inherits the
+             tombstone at read time, so clearing the top of the run is the whole
+             operation — sync-flow.md §4.9. -->
+        <button
+          type="button"
+          class="row-control shrink-0 rounded border border-line px-2 py-0.5 text-xs hover:bg-surface"
+          data-testid="restore"
+          onclick={() => session.run((tree, ctx) => restore(tree, ctx, row.id))}
+        >
+          Restore
+        </button>
       </div>
     {:else}
       <p class="px-2 py-3 text-sm text-ink-muted" data-testid="deleted-empty">
@@ -89,11 +100,9 @@
       </p>
     {/each}
     {#if deleted.length > 0}
-      <!-- T-13. Saying so is the honest version of an absent button: the row is
-           kept rather than removed, so it is findable, and that is all M1 offers. -->
       <p class="px-2 text-xs text-ink-faint">
-        A deleted row and everything inside it is kept rather than removed, so it stays findable — but
-        this version has no way to put one back.
+        A deleted row and everything inside it is kept rather than removed, so restoring one brings
+        back what it held.
       </p>
     {/if}
   </section>

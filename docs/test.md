@@ -68,6 +68,12 @@ set equals the fold of the original (commutative), folding in two groups equals 
 folding a set twice changes nothing (idempotent). `SEED` in the environment reproduces a failure exactly. What keeps
 S-12 open is shrinking — a failure arrives as the whole generated set rather than as the two ops that caused it.
 
+Compaction is a fourth property over the same generator, and it belongs here rather than with the scenarios because it
+is the same kind of claim: **the fold of a compacted op set equals the fold of the original**, for every device
+compacted, in any combination. `src/core/compact.test.ts` asserts it, along with the two invariants
+[sync-flow.md §4.8 The compaction cut](sync-flow.md#48-the-compaction-cut) names — the highest counter survives, and
+every retained op reconstructs the vector it had before.
+
 The prototype gets part of the way. Its `scenario.mjs` check 10 runs four devices through 300 randomised edits,
 deliveries and syncs drawn from a seeded PRNG, then asserts that all four agree on the text and on the vector; `SEED` in
 the environment reproduces any failure exactly. What is missing is what makes S-12 a separate requirement in
@@ -96,6 +102,9 @@ Production adds the tree cases, and these are the ones that will find bugs:
 | A third device joins mid-sequence | no registration step, converges from an empty vector |
 | A device offline across many peer edits, then returning | fast-forward without a spurious race |
 | Sibling ordering under concurrent insertion | every device derives one order (T-2) |
+| Deleting a row, then restoring it | the tombstone clears and the row returns to the list it came from, at the order key it kept (T-13) |
+| Concurrent delete and restore of one row | `deleted` resolves by `(at, device id)` like any other field, and the loser is offered back (T-13, C-4) |
+| Compacting one device's log mid-sequence | every device still derives the identical tree, and the compacted file is not skipped as a stale read (S-14) |
 
 ### 3.3 Adapter conformance
 
@@ -129,7 +138,13 @@ every keyboard action also exists in the row menu, since phones have no Tab key.
 
 Two of the checks are about what is *not* on screen, which a unit test cannot see: ticking a row makes it leave the tree
 and the sidebar (T-11), and the Done view at `#/done` then holds it beside every deleted row, with the path each sat on
-(T-12). Un-ticking there returns the row to the tree it came from; the deleted ones stay put, because T-13 is not built.
+(T-12). Un-ticking there returns the row to the tree it came from, and since M3 so does restoring a deleted one — T-13,
+which the smoke run checks by deleting a row with a child, restoring it from `#/done`, and asserting the child came back
+with it.
+
+M3 adds two more views to drive: `#/search` for [requirements.md §6 Search](requirements.md#6-search) — that a query
+finds a title, a note body, and a row T-11 has hidden — and `#/devices` for D-1, that a name typed there survives a
+reload, which is the only way to see that it reached the file rather than the page.
 
 The prototype's `android-bridge.mjs` drives the same page in the same browser with `window.AndroidFolder` replaced by an
 in-page stub, which is how the Android startup path — first-run folder pick, edit, conflict, resolution — is exercised
@@ -145,6 +160,22 @@ opt-in.
 Not automatable on this machine, so it is a written checklist rather than a script: the Android SAF grant surviving a
 restart and an app update, a cold offline launch from the home-screen icon, a deep link surviving that cold launch
 (X-8), and the maskable icon rendering uncropped on a real launcher (X-4).
+
+M3 built the two bundles that make the rest of this checklist reachable, and none of it has been walked yet —
+[requirements.md §15 Deviations and defects found during verification](requirements.md#15-deviations-and-defects-found-during-verification)
+row 10. In the order that finds the most:
+
+| # | Check | Answers |
+| --- | --- | --- |
+| 1 | Install `bundles/checklist.apk`, grant a folder in the provider's synced directory, add a row | The SAF grant and the Android adapter against a real client |
+| 2 | Force-stop the app, reopen it | `takePersistableUriPermission` survived, so there is no second prompt |
+| 3 | Unzip `checklist-windows.zip` on Windows, run `Checklist.bat`, point Firefox at it | The loopback helper path, which no headless run can hold |
+| 4 | Edit on the phone, wait for the provider's client, refresh on Windows | Provider latency and partial files — [sync-flow.md §7 What is still open](sync-flow.md#7-what-is-still-open) item 5 |
+| 5 | Edit both while both are offline, then reconnect | A real race with a real clock skew between two real devices |
+| 6 | Leave it running for long enough for the compaction trigger to fire | S-14 against a provider's client, which re-uploads the whole file when it shrinks |
+
+Check 6 is the one with a genuinely unknown answer. Every other row exercises code that a test already covers with a
+stand-in; a provider's reaction to a file that got *smaller* is behaviour nothing here has ever observed.
 
 ## 4. What the tests must not do
 
@@ -179,7 +210,7 @@ choice is the stack changing, not the test suite growing.
 
 ## 6. Commands
 
-Production, as of M2:
+Production, as of M3:
 
 ```bash
 npm test              # Vitest over src/**/*.test.ts — the logic layer, the merge, the adapters, the row-action parity
@@ -187,6 +218,14 @@ npm run check         # svelte-check, in strict TypeScript
 npm run ui-smoke      # builds, serves dist/ on 38531, drives Chromium, screenshots to ui-smoke/
 npm run seed          # the same app with a small tree in it, in a window, to look at
 npm run make-icons    # re-render the PWA PNGs from public/icons/*.svg
+```
+
+The two bundles are built rather than tested, and what they produce is on [§3.6 Platform](#36-platform)'s checklist
+rather than in any script:
+
+```bash
+make windows          # bundles/checklist-windows.zip — web assets, the helper, a shortcut
+make apk              # bundles/checklist.apk, built in Docker
 ```
 
 `ui-smoke` and `seed` need Playwright on `NODE_PATH`, which is installed on this machine rather than in the project:

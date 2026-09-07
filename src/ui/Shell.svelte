@@ -7,7 +7,7 @@
   import type { Dismissals } from '../app/dismissals.svelte';
   import type { ViewState } from '../app/view-state.svelte';
   import SidebarBranch from './SidebarBranch.svelte';
-  import { CONFLICTS_HREF, DONE_HREF } from '../app/router.svelte';
+  import { CONFLICTS_HREF, DEVICES_HREF, DONE_HREF, SEARCH_HREF } from '../app/router.svelte';
   import { ROOT } from '../core/types';
 
   let {
@@ -17,6 +17,8 @@
     currentId,
     doneOpen,
     conflictsOpen,
+    searchOpen,
+    devicesOpen,
     folderLabel,
     synced,
     onrefresh,
@@ -28,6 +30,8 @@
     currentId: string | null;
     doneOpen: boolean;
     conflictsOpen: boolean;
+    searchOpen: boolean;
+    devicesOpen: boolean;
     folderLabel: string;
     synced: boolean;
     onrefresh: () => void;
@@ -38,6 +42,10 @@
   // otherwise. A permanent one would be empty almost always, which is how a nav
   // entry teaches a user to stop reading it.
   const pending = $derived(session.conflicts.filter((row) => !dismissals.has(row.id)).length);
+
+  const selfName = $derived(
+    session.devices.find((device) => device.self)?.name || session.deviceId,
+  );
 </script>
 
 <div class="flex min-h-dvh bg-surface text-ink">
@@ -78,11 +86,25 @@
         onNavigate={() => view.setDrawer(false)}
       />
 
-      <!-- T-12. Always here, even when empty: a view that appeared only once it
-           had something in it is a view the user never learns exists. -->
+      <!-- T-12, F-5 and D-1. All three are always here, even when empty: a view
+           that appeared only once it had something in it is a view the user
+           never learns exists — requirements.md §5. -->
+      <a
+        href={SEARCH_HREF}
+        class="mt-2 flex items-center gap-2 rounded-md border-t border-line px-2 pt-3 pb-1.5 text-sm hover:bg-surface-sunken"
+        class:text-accent={searchOpen}
+        class:text-ink-muted={!searchOpen}
+        data-testid="search-link"
+        onclick={() => view.setDrawer(false)}
+      >
+        <span class="size-4 shrink-0 text-center" aria-hidden="true">⌕</span>
+        <span class="truncate">Search</span>
+        <span class="ml-auto shrink-0 text-xs text-ink-faint">/</span>
+      </a>
+
       <a
         href={DONE_HREF}
-        class="mt-2 flex items-center gap-2 rounded-md border-t border-line px-2 pt-3 pb-1.5 text-sm hover:bg-surface-sunken"
+        class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-surface-sunken"
         class:text-accent={doneOpen}
         class:text-ink-muted={!doneOpen}
         data-testid="done-link"
@@ -90,6 +112,18 @@
       >
         <span class="size-4 shrink-0 text-center" aria-hidden="true">☑</span>
         <span class="truncate">Done</span>
+      </a>
+
+      <a
+        href={DEVICES_HREF}
+        class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-surface-sunken"
+        class:text-accent={devicesOpen}
+        class:text-ink-muted={!devicesOpen}
+        data-testid="devices-link"
+        onclick={() => view.setDrawer(false)}
+      >
+        <span class="size-4 shrink-0 text-center" aria-hidden="true">▤</span>
+        <span class="truncate">Devices</span>
       </a>
 
       {#if pending > 0 || conflictsOpen}
@@ -113,7 +147,13 @@
     </nav>
 
     <footer class="border-t border-line px-3 py-2 text-xs text-ink-faint">
-      <p data-testid="device-id">Device {session.deviceId}</p>
+      <!-- D-1: the name once there is one, and the id until then — which is all
+           an unnamed device has to show. -->
+      <p data-testid="device-id">
+        <a href={DEVICES_HREF} class="hover:text-ink" onclick={() => view.setDrawer(false)}>
+          Device {selfName}
+        </a>
+      </p>
       <p class="flex items-center gap-1">
         <span class="min-w-0 truncate" data-testid="folder-label">{folderLabel}</span>
         {#if synced}

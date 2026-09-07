@@ -98,7 +98,18 @@ export interface DeleteOp extends OpBase {
   id: NodeId;
 }
 
-export type Op = CreateOp | SetOp | MoveOp | DeleteOp;
+/**
+ * T-13, the mirror of `delete`. It clears the node's *own* tombstone and never
+ * an inherited one, so a row under a still-deleted ancestor stays out of the
+ * tree — which is also what makes restoring a subtree one op rather than one
+ * per node — sync-flow.md §4.9.
+ */
+export interface RestoreOp extends OpBase {
+  op: 'restore';
+  id: NodeId;
+}
+
+export type Op = CreateOp | SetOp | MoveOp | DeleteOp | RestoreOp;
 
 /**
  * What an edit needs from outside itself. The logic layer has no clock and no

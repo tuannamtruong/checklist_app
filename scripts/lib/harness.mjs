@@ -130,6 +130,10 @@ export function seedLog(device = DEVICE) {
     { id: 'n_seed0008', parent: 'root', kind: 'note', order: 'a3', title: 'Trip notes' },
     { id: 'n_seed0009', parent: 'n_seed0008', kind: 'task', order: 'a1', title: 'Book the ferry' },
     { id: 'n_seed0010', parent: 'root', kind: 'note', order: 'a4', title: 'Old receipts', deleted: true },
+    // Inside a tombstoned parent and never deleted on its own — T-7 inherits at
+    // read time. It is what makes the T-13 restore worth checking: one op has
+    // to bring the subtree back, not just the row named.
+    { id: 'n_seed0011', parent: 'n_seed0010', kind: 'task', order: 'a1', title: 'Fuel receipt' },
   ];
 
   for (const row of rows) {

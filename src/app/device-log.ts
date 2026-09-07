@@ -6,8 +6,16 @@
 // burst of whole-file writes, and two writes must never be in flight at once,
 // or the shorter one can land last.
 
+import { compactOps } from '../core/compact';
 import { receiptDelta } from '../core/merge';
-import { clockOf, decodeLog, deviceFileName, encodeLog, LOG_VERSION } from '../core/op-log';
+import {
+  cleanDeviceName,
+  clockOf,
+  decodeLog,
+  deviceFileName,
+  encodeLog,
+  LOG_VERSION,
+} from '../core/op-log';
 import { dominates, join } from '../core/sclock';
 import type { FolderAdapter } from '../core/folder';
 import type { DeviceId, Op, SClock } from '../core/types';
@@ -34,6 +42,10 @@ export class DeviceLog {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private writing: Promise<void> = Promise.resolve();
   private pending = false;
+  /** D-1. What this device calls itself, as its own header line carries it. */
+  private label = '';
+  /** The bytes this file last cost, which is what the S-14 trigger weighs. */
+  private bytes = 0;
 
   private constructor(folder: FolderAdapter, device: DeviceId, events: DeviceLogEvents) {
     this.folder = folder;
@@ -58,6 +70,8 @@ export class DeviceLog {
       if (decoded !== null) {
         log.entries = decoded.ops;
         log.counter = clockOf(decoded.ops)[device] ?? 0;
+        log.label = decoded.header.name ?? '';
+        log.bytes = text?.length ?? 0;
         // Our own receipts, as we last wrote them. Reloading without them would
         // make every peer edit already folded in look new again on the next
         // write, and every one of our ops would carry a `seen` for it.
@@ -83,6 +97,45 @@ export class DeviceLog {
   /** Every op this device has ever written, in the order it wrote them. */
   get ops(): readonly Op[] {
     return this.entries;
+  }
+
+  /** What this file cost on disk the last time it was written or read. */
+  get byteLength(): number {
+    return this.bytes;
+  }
+
+  /** D-1. Empty until somebody names this device on this device. */
+  get name(): string {
+    return this.label;
+  }
+
+  /**
+   * D-1. A device names only itself, so this writes the header of the one file
+   * this device owns and no op at all — the name is not tree data and has no
+   * merge rule, because there is exactly one writer of it.
+   */
+  rename(name: string): void {
+    const cleaned = cleanDeviceName(name);
+    if (cleaned === this.label) return;
+    this.label = cleaned;
+    this.schedule();
+  }
+
+  /**
+   * S-14. Drops this device's superseded ops and rewrites its own file —
+   * sync-flow.md §4.8. Answers whether anything was actually dropped, so a
+   * caller can leave the trigger alone rather than rewriting the file to say
+   * that nothing changed.
+   */
+  compact(): boolean {
+    const compacted = compactOps(this.entries);
+    // By size rather than by count: a `set` that carried two fields and keeps
+    // one is retained and still shrinks the file. Stringifying twice is
+    // affordable because this runs when the trigger fires, not per write.
+    if (JSON.stringify(compacted).length >= JSON.stringify(this.entries).length) return false;
+    this.entries = compacted;
+    this.schedule();
+    return true;
   }
 
   /** This device's counter. Only an op that is actually written may take one. */
@@ -131,10 +184,18 @@ export class DeviceLog {
     this.pending = false;
     const snapshot = [...this.entries];
     const receipts = this.receipts;
+    const name = this.label;
     this.writing = this.writing.then(async () => {
       try {
         const clock = join(clockOf(snapshot), receipts);
-        const content = encodeLog({ v: LOG_VERSION, dev: this.device, clock }, snapshot);
+        // D-2's `lastSeen` is stamped here because here is where "this device
+        // was running" is actually true. It is advisory and nothing reads it
+        // but the device list, which is what keeps D-3 structural.
+        const content = encodeLog(
+          { v: LOG_VERSION, dev: this.device, clock, ...(name ? { name } : {}), at: Date.now() },
+          snapshot,
+        );
+        this.bytes = content.length;
         await this.folder.write(deviceFileName(this.device), content);
       } catch (error) {
         // Keep the ops queued: the next edit rewrites the whole file anyway, so

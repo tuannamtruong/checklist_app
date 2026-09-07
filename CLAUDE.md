@@ -5,8 +5,8 @@
 A checklist and notes app for one person across several devices. Local-first, no application server: devices synchronise
 through a folder that a cloud provider's own client keeps in sync.
 
-**Status: milestones M1 and M2 are built** — the local-first core, and sync through the folder. The production tree is
-`src/`, driven by `package.json`. M3 (compaction, search, device names, undelete) has not started.
+**Status: milestones M1, M2 and M3 are built** — the local-first core, sync through the folder, and then compaction,
+search, device names, undelete and the two platform bundles. The production tree is `src/`, driven by `package.json`.
 
 ## Development
 
@@ -52,7 +52,15 @@ npm run ui-smoke         # builds, serves dist/, drives Chromium, screenshots to
 npm run seed             # the app in a window with a small tree in it
 npm run make-icons       # re-render the PWA PNGs from public/icons/*.svg
 python3 scripts/md-reflow.py docs/*.md   # --check to fail without writing
+
+make windows             # bundles/checklist-windows.zip — web assets, the loopback helper, a shortcut
+make apk                 # bundles/checklist.apk, built in Docker; nothing is installed on the host
 ```
+
+Both bundles take `dist/` as input rather than building their own, so the phone and the laptop cannot drift. The shells
+live in `packaging/windows/` and `packaging/android/` — architecture.md §7. `make windows PYTHON_EMBED=skip` omits the
+embeddable Python runtime (and its one network fetch, cached in `.build-cache/`); `make apk` needs Docker and says so in
+a second rather than after ten minutes of Gradle.
 
 `ui-smoke`, `seed` and `make-icons` need Playwright, which lives outside the project on this machine:
 
@@ -79,9 +87,13 @@ instead of failing bare, and `make stop` frees the port.
 ### Data files
 
 One file per device, in the folder: `checklist.<device-id>.ops.jsonl`. A header line carries the full version vector,
-then one op per line — `create`, `set`, `move`, `delete`. The device id is implied by the header rather than repeated on
-every line. `src/core/op-log.ts` is the only module that spells the format; the adapter has no append, so every write is
-the whole file.
+then one op per line — `create`, `set`, `move`, `delete`, `restore`. The device id is implied by the header rather than
+repeated on every line. `src/core/op-log.ts` is the only module that spells the format; the adapter has no append, so
+every write is the whole file.
+
+The header also carries two advisory fields nothing in the merge reads: `name`, which is what this device calls itself
+(D-1), and `at`, when it last wrote (D-2). A device names only itself, because it writes only its own file — that is the
+whole merge story for a name. `src/core/devices.ts` is the only reader of either.
 
 A device writes that one file and reads every other. `src/app/device-log.ts` is the only writer;
 `src/app/folder-sync.ts` is the only reader of peers, and the header written back carries a receipt for every peer
@@ -91,14 +103,21 @@ Which folder holds the files is decided at startup by `src/app/folder-choice.ts`
 A browser that can reach no folder falls back to `local-folder`, which is `localStorage` and syncs with nothing; the
 footer says so for as long as it is in use.
 
+**Compaction rewrites a device's own file in place** once total log bytes exceed device count × serialised tree bytes.
+`src/core/compact.ts` drops only those of this device's ops that a later op of its own overwrites — provably unreachable
+under every interleaving, so the fold is *identical* rather than merely equivalent — and `Session.cycle` is what fires
+it. Never a peer's file: one writer per file, and that is also why the cut needs no agreement with anyone. It must never
+lower this device's top counter, or every peer reads the file as a partial download and skips it forever. sync-flow.md
+§4.8.
+
 Never in a file, always `localStorage`: the device id, collapse state, the drawer's state, which folder this device
 chose, and dismissed conflict rows. The File System Access handle is the exception, and only because it is an object:
 IndexedDB.
 
 ### Component catalog
 
-`src/core/` is the logic layer, `src/adapters/` storage, `src/app/` the store and routing, `src/ui/` the views.
-`docs/requirements.md` names the file that implements each requirement.
+`src/core/` is the logic layer, `src/adapters/` storage, `src/app/` the store and routing, `src/ui/` the views,
+`packaging/` the two platform shells. `docs/requirements.md` names the file that implements each requirement.
 
 ### Data flow
 
@@ -135,7 +154,12 @@ committed, and a note body updates the store on a 1 s debounce but only becomes 
 `resolveTree` drops two things from `children`, and every edit and every view reads the filtered set: a tombstoned
 subtree (T-7, inherited) and a row whose own `done` is set (T-11, **not** inherited). Both are still in `tree.nodes`.
 `src/core/done.ts` reads them back out for the Done view at `#/done` (T-12), which is where a finished row is un-ticked
-and where a deleted one can be found. Nothing un-deletes — T-13 is not built.
+and a deleted one restored — T-13, one `restore` op, and the subtree comes back with it because T-7 never tombstoned the
+descendants individually.
+
+`src/core/search.ts` at `#/search/<query>` is the other way back to both, and the only one that finds them by name: it
+scans the materialised tree per query and stores no index at all (F-4). `#/devices` lists every device the folder knows
+about and is where this device gets a name.
 
 ### What the merge decided without asking
 

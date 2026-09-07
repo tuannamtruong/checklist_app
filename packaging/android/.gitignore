@@ -1,0 +1,4 @@
+.gradle/
+.gradle-cache/
+app/build/
+build/

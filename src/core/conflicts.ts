@@ -21,7 +21,7 @@ import type { ResolvedTree } from './tree';
 import { ROOT, type DeviceId, type NodeId, type Op, type ParentId } from './types';
 
 /** The fields two devices can write independently. */
-export type ConflictField = 'title' | 'done' | 'body' | 'kind' | 'parent';
+export type ConflictField = 'title' | 'done' | 'body' | 'kind' | 'parent' | 'deleted';
 
 export type FieldValue = string | boolean | null;
 
@@ -61,11 +61,16 @@ export type Conflict = FieldConflict | CycleConflict | OrderConflict;
 
 /**
  * A create cannot race: one device mints the id, so no other device can have
- * written the node's first version. A delete does not lose either — T-7 makes a
- * tombstone final rather than a value in a contest.
+ * written the node's first version.
+ *
+ * A delete *can* lose, and only since T-13. `restore` is the other writer of
+ * `deleted`, so the two settle by `(at, device id)` like any other field and a
+ * dropped delete is offered back like any other value — sync-flow.md §4.9.
  */
 function writesOf(op: Op): readonly (readonly [ConflictField, FieldValue])[] {
   if (op.op === 'move') return [['parent', op.parent]];
+  if (op.op === 'delete') return [['deleted', true]];
+  if (op.op === 'restore') return [['deleted', false]];
   if (op.op !== 'set') return [];
   const writes: (readonly [ConflictField, FieldValue])[] = [];
   if (op.title !== undefined) writes.push(['title', op.title]);
@@ -91,10 +96,17 @@ function fieldConflicts(tree: ResolvedTree, logs: readonly DeviceOps[]): FieldCo
 
   for (const log of logs) {
     for (const op of log.ops) {
-      // A tombstoned row's history is not something to ask the user about, and
-      // a node no file has created yet is not a row at all.
-      if (tree.nodes[op.id] === undefined || tree.deleted.has(op.id)) continue;
+      const node = tree.nodes[op.id];
+      // A node no file has created yet is not a row at all.
+      if (node === undefined) continue;
+      // A row gone under somebody else's tombstone is not a row to ask about:
+      // the question the user has is about the ancestor, and T-7 already
+      // answered it there.
+      if (tree.deleted.has(op.id) && !node.deleted) continue;
       for (const [field, value] of writesOf(op)) {
+        // What a tombstoned row's title once was is not worth asking. Whether
+        // it should be tombstoned at all now is — that is what T-13 changed.
+        if (node.deleted && field !== 'deleted') continue;
         const key = `${op.id}:${field}`;
         const group = groups.get(key);
         if (group) group.writes.push({ op, value });
@@ -201,11 +213,14 @@ export function describeField(field: ConflictField): string {
       return 'kind';
     case 'parent':
       return 'parent';
+    case 'deleted':
+      return 'deletion';
   }
 }
 
 export function describeValue(field: ConflictField, value: FieldValue, tree: ResolvedTree): string {
   if (field === 'done') return value === true ? 'ticked' : 'not ticked';
+  if (field === 'deleted') return value === true ? 'deleted' : 'restored';
   if (field === 'parent') {
     if (value === ROOT || typeof value !== 'string') return 'the top level';
     return tree.nodes[value]?.title || 'an untitled row';

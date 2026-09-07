@@ -80,10 +80,18 @@ export function applyOp(nodes: NodeMap, op: Op): NodeMap {
           orderBy: op.dev,
         },
       };
+    // `delete` and `restore` are the two writers of one field, so the total
+    // order settles them against each other with no precedence between the ops
+    // — sync-flow.md §4.9. `deletedAt` is that field's timestamp.
     case 'delete':
       return {
         ...nodes,
         [op.id]: { ...existing, deleted: true, deletedAt: op.at },
+      };
+    case 'restore':
+      return {
+        ...nodes,
+        [op.id]: { ...existing, deleted: false, deletedAt: null },
       };
   }
 }

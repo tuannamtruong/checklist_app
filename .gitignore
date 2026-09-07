@@ -36,3 +36,9 @@ ui-smoke/
 venv/
 env/
 *.egg-info/
+
+# Platform bundles from `make windows` and `make apk`
+bundles/
+
+# Downloaded once and reused: the embeddable Python for the Windows bundle
+.build-cache/
