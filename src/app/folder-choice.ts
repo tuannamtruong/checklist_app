@@ -19,8 +19,17 @@ const MODE_KEY = 'checklist.folder.mode';
 /** Only the two the user can be asked for. The rest are decided by the shell. */
 export type FolderMode = 'local' | 'fsaa';
 
+/**
+ * Which of the flowchart's branches this folder came out of. The adapters are
+ * interchangeable and the app never asks — except on the settings screen, where
+ * "open this folder" is a question only the shell that owns it can answer —
+ * architecture.md §4.1.
+ */
+export type FolderSource = 'memory' | 'local' | 'fsaa' | 'http' | 'android';
+
 export interface OpenFolder {
   kind: 'folder';
+  source: FolderSource;
   folder: FolderAdapter;
   /** What the shell tells the user it is writing to. */
   label: string;
@@ -61,6 +70,7 @@ export function rememberMode(mode: FolderMode, storage: Storage = window.localSt
 export function browserOnly(storage: Storage = window.localStorage): OpenFolder {
   return {
     kind: 'folder',
+    source: 'local',
     folder: localFolder(storage),
     label: 'This browser only — not synced',
     synced: false,
@@ -76,6 +86,7 @@ async function fromHandle(): Promise<FolderChoice | null> {
   }
   return {
     kind: 'folder',
+    source: 'fsaa',
     folder: fsaaFolder(handle),
     label: handle.name,
     synced: true,
@@ -90,6 +101,7 @@ export async function chooseFolder(
   if (isUiTest(location.search)) {
     return {
       kind: 'folder',
+      source: 'memory',
       folder: memoryFolder(),
       label: 'UI test folder (in memory)',
       synced: false,
@@ -115,6 +127,7 @@ export async function chooseFolder(
     }
     return {
       kind: 'folder',
+      source: 'android',
       folder: androidFolder(android),
       label: android.folderName(),
       synced: true,
@@ -126,6 +139,7 @@ export async function chooseFolder(
   if (helper.configured) {
     return {
       kind: 'folder',
+      source: 'http',
       folder: httpFolder(),
       label: helper.name ?? 'the folder this device serves',
       synced: true,
@@ -148,6 +162,7 @@ export async function grantFolder(): Promise<FolderChoice> {
   rememberMode('fsaa');
   return {
     kind: 'folder',
+    source: 'fsaa',
     folder: fsaaFolder(handle),
     label: handle.name,
     synced: true,

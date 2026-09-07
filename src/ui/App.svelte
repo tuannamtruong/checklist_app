@@ -134,7 +134,7 @@
     {:else if searchOpen}
       <SearchPage {session} {query} onquery={setQuery} />
     {:else if settingsOpen}
-      <SettingsPage {session} {theme} />
+      <SettingsPage {session} {theme} {folder} />
     {:else if devicesOpen}
       <DevicesPage {session} />
     {:else if logsOpen}

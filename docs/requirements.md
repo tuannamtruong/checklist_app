@@ -90,8 +90,8 @@ the rule is [sync-flow.md §4.8 The compaction cut](sync-flow.md#48-the-compacti
 Device-local state, held in `localStorage` and never written to a shared file: the device id, collapse/expand state
 (T-8), the sync cadence (S-19), which folder this device reaches the tree through
 ([architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter)), dismissed conflict notices (C-6), the
-chosen theme (X-14), and any filter the Done view grows (T-12). Anything the user would not want to converge across
-devices belongs here rather than in the tree.
+chosen theme (X-14), which cloud provider this device's folder belongs to (X-17), and any filter the Done view grows
+(T-12). Anything the user would not want to converge across devices belongs here rather than in the tree.
 
 The **search index** is not state at all, in the same sense the Done view is not: F-4 scans the materialised tree on
 each keystroke, so there is nothing to store, nothing to invalidate and nothing to sync.
@@ -388,6 +388,9 @@ to empty, and a dismissal is only for a row the user is content to leave as it l
 | X-12 | One settings screen holds everything that is about this device rather than about the tree: its name, its log, its appearance | ✅ | `src/ui/SettingsPage.svelte` at `#/settings`, in the nav. It writes exactly one op kind — the D-1 rename — and everything else on it is device-local |
 | X-13 | Six themes: light, dark, green, orange, yellow and teal | ✅ | `src/core/themes.ts` is the catalog and `src/app.css` holds one palette per id; `themes.test.ts` fails if the two drift. Switching swaps the semantic tokens of [§10.1 Themes](#101-themes), so no component names a colour |
 | X-14 | The theme is device-local and takes effect before the first paint | ✅ | `src/app/theme.svelte.ts` — the id in `localStorage` and `data-theme` on the document root, set by a boot line in `index.html` so a dark theme never flashes light. Never in a file, never synced — [§2.3 What is never in the Sync Folder](#23-what-is-never-in-the-sync-folder) |
+| X-15 | The settings screen names the folder this device syncs through, and opens it in the system's file manager where the shell can | ✅ | `src/ui/SettingsPage.svelte`, over `src/app/shell.ts`. Opening a folder is not a fourth adapter method and never becomes one — [architecture.md §4.1 Shell actions, beside the adapter](architecture.md#41-shell-actions-beside-the-adapter) |
+| X-16 | The settings screen points this device at a different folder, and names who decides when it cannot | ✅ | `changeFolder` in `src/app/shell.ts`, which re-enters [architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter)'s picker and reloads. The rows already written do not follow the device to the new folder, and the screen says so before the picker opens |
+| X-17 | The settings screen launches the cloud provider's own app, and which provider that is stays on this device | ✅ | `src/core/providers.ts` is the catalog; the choice is `localStorage`, per [§2.3 What is never in the Sync Folder](#23-what-is-never-in-the-sync-folder). A shell that cannot launch an app says so rather than offering a button that does nothing |
 
 Packaging decides which of these are reachable, and it answers them per target rather than once — see
 [architecture.md §7 Packaging](architecture.md#7-packaging). X-3 in particular is a PWA install on Chromium and an APK
@@ -431,6 +434,35 @@ only.
 The choice does not sync, and that is the point rather than a limitation: the phone is read in bed and the laptop in an
 office, and a preference that converged across them would be one the user has to fight on whichever device they are not
 holding. It is `localStorage`, beside the collapse state (T-8) that is device-local for the same reason.
+
+### 10.2 The sync folder, on the settings screen
+
+X-12 gathered what is about *this device* rather than about the tree, and the folder is the oldest thing on that list:
+it is chosen once, on the setup screen, and then never mentioned again except as a line in the footer. X-15 to X-17 give
+it a section — what this device writes to, how to look inside it, and how to point the device somewhere else.
+
+**Opening a folder is not something the folder adapter does.** The adapter is three methods and stays three —
+[code-standard.md §3 Module boundaries](code-standard.md#3-module-boundaries) — so the three buttons are a separate,
+optional capability of the *shell*, and each shell answers for itself:
+
+| Shell | Open the folder | Launch the provider's app | Point at another folder |
+| --- | --- | --- | --- |
+| Android (`android-folder`) | The system's file viewer, on the granted tree | The provider's launch intent, by package name | The system picker, then a reload |
+| Windows helper (`http-folder`) | The desktop's own file manager, from the process that already holds the folder | The provider's command, found on `PATH` and run with no arguments | Not offered: the launcher's `--folder` decides, and the screen says so |
+| Chrome/Edge (`fsaa-folder`) | Not offered: a page holds a directory handle, not a window | Not offered | The File System Access picker, then a reload |
+| This browser only (`local-folder`) | Nothing to open — there is no folder | Not offered | The picker, where the browser has one |
+
+A button that a shell cannot honour is absent rather than disabled-with-a-tooltip: the row above it already says what
+this device reaches its folder through, so an absent button reads as "not here" rather than as a fault.
+
+**Changing the folder reloads the page, and takes nothing with it.** The rows already written are in the old folder; the
+new one is read from scratch on the way back up, exactly as a new device reads it. That is stated on the screen before
+the picker opens, because it is the one thing on this page that can lose work.
+
+**The provider is a device-local label, not a code path.** Nothing in the merge, the adapter or the file format knows
+which provider is under the folder — [§7.3 Fixed constraints](#73-fixed-constraints) — so the catalog in
+`src/core/providers.ts` buys exactly one thing: a button that opens the app whose client is keeping this folder in sync.
+A device that has not named one has no button, which is what an unnamed provider means.
 
 ## 11. Import, export and backup
 

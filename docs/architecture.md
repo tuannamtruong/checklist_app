@@ -146,6 +146,36 @@ the whole application against `local-folder`; what it cannot do is sync. The set
 shell keeps saying it in the footer, because a user who believes they are synced and is not is the one failure this
 design must never produce silently.
 
+### 4.1 Shell actions, beside the adapter
+
+The adapter answers "what is in the folder". It does not answer "show me the folder", and it must not learn to: three
+methods is what lets the merge be tested against a plain object and shipped against a phone, and a fourth method exists
+for one adapter and is a stub in the other five —
+[code-standard.md §3 Module boundaries](code-standard.md#3-module-boundaries).
+
+So X-15 to X-17 are a separate, entirely optional capability. `src/app/shell.ts` asks the shell that is actually running
+— the Android bridge, the loopback helper, the browser — what it can do, and the settings screen renders only the
+answers it gets:
+
+| Action | Android | Windows helper | Browser |
+| --- | --- | --- | --- |
+| `openFolder` | `AndroidFolder.openFolder()`, an `ACTION_VIEW` on the granted tree | `POST /shell/open` with `{"what":"folder"}` | — |
+| `openApp` | `AndroidFolder.openApp(pkg)`, the launch intent for a package | `POST /shell/open` with `{"what":"app"}` and a command found on `PATH` | — |
+| `changeFolder` | `AndroidFolder.pickFolder()` | — (`--folder` is the launcher's) | The File System Access picker |
+
+Three properties keep this from being the fourth method by another name:
+
+**Nothing in the sync path calls any of it.** A device with no shell actions at all syncs identically. They are
+convenience, and the merge cannot tell whether they exist.
+
+**The helper takes a command, never a path.** `POST /shell/open` accepts a bare command name matching the same narrow
+pattern the folder API uses, resolves it with `shutil.which` and runs it with no arguments and no shell. It cannot be
+asked to run something out of a directory the caller names, which is the property that makes a loopback endpoint that
+starts processes acceptable at all. It refuses cross-origin exactly as `/folder/` does.
+
+**The folder itself is the one path the helper will open**, because the helper already had it: it came from `--folder`
+on the command line rather than from the page.
+
 ## 5. Device identity and local storage
 
 A device is identified by a generated id, never by a name the user typed. The id names the file, and one file per

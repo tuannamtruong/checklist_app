@@ -11,6 +11,27 @@
       needs no manifest permission and no All Files Access.
     -->
 
+    <!--
+      X-17. Android 11 hides installed packages from an app that has not said
+      which ones it cares about, and getLaunchIntentForPackage returns null for
+      the rest. This is the same catalog src/core/providers.ts holds, and it is
+      only ever used to *start* one of them: there is no INTERNET permission
+      here, so nothing is ever said to it.
+    -->
+    <queries>
+        <package android:name="mega.privacy.android.app" />
+        <package android:name="com.dropbox.android" />
+        <package android:name="com.google.android.apps.docs" />
+        <package android:name="com.microsoft.skydrive" />
+        <package android:name="com.nextcloud.client" />
+        <package android:name="com.nutomic.syncthingandroid" />
+        <!-- X-15: whatever this phone opens a folder with. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="vnd.android.document/directory" />
+        </intent>
+    </queries>
+
     <application
         android:allowBackup="true"
         android:label="@string/app_name"

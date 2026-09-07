@@ -157,6 +157,14 @@ asserted — it is a screenshot per theme, which is what a person can check and 
 assert about the rest of the palette is that no theme changes the layout: the app is measured for horizontal overflow
 under the widest one, and every theme renders the same DOM.
 
+M5 adds the sync folder section, and what the smoke run can assert about it is narrow on purpose: the section names the
+same folder the footer does, and a shell that cannot open a folder or start an app offers no button for either
+([requirements.md §10.2 The sync folder, on the settings screen](requirements.md#102-the-sync-folder-on-the-settings-screen)).
+The buttons themselves are [§3.6 Platform](#36-platform)'s — a file manager opening and a cloud client starting are
+events that happen outside the browser, and the run that could see them is the one on a real phone and a real desktop.
+What a unit test does hold is the seam: `providers.test.ts` fails if the catalog names an Android package the manifest's
+`<queries>` does not, which is the same drift `themes.test.ts` catches between the catalog and the palettes.
+
 The prototype's `android-bridge.mjs` drives the same page in the same browser with `window.AndroidFolder` replaced by an
 in-page stub, which is how the Android startup path — first-run folder pick, edit, conflict, resolution — is exercised
 without a JVM. It is a UI test wearing the phone's clothes, not a platform test; the platform layer starts where the
@@ -185,6 +193,8 @@ row 10. In the order that finds the most:
 | 4 | Edit on the phone, wait for the provider's client, refresh on Windows | Provider latency and partial files — [sync-flow.md §7 What is still open](sync-flow.md#7-what-is-still-open) item 5 |
 | 5 | Edit both while both are offline, then reconnect | A real race with a real clock skew between two real devices |
 | 6 | Leave it running for long enough for the compaction trigger to fire | S-14 against a provider's client, which re-uploads the whole file when it shrinks |
+| 7 | On the phone and on Windows, open Settings and press "Open the folder" | X-15 on both shells: the file app shows the granted tree, and Explorer shows the folder the launcher was given |
+| 8 | Name the provider, press "Open MEGA" on the phone, then on Windows | X-17: the launch intent finds a package the `<queries>` block names, and `shutil.which` finds the desktop client — or says plainly that it did not |
 
 Check 6 is the one with a genuinely unknown answer. Every other row exercises code that a test already covers with a
 stand-in; a provider's reaction to a file that got *smaller* is behaviour nothing here has ever observed.
