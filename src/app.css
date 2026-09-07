@@ -146,4 +146,15 @@ body {
     min-width: 2.25rem;
     min-height: 2.25rem;
   }
+
+  /* T-14: there is no hover on a touch screen, so the grip is simply there. */
+  .drag-handle {
+    opacity: 1;
+  }
+}
+
+/* A pointer that starts on the grip is a drag, never a scroll — T-14. Unlayered,
+   so it wins over the utility that would otherwise let the list move under it. */
+.drag-handle {
+  touch-action: none;
 }

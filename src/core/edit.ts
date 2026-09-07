@@ -284,6 +284,53 @@ export function moveTo(
   return [{ op: 'move', id, parent: newParent, order, ...stamp(ctx) }];
 }
 
+/** T-14. Where a drop lands, relative to the row it landed on. */
+export type DropWhere = 'before' | 'after' | 'inside';
+
+/**
+ * T-5's question again, asked in the vocabulary of a drop: dropping *inside* a
+ * row is a move into it, and dropping above or below one is a move into its
+ * parent. A drop onto the dragged row itself is neither — it is the gesture
+ * ending where it started.
+ */
+export function canDrop(tree: ResolvedTree, id: NodeId, target: NodeId, where: DropWhere): boolean {
+  if (id === target) return false;
+  return canMoveTo(tree, id, where === 'inside' ? target : parentOf(tree, target));
+}
+
+/**
+ * T-14, and it is one `move` op — the same op `Tab` and `Alt-↓` write. The order
+ * key is minted among the target's siblings by the same rule every other
+ * insertion uses (T-2), so two devices dragging into one gap settle by
+ * sync-flow.md §5.3 rather than by anything the drag knows.
+ *
+ * The dragged row is taken out of the sibling list before the key is minted,
+ * because "below the row above me" must not mean "below myself".
+ */
+export function dropOnto(
+  tree: ResolvedTree,
+  ctx: EditContext,
+  id: NodeId,
+  target: NodeId,
+  where: DropWhere,
+): Op[] {
+  if (!canDrop(tree, id, target, where)) return [];
+
+  if (where === 'inside') {
+    // Into the end of what is already there, which is where `Tab` puts a row
+    // too — a drop onto a row is "put this in here", not "put this first".
+    const children = childrenOf(tree, target).filter((child) => child !== id);
+    return moveTo(tree, ctx, id, target, children[children.length - 1] ?? null);
+  }
+
+  const parent = parentOf(tree, target);
+  const siblings = childrenOf(tree, parent).filter((sibling) => sibling !== id);
+  const index = siblings.indexOf(target);
+  if (index === -1) return [];
+  const after = where === 'after' ? target : (siblings[index - 1] ?? null);
+  return moveTo(tree, ctx, id, parent, after);
+}
+
 /**
  * `Backspace` on an empty row deletes it, and is refused if it has children —
  * requirements.md §3.1. The refusal is the keyboard's, not the model's: the row

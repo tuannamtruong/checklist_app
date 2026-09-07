@@ -138,6 +138,46 @@ async function main() {
       (await titlesUnder(page, 'Shopping')).join('|') === 'Milk|Coffee beans|Oat milk',
     );
 
+    // --- T-14: dragging a row, with a pointer -----------------------------
+    // Pointer events rather than HTML5 drag-and-drop, so this is the same input
+    // a thumb produces — requirements.md §3. Playwright's mouse emits the
+    // pointer events the grip listens for.
+    await dragRow(page, 'Milk', 'Oat milk', 'after');
+    check(
+      'a row dropped below another lands there — T-14',
+      (await titlesUnder(page, 'Shopping')).join('|') === 'Coffee beans|Oat milk|Milk',
+      (await titlesUnder(page, 'Shopping')).join('|'),
+    );
+    await dragRow(page, 'Milk', 'Coffee beans', 'before');
+    check(
+      'and dropped above one, it lands above it',
+      (await titlesUnder(page, 'Shopping')).join('|') === 'Milk|Coffee beans|Oat milk',
+      (await titlesUnder(page, 'Shopping')).join('|'),
+    );
+    await dragRow(page, 'Oat milk', 'Coffee beans', 'inside');
+    check(
+      'and dropped into the middle of a row, it becomes its child',
+      (await depthOf(page, 'Oat milk')) === 2 &&
+        (await titlesUnder(page, 'Coffee beans')).join('|') === 'Oat milk',
+      `depth ${await depthOf(page, 'Oat milk')}`,
+    );
+
+    // T-5's refusal, reachable at last — §15 row 2. Dragging a row into its own
+    // child is the one gesture that can ask for it.
+    const beforeRefused = (await titlesUnder(page, 'Shopping')).join('|');
+    const refusedMark = await dragRow(page, 'Coffee beans', 'Oat milk', 'inside');
+    check(
+      'a drop into the dragged row’s own child is refused, and drawn as refused — T-5',
+      refusedMark === 'true' && (await titlesUnder(page, 'Shopping')).join('|') === beforeRefused,
+      `refused=${refusedMark}`,
+    );
+    await dragRow(page, 'Oat milk', 'Coffee beans', 'after');
+    check(
+      'and the row dragged back out is a sibling again',
+      (await depthOf(page, 'Oat milk')) === 1,
+      `depth ${await depthOf(page, 'Oat milk')}`,
+    );
+
     // --- ↑ / ↓ move the caret --------------------------------------------
     await page.keyboard.press('ArrowUp');
     const focusedTitle = await page.evaluate(() => document.activeElement?.value ?? null);
@@ -684,6 +724,33 @@ async function main() {
   const failed = results.filter((result) => !result.ok);
   console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
   if (failed.length > 0) process.exit(1);
+}
+
+/**
+ * T-14, driven the way a finger drives it: down on the grip, move, up. The
+ * pointer is captured by the grip, so every move goes there and the app decides
+ * what is under it — `src/ui/drag.svelte.ts`.
+ *
+ * Returns what the target row said about the drop while the pointer was still
+ * down, which is the only moment a refusal is visible.
+ */
+async function dragRow(page, title, ontoTitle, where) {
+  const grip = (await rowByTitle(page, title)).locator('[data-testid="drag-handle"]');
+  const target = await rowByTitle(page, ontoTitle);
+  const from = await grip.boundingBox();
+  const to = await target.boundingBox();
+  const y =
+    where === 'before' ? to.y + 2 : where === 'after' ? to.y + to.height - 2 : to.y + to.height / 2;
+
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  // Two moves: the first leaves the grip, the second lands, and a single jump
+  // can be coalesced into something the page never sees.
+  await page.mouse.move(to.x + to.width / 2, y, { steps: 4 });
+  await page.mouse.move(to.x + to.width / 2 + 1, y, { steps: 2 });
+  const refused = await target.getAttribute('data-drop-refused');
+  await page.mouse.up();
+  return refused;
 }
 
 async function rowByTitle(page, title) {

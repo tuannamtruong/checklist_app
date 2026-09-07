@@ -114,7 +114,7 @@ sync and no writes.
 | T-2 | Children render in a stable order every device agrees on | ✅ | `src/core/order.ts`, sorted on `(order, orderBy, id)` — [sync-flow.md §5 Sibling ordering](sync-flow.md#5-sibling-ordering); `order.test.ts` |
 | T-3 | Indent (become child of sibling above) / outdent (become parent's next sibling) | ✅ | `src/core/edit.ts` `indent`/`outdent`; `edit.test.ts`, `scripts/ui-smoke.mjs` |
 | T-4 | Move up/down among siblings | ✅ | `src/core/edit.ts` `moveUp`/`moveDown`; `edit.test.ts` |
-| T-5 | A move that would create a loop is refused | ◐ | `src/core/edit.ts` `canMoveTo`; `edit.test.ts`. M1 has no drag and no move-to picker, so no UI path can attempt one yet. Local check only — it catches one device dragging a folder into its own child, never the merge case, which is T-6: [sync-flow.md §6.1 T-5 is not the loop defence](sync-flow.md#61-t-5-is-not-the-loop-defence) |
+| T-5 | A move that would create a loop is refused | ✅ | `src/core/edit.ts` `canMoveTo`; `edit.test.ts`. M5's drag (T-14) is the UI that can finally express one, and a drop it refuses is shown as refused rather than silently dropped. Local check only — it catches one device dragging a folder into its own child, never the merge case, which is T-6: [sync-flow.md §6.1 T-5 is not the loop defence](sync-flow.md#61-t-5-is-not-the-loop-defence) |
 | T-6 | A Cyclic tree state (concurrent A→B, B→A) is repaired at _read_ time by re-rooting, never by writing | ✅ | Drop the cycle edge with the oldest `(parentSetAt, device id)` — [sync-flow.md §6.2 The repair](sync-flow.md#62-the-repair) — `src/core/tree.ts` `resolveTree`; `tree.test.ts`, and `merge.test.ts` builds the cycle the way it actually happens — two devices, two concurrent moves, folded from two files. The repair names the node it re-rooted, which is C-2 |
 | T-7 | Deleting a node tombstones its whole subtree, not just the node | ✅ | The ancestor walk must climb the T-6-resolved parent, or a tombstoned subtree containing a cycle hangs — [sync-flow.md §6.2 The repair](sync-flow.md#62-the-repair) — `src/core/tree.ts`; `tree.test.ts` covers the tombstoned subtree that contains a cycle |
 | T-8 | Collapse/expand state is per-device and never synced | ✅ | `src/app/view-state.svelte.ts` — `localStorage`, never a file |
@@ -123,9 +123,24 @@ sync and no writes.
 | T-11 | A ticked row is not in the normal view at all — not in its list, not in the sidebar, not in the caret order, and neither is anything it holds | ✅ | The filter is `resolveTree`'s, beside T-7's: `src/core/tree.ts` drops an own-`done` node from `children`, and one filtered set answers all three. The subtree goes with it because nothing walks *into* a row that is not there — but the flag itself is **not** inherited, so a finished row's own page still shows what is inside it, which is what makes T-12's rows worth opening. `tree.test.ts`, `scripts/ui-smoke.mjs` |
 | T-12 | One Done view lists every finished row and every deleted row, each with the path it sat on | ✅ | `src/core/done.ts` derives both lists; `src/ui/DonePage.svelte` at `#/done`. Each list names the top of its run, never the descendants. A finished row is un-ticked from here and returns to the tree — an ordinary `set done:false`, so it costs no new op. `done.test.ts`, `scripts/ui-smoke.mjs` |
 | T-13 | A deleted row can be restored from the Done view | ✅ | The `restore` op of [§2.2 The op](#22-the-op), added in M3: `src/core/edit.ts` `restore`, offered by `src/ui/DonePage.svelte`. It clears the row's **own** tombstone and nothing else, so a row still under a deleted ancestor stays gone — which is why the Done view lists only the top of a deleted run, and restoring that one brings the whole subtree back with it. `done.test.ts`, `edit.test.ts`, `scripts/ui-smoke.mjs` |
+| T-14 | A row is dragged to another place in the tree: above a row, below it, or into it | ✅ | `dropOnto` in `src/core/edit.ts`, one `move` op like every other; `src/ui/drag.svelte.ts` drives it over **pointer** events rather than HTML5 drag-and-drop, so a thumb and a mouse take one code path. `edit.test.ts`, `scripts/ui-smoke.mjs` |
 
 [sync-flow.md §3 Why a snapshot does not scale to a tree](sync-flow.md#3-why-a-snapshot-does-not-scale-to-a-tree) is why
 T-2, T-5, T-6 and T-7 constrain the sync payload, not just the UI.
+
+**Dragging is pointer events, not HTML5 drag-and-drop, and that is a requirement rather than a preference.** The
+`dragstart` family does not fire on touch at all, so an HTML5 implementation would be a desktop-only feature wearing the
+same icon on a phone — and every other edit in this application reaches a phone. One `pointerdown` on the row's grip,
+`setPointerCapture`, and the row under the pointer is found by hit-testing; the same three lines serve both.
+
+**A drop lands in one of three places, and which one is a question about the pointer's height in the target row**: the
+top quarter is above it, the bottom quarter is below it, and the middle is inside it. Inside is what makes drag able to
+express T-5's refusal — it is the one gesture that can ask for a row to become its own descendant — so a refused target
+is drawn as refused and the drop writes nothing.
+
+A drag is one `move` op, exactly like `Tab` and `Alt-↓` before it. It mints an order key among the target's siblings the
+way every other insertion does (T-2), so two devices dragging into one gap resolve by
+[§5.3 The tiebreak](sync-flow.md#53-the-tiebreak) rather than by anything the drag knows about.
 
 T-11 filters `children` rather than the rendering, so every edit sees the same rows the user does: `Alt-↓` cannot move a
 row past a hidden one, and `Backspace` on an empty row is not refused by children nobody can see. The cost is that a new
@@ -490,7 +505,7 @@ bug — `npm test` and `npm run ui-smoke` both pass.
 | # | Deviation | Why it stands |
 | --- | --- | --- |
 | 1 | No provider's client has ever been under the folder | Every merge case is exercised against a folder adapter, and the `fsaa`, `http` and `android` adapters are the same three methods as the ones that are. What is unobserved is latency, partial files and a client's opinion of the folder — and it stays unobserved until the Windows and Android builds exist, which is [sync-flow.md §7 What is still open](sync-flow.md#7-what-is-still-open) item 5 |
-| 2 | T-5's refusal has no UI that can provoke it | Rows move with the keyboard and the row menu, and neither can express "into my own child". The check and its test exist; a drag or a move-to picker is what will reach them |
+| 2 | T-5's refusal has no UI that can provoke it | **Closed by M5.** The drag of T-14 is the move-to gesture this row was waiting for: dropping a row into the middle of one of its own descendants is exactly the move `canMoveTo` refuses, and the drop is drawn as refused rather than written and undone |
 | 3 | X-3 and X-4 are verified in a browser, not on a device | An install and a launcher icon cannot be asserted from WSL — [test.md §3.6 Platform](test.md#36-platform) carries them as a written checklist |
 | 4 | The `fsaa` adapter is outside the conformance suite | S-18. A directory handle needs a picker and a real user gesture, so no headless run can hold one. Its three methods are the thinnest of the six, and the folder grant is on [test.md §3.6 Platform](test.md#36-platform)'s checklist |
 | 5 | Compaction never shrinks a **peer's** file | S-14 compacts this device's own ops and no others, because one writer per file (S-3) allows nothing else. A peer that stops running keeps its log at the size it died at, forever. Every running device shrinks, which is the whole of the growth problem in practice |
@@ -510,6 +525,10 @@ Themes were on this list until M4 and are now X-13. What took them off it is tha
 rather than colours, so the feature turned out to be a palette per theme and no component change at all —
 [§10.1 Themes](#101-themes). What stays off is anything that syncs a preference: a theme is device-local (X-14), and a
 converging one is a different requirement with a merge rule attached.
+
+Drag came off the list in the same way at M5 and is now T-14: the tree already moved a row with one `move` op, so a drag
+turned out to be a second caller of it rather than a mechanism. What stayed off is a *move-to picker* — a dialog naming
+every possible destination is a second navigation to build and to test, and the gesture people reach for is the drag.
 
 ## 17. Milestones
 
