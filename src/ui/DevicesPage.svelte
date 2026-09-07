@@ -9,6 +9,7 @@
   // the phone, and the page says so rather than leaving it to be discovered.
   import { labelOf, type DeviceRecord } from '../core/devices';
   import type { Session } from '../app/Session.svelte';
+  import { LOGS_HREF } from '../app/router.svelte';
 
   let { session }: { session: Session } = $props();
 
@@ -60,9 +61,16 @@
         {:else}
           <span class="text-sm" data-testid="device-label">{labelOf(device)}</span>
         {/if}
-        <span class="flex gap-2 text-xs text-ink-faint">
+        <span class="flex flex-wrap items-center gap-2 text-xs text-ink-faint">
           <span data-testid="device-id">{device.id}</span>
           <span data-testid="device-seen">· {seen(device)}</span>
+          {#if device.self}
+            <!-- D-4. Only this device's log is readable, and only from the row
+                 that is this device — requirements.md §8. -->
+            <a href={LOGS_HREF} class="ml-auto text-ink-muted hover:text-accent" data-testid="log-link">
+              View log →
+            </a>
+          {/if}
         </span>
       </li>
     {/each}

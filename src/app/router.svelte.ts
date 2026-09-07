@@ -12,6 +12,7 @@ export type Route =
   | { name: 'conflicts' }
   | { name: 'search'; query: string }
   | { name: 'devices' }
+  | { name: 'logs' }
   | { name: 'unknown'; hash: string };
 
 export function routeOf(hash: string): Route {
@@ -20,6 +21,7 @@ export function routeOf(hash: string): Route {
   if (path === '/done') return { name: 'done' };
   if (path === '/conflicts') return { name: 'conflicts' };
   if (path === '/devices') return { name: 'devices' };
+  if (path === '/logs') return { name: 'logs' };
   // F-5. The query is a path segment rather than a query string, for the reason
   // X-7 already gives: it stays in the fragment, so a result list is linkable
   // and survives a cold launch without any of it reaching a server.
@@ -45,6 +47,8 @@ export function hrefOf(route: Route): string {
       return route.query === '' ? '#/search' : `#/search/${encodeURIComponent(route.query)}`;
     case 'devices':
       return '#/devices';
+    case 'logs':
+      return '#/logs';
     case 'unknown':
       return `#${route.hash}`;
   }
@@ -62,6 +66,13 @@ export const CONFLICTS_HREF = hrefOf({ name: 'conflicts' });
 /** §6's view and §8's, both permanent in the nav — see requirements.md §5. */
 export const SEARCH_HREF = hrefOf({ name: 'search', query: '' });
 export const DEVICES_HREF = hrefOf({ name: 'devices' });
+
+/**
+ * D-4's view. Deliberately not in the nav: it says something about one device,
+ * and `#/devices` is where that device is already the subject — requirements.md
+ * §5.
+ */
+export const LOGS_HREF = hrefOf({ name: 'logs' });
 
 export function nodeHref(id: NodeId): string {
   return hrefOf({ name: 'node', id });

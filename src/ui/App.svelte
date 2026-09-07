@@ -20,6 +20,7 @@
   import DevicesPage from './DevicesPage.svelte';
   import DonePage from './DonePage.svelte';
   import FolderSetup from './FolderSetup.svelte';
+  import LogPage from './LogPage.svelte';
   import NodePage from './NodePage.svelte';
   import RecoveryPage from './RecoveryPage.svelte';
   import SearchPage from './SearchPage.svelte';
@@ -55,6 +56,9 @@
   const conflictsOpen = $derived(router.route.name === 'conflicts');
   const searchOpen = $derived(router.route.name === 'search');
   const devicesOpen = $derived(router.route.name === 'devices');
+  // D-4 hangs off the device screen rather than the nav, so it lights the same
+  // entry: the log is where #/devices leads, not a fifth place to be.
+  const logsOpen = $derived(router.route.name === 'logs');
   const query = $derived(router.route.name === 'search' ? router.route.query : '');
 
   /**
@@ -112,7 +116,7 @@
     {doneOpen}
     {conflictsOpen}
     {searchOpen}
-    {devicesOpen}
+    devicesOpen={devicesOpen || logsOpen}
     folderLabel={folder.label}
     synced={folder.synced}
     onrefresh={refresh}
@@ -125,6 +129,8 @@
       <SearchPage {session} {query} onquery={setQuery} />
     {:else if devicesOpen}
       <DevicesPage {session} />
+    {:else if logsOpen}
+      <LogPage {session} />
     {:else if doneOpen}
       <DonePage {session} />
     {:else if currentId !== null && !isVisible(session.tree, currentId)}

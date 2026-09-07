@@ -53,7 +53,7 @@ npm run seed             # the app in a window with a small tree in it
 npm run make-icons       # re-render the PWA PNGs from public/icons/*.svg
 python3 scripts/md-reflow.py docs/*.md   # --check to fail without writing
 
-make windows             # bundles/checklist-windows.zip — web assets, the loopback helper, a shortcut
+make windows             # bundles/checklist-windows.zip — web assets, the loopback helper, Setup.vbs
 make apk                 # bundles/checklist.apk, built in Docker; nothing is installed on the host
 ```
 
@@ -159,7 +159,9 @@ descendants individually.
 
 `src/core/search.ts` at `#/search/<query>` is the other way back to both, and the only one that finds them by name: it
 scans the materialised tree per query and stores no index at all (F-4). `#/devices` lists every device the folder knows
-about and is where this device gets a name.
+about and is where this device gets a name, and the "this device" row there is the only way to `#/logs` — D-4, this
+device's own ops read back newest first by `src/core/log-view.ts`, with the header line's vector above them. Nothing on
+that page writes.
 
 ### What the merge decided without asking
 

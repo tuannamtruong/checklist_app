@@ -30,7 +30,7 @@ The two platform bundles land in `bundles/` — [docs/architecture.md §7](./doc
 target needs which:
 
 ```bash
-make windows       # checklist-windows.zip: web assets, the loopback helper, a shortcut
+make windows       # checklist-windows.zip: web assets, the loopback helper, Setup.vbs
 make apk           # checklist.apk, built in Docker; nothing is installed on the host
 ```
 

@@ -215,11 +215,29 @@ Same web build, two distributions, differing only in what is wrapped around it:
   `pythonw.exe`. No `.exe` is produced deliberately, SmartScreen never fires, and it needs no installer, no pip and no
   admin rights. It needs no static host and no network at all.
 
-`make windows` produces `bundles/checklist-windows.zip`: `web/` (the `dist/` build), `serve.py`, `Checklist.bat`,
-`make-shortcut.ps1` and a `README.txt`. The embeddable Python runtime is fetched once into `.build-cache/` and staged
-into the zip under `python/`; `make windows PYTHON_EMBED=skip` omits it, for a machine that already has Python and only
-wants the assets. Unzipping anywhere and running `Checklist.bat` once is the whole installation, and the `.ps1` is what
-puts it on the taskbar — Firefox on the desktop does not install PWAs, so the shortcut is the taskbar entry there.
+`make windows` produces `bundles/checklist-windows.zip`: `web/` (the `dist/` build), `serve.py`, `Setup.vbs`,
+`Checklist.bat`, `Checklist.ico` and a `README.txt`. The embeddable Python runtime is fetched once into `.build-cache/`
+and staged into the zip under `python/`; `make windows PYTHON_EMBED=skip` omits it, for a machine that already has
+Python and only wants the assets.
+
+Two rules the zip is built to, and they are what make it a zip rather than an installer:
+
+**Nothing reaches outside the folder it was unzipped into.** Every path the bundle names — the runtime, the helper, the
+icon, the shortcut's target and working directory — is resolved from the folder holding `Setup.vbs` at the moment it
+runs. No build machine's paths are baked in, so the zip is the same zip on any Windows box, and nothing in it refers to
+the tree it was built from. In particular the build may run under WSL and the bundle may not know that: a shortcut
+reaching back over `\\wsl.localhost` would be a bundle that only works on the machine that built it.
+
+**No console window, ever, on the normal path.** Unzip anywhere and double-click `Setup.vbs`. It asks for the synced
+folder with the system folder dialog, writes the answer to `folder.txt` beside itself, puts `Checklist.lnk` on the
+desktop and in the folder, and starts the app. The shortcut targets `python\pythonw.exe` — Microsoft's own signed
+binary, and the one with no console — passing `serve.py` and the folder as arguments. Later launches are the desktop
+icon and nothing else. `Setup.vbs` runs under `wscript.exe`, which is why it is not a `.ps1`: a script double-clicked by
+someone who never opens a terminal must not meet ExecutionPolicy first.
+
+`Checklist.bat` is the exception and the reason it stays: it runs the same helper under `python.exe` in a visible
+console, so a launch that fails silently under `pythonw.exe` can be made to say why. It is the diagnostic, not the way
+in. Changing folders later is `folder.txt` — edit it, or delete it and run `Setup.vbs` again.
 
 The helper serves `web/` and exposes `/folder/info`, `/folder/list` and `/folder/file/<name>` — exactly the three
 methods `src/adapters/http-folder.ts` calls, and nothing more. It is stdlib-only, which is what lets an embeddable
