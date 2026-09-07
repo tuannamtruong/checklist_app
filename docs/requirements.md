@@ -96,8 +96,8 @@ Device-local state, held in `localStorage` and never written to a shared file: t
 (T-8), the sync cadence (S-19), which folder this device reaches the tree through
 ([architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter)), dismissed conflict notices (C-6), the
 chosen theme (X-14), which cloud provider this device's folder belongs to (X-17), which tags the tree is filtered by
-(A-5), how wide the sidebar has been dragged (X-20), and any filter the Done view grows (T-12). Anything the user would
-not want to converge across devices belongs here rather than in the tree.
+(A-5), how wide the sidebar and the note pane have been dragged (X-20, X-24), and any filter the Done view grows (T-12).
+Anything the user would not want to converge across devices belongs here rather than in the tree.
 
 The **search index** is not state at all, in the same sense the Done view is not: F-4 scans the materialised tree on
 each keystroke, so there is nothing to store, nothing to invalidate and nothing to sync.
@@ -216,12 +216,12 @@ something.
 | --- | --- | --- | --- |
 | K-1 | A row is one of three kinds: `folder`, `note` or `task` | ✅ | `src/core/types.ts`. Only a task is checkable; a top-level `folder` or `note` is what T-10 shows in the sidebar. Kind drives rendering, never structure — any kind may own children. There were four until M6: `list` is read as `folder` by `src/core/op-log.ts`, so a file written before it went keeps folding to the same tree — `op-log.test.ts` |
 | K-2 | Tasks render a checkbox; folders and notes render a kind icon | ✅ | `src/ui/Row.svelte`, `src/ui/KindIcon.svelte` |
-| K-3 | A note has a long free-text body with its own full-page editor | ✅ | `src/ui/NodePage.svelte`, `src/ui/NoteBody.svelte` |
+| K-3 | A note has a long free-text body with its own editor | ✅ | `src/ui/NoteBody.svelte`, carried by `src/ui/NotePane.svelte` — beside the list above `lg` and over it below, per X-21 and X-22. It was a full page instead of the list until then, and the field itself did not change |
 | K-4 | A note can still own checklist children (heading + items pattern) | ✅ | The note's page renders its body and its children; `edit.test.ts` |
 | K-5 | Any row can be converted to any kind after the fact ("Turn into") | ✅ | `turnInto` in `src/core/edit.ts`, in the row menu. Two devices converting one row differently resolve by `(at, device id)`, with a notice — [§9 Conflict presentation](#9-conflict-presentation) |
 | K-6 | ~~A note can be promoted to a checklist from its own page~~ | ✗ **Withdrawn** | Built in M1 and taken out again: it was a second control for the one op K-5 already offers, and the only one that changed a kind from outside the row menu. Nothing replaces it — `turnInto` is unchanged and the row menu still reaches every kind |
 | K-7 | Note body saves are debounced (1 s) so typing is not one op per keystroke | ✅ | `src/ui/NoteBody.svelte`. The 1 s debounce governs the store; an **op** is emitted on blur, on navigating away, or after 60 s of continuous editing — S-20 |
-| K-8 | Every list page opens with a line where typing a title and pressing Enter makes a **task** at the end of the list, and leaves the line ready for the next one | ✅ | `src/ui/QuickAdd.svelte`, over `createLastChild` with no kind — which is `task`, the default every other creation path already used. `src/ui/NodePage.svelte` gives it the page header, centred and above the breadcrumbs; the other two kinds keep their buttons under the list |
+| K-8 | Every list page opens with a line where typing a title and pressing Enter makes a **task** at the end of the list, and leaves the line ready for the next one | ✅ | `src/ui/QuickAdd.svelte`, over `createLastChild` with no kind — which is `task`, the default every other creation path already used. `src/ui/NodePage.svelte` gives it the page header, narrow and above the breadcrumbs; `src/ui/NotePane.svelte` gives the note's own children the same line directly above them, because a pane that opened with an input rather than with the note's text would be a note you cannot read — X-21. The other two kinds keep their buttons under the list |
 | K-9 | A paste into that line carrying line breaks makes one row per line, all at the end of the list | ✅ | `src/core/paste.ts` is the only place the split is spelled, `createLastChildren` in `src/core/edit.ts` mints the keys, and `src/ui/QuickAdd.svelte` is the one caller. `paste.test.ts`, `edit.test.ts`, `scripts/ui-smoke.mjs` |
 
 **There were four kinds and there are three — `list` is gone.** A `list` and a `folder` differed by an icon and by
@@ -258,9 +258,11 @@ questions, and only the second one is the merge's: the row is still appended, so
 it are unchanged. What moved is the reach. At the end of a list the line is wherever the last row happens to leave it,
 so a list long enough to scroll puts the one control the app is mostly used for below the fold, and every row added
 pushes it further down. A header is at a fixed place on every list page, which is what makes typing the next task a
-reflex rather than a scroll. It is centred and narrow because it is one short input and a full-width one reads as a
-search bar. The header belongs to the node page alone — Search, Done and Settings have no list to add to, so they have
-no line.
+reflex rather than a scroll. It is narrow because it is one short input and a full-width one reads as a search bar, and
+it sits at the left edge of the page's own column rather than in the middle of the header — X-23, so it does not move
+sideways when the note pane opens beside it. The header belongs to the node page alone — Search, Done and Settings have
+no list to add to, so they have no line. The note pane is the one place the line is not a page header: there it sits
+immediately above the children it adds to, under the body — X-21.
 
 **A pasted paragraph is a list somebody has already written — K-9.** Typing `Enter` after each of fifteen lines is work
 the line breaks already did, so a paste carrying one is fifteen rows at the end of the list rather than one row holding
@@ -411,7 +413,7 @@ helper and to the Android WebView unchanged. `src/app/router.svelte.ts` holds th
 | Route | Renders | Where |
 | --- | --- | --- |
 | `#/` | The root: every top-level row | `src/ui/NodePage.svelte` with no node |
-| `#/n/<node-id>` | One node's page — its path, its title, its body if it is a note, and its children | `src/ui/NodePage.svelte` |
+| `#/n/<node-id>` | One node's page — its path, its title, its body if it is a note, and its children. A **note** is drawn beside the nearest list above it rather than instead of it — X-21, X-22 | `src/ui/NodePage.svelte`, and `src/ui/NotePane.svelte` for a note |
 | `#/done` | The Done view of T-12: every ticked and deleted row in one list, newest first | `src/ui/DonePage.svelte` |
 | `#/conflicts` | What the merge decided without asking — [§9 Conflict presentation](#9-conflict-presentation) | `src/ui/ConflictsPage.svelte` |
 | `#/search` and `#/search/<query>` | The search results of [§6 Search](#6-search) | `src/ui/SearchPage.svelte` |
@@ -426,6 +428,13 @@ path segment the router splits like any other, it survives a reload and a cold l
 A node id that no longer resolves is not an error state: `#/n/<id>` of a deleted or unknown node renders the recovery
 page, which tells deletion from absence because T-7 keeps the two distinguishable. A **finished** node resolves normally
 — T-11 hides a row from its parent's page, not from its own — so a row opened from `#/done` gets the page it always had.
+
+**A note's route composes two things rather than one.** `#/n/<id>` of a `note` draws the note *and* the list it hangs
+under — the page of its T-6-resolved parent — because a note is read against the list it belongs to and replacing that
+list to read one line cost two navigations to undo. The route did not change and neither did the Back button: the second
+pane is derived from the route, so a cold launch on `#/n/<id>` draws the same two panes a click did (X-8), and
+`#/n/<id>` of a `folder` or a `task` is the single page it always was. Which pane goes where is a breakpoint —
+[§10.3 A note beside the list](#103-a-note-beside-the-list).
 
 Two navigations exist besides the routes: the sidebar (T-10, top-level folders and notes, and T-11 takes finished ones
 out of it) and breadcrumbs (T-9). Breadcrumbs climb the T-6-resolved parent, never the stored one, and the sidebar reads
@@ -642,7 +651,11 @@ to empty, and a dismissal is only for a row the user is content to leave as it l
 | X-17 | The settings screen launches the cloud provider's own app, and which provider that is stays on this device | ✅ | `src/core/providers.ts` is the catalog; the choice is `localStorage`, per [§2.3 What is never in the Sync Folder](#23-what-is-never-in-the-sync-folder). A shell that cannot launch an app says so rather than offering a button that does nothing |
 | X-18 | A device on the browser-only fallback takes the folder its own launcher is holding, rather than keeping an answer it gave before there was one | ✅ | `chooseFolder` in `src/app/folder-choice.ts`: the two shells that hand a folder in unasked are asked before a stored `local` is honoured, and nothing is written when one is taken — [architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter). `folder-choice.test.ts`; a real Firefox is [test.md §3.6 Platform](test.md#36-platform) check 3b. Without it, "this browser only" is a one-way door on the one browser the helper exists for |
 | X-19 | The sidebar's type is a fifth larger than the page beside it | ✅ | `.sidebar-text` and `.sidebar-note` in `src/app.css`, read by `src/ui/Shell.svelte` and `src/ui/SidebarLinks.svelte`. One rule rather than a size named per component, and unlayered so it wins over the `text-sm` it replaces — the icons scale with it so the column keeps its proportions |
-| X-20 | The sidebar's width is dragged by its right edge, and the width is this device's own | ✅ | `src/ui/SidebarResizer.svelte` over `sidebarWidth` in `src/app/view-state.svelte.ts`, bounded there rather than at the grip. Pointer events, for T-14's reason — a tablet is wide enough for the `md` layout and has no mouse. Above `md` only: below it the sidebar is a drawer over the page, where a width takes room from nothing. `view-state.svelte.test.ts`, `scripts/ui-smoke.mjs` |
+| X-20 | The sidebar's width is dragged by its right edge, and the width is this device's own | ✅ | `src/ui/WidthGrip.svelte` over `sidebarWidth` in `src/app/view-state.svelte.ts`, bounded there rather than at the grip. Pointer events, for T-14's reason — a tablet is wide enough for the `md` layout and has no mouse. Above `md` only: below it the sidebar is a drawer over the page, where a width takes room from nothing. `view-state.svelte.test.ts`, `scripts/ui-smoke.mjs` |
+| X-21 | Above `lg`, a note opens **beside** the list it was opened from rather than instead of it, and the list beside it is the nearest ancestor that is **not** a note — a note nested under a note opens in the pane and leaves the left column where it was | ✅ | `src/ui/App.svelte` composes the two panes; the right one is `src/ui/NotePane.svelte` and the left is `src/ui/NodePage.svelte` on `listAbove` in `src/core/tree.ts`, which is T-6's resolved parent walked up past every note. One route still — [§10.3 A note beside the list](#103-a-note-beside-the-list) |
+| X-22 | Below `lg`, that same route lays the note **over** the list as a sheet, as tall as its own content and never taller than 60% of the viewport; a second tap anywhere on it opens it fully | ✅ | `src/ui/NotePane.svelte`. The height is a `max-height` over content height rather than a measurement, so "short enough shows all of it" is one CSS rule and no arithmetic. The peek is covered by one transparent layer, which is what keeps the tap out of the body's always-mounted textarea — B-3 |
+| X-23 | A page's column sits at the left edge of the page area rather than centred, whether or not a note is open | ✅ | `src/ui/NodePage.svelte`. A centred column would slide sideways the moment the note pane appeared, so every open and close would move the list the user is reading |
+| X-24 | The divider between the list and the note pane is dragged, and the width is this device's own | ✅ | `src/ui/WidthGrip.svelte` over `notePaneWidth` in `src/app/view-state.svelte.ts` — X-20's grip with the sign flipped, since the pane's edge is its left one. Above `lg` only: below it the pane is X-22's sheet and its width is the viewport's. `view-state.svelte.test.ts`, `scripts/ui-smoke.mjs` |
 
 Packaging decides which of these are reachable, and it answers them per target rather than once — see
 [architecture.md §7 Packaging](architecture.md#7-packaging). X-3 in particular is a PWA install on Chromium and an APK
@@ -751,6 +764,79 @@ which provider is under the folder — [§7.3 Fixed constraints](#73-fixed-const
 `src/core/providers.ts` buys exactly one thing: a button that opens the app whose client is keeping this folder in sync.
 A device that has not named one has no button, which is what an unnamed provider means.
 
+### 10.3 A note beside the list
+
+A note used to take the screen. Clicking one navigated to its page, the list it was clicked from went, and getting back
+was the breadcrumb or the Back button — two navigations to read one line of a note that belongs to the list you were
+already looking at. That is the wrong trade for the one kind of row that is *read* rather than ticked: a folder is
+somewhere you go, and a note is something you look at while staying where you are.
+
+**The route is unchanged and the composition is not.** `#/n/<id>` still names one node, still deep-links, still survives
+a cold launch (X-8). What changed is what the application draws for it when that node is a `note`: the note, and the
+page of its resolved parent (T-6) beside it. The second pane is *derived* rather than remembered, which is the whole
+reason there is no new route and no new state — the list on the left is a function of the note on the right, so a link
+pasted into another device opens the same two panes, and Back closes the note by leaving the route exactly as it always
+did.
+
+**Only a note splits.** A folder is a list, and a list beside a list is the same drawing twice, one of which is always
+the narrower — the argument T-10 already made against the sidebar carrying the whole tree. A task has no page to open.
+So the split exists exactly when the route's node has `kind === 'note'`, and every other route renders as it did.
+
+**The left pane is the nearest ancestor that is *not* a note — X-21.** A note nested under a note is opened from the
+pane's own list (K-4), and the pane is where it opens: the left column keeps the list it was already showing rather than
+becoming the parent note's page. Drawing the parent note there instead was the first reading and it was wrong twice
+over. It puts a second body on screen — a second editor, with its own K-7 debounce and its own caret, for a note nobody
+asked to edit — and it moves the list under the pointer on every step down, which is the jump X-23 exists to prevent. So
+walking down a chain of notes moves one pane, and the tree the chain hangs in stays exactly where it is. The nested note
+is still reachable and still highlighted on the left, because the tree draws the whole subtree rather than one level
+(T-10 is the sidebar's rule, not the tree's).
+
+**The divider between the two is dragged — X-24.** The pane is the second column with a share of the width worth arguing
+about, which is X-20's question asked a second time, and it gets X-20's answer: pointer events for T-14's reason, bounds
+in `view-state.svelte.ts` rather than at the grip, `localStorage` rather than a file
+([§2.3 What is never in the Sync Folder](#23-what-is-never-in-the-sync-folder)), and above `lg` only — below it the pane
+is the sheet and its width is the viewport's. It is one component at both edges with the sign flipped: the sidebar's
+grip is on its right edge and widens as it goes right, the pane's is on its left edge and widens as it goes left.
+
+**What stops it is the window, and the list keeps a strip rather than a column.** The pane may take everything the
+window has that is not the sidebar and is not 176px — X-20's own minimum, the width below which a title is a truncation.
+A fixed ceiling was the first cut and it was the wrong question twice: a number generous on a laptop is a third of a
+monitor, and reserving a *readable* 320px column for the list assumed the list was still being read. It is not — it is
+behind the note, and what it owes the reader while a note is open is somewhere to click back to. The note long enough to
+want the width was exactly the note that could not have it.
+
+**Above `lg` it is beside, below `lg` it is over — X-1 with a breakpoint, not a second application.** The phone has no
+room for two columns, so the same pane becomes a sheet on the bottom edge with the list still behind it.
+
+**The breakpoint is `lg` and not X-2's `md`, because the two are different questions.** X-2 asks whether there is room
+for a column of *navigation* beside the page, and 768px has that. X-21 asks whether there is room for two columns of
+*content*, and 768px does not: the sidebar takes 256 of it and a two-fifths pane takes another 300, leaving the list
+less width than one of its own rows needs. A tablet in portrait therefore gets the sheet, which is the right drawing for
+it anyway — one column of content, and the note over it.
+
+What the sheet adds is a height rule and a second tap:
+
+- **As tall as the note, and never taller than 60% of the viewport.** This is `max-height` over an auto height, so a
+  note short enough to fit is shown whole and a long one is cut at 60% — the requirement "how much is shown depends on
+  the length" is a CSS rule rather than a measurement, and nothing has to be re-measured when a peer's edit changes the
+  body under it (X-10).
+- **The peek is not the editor.** A peek is covered by one transparent layer that swallows the tap and opens the sheet
+  fully. Without it the tap would land in the body's textarea — which B-3 keeps mounted and transparent precisely so
+  that a click reaches it — and the phone would put a caret and a keyboard into text the user can only see 60% of. One
+  layer over the whole sheet is also what makes "the content or the header" one target rather than two: everything on
+  the peek means *open this*, except the control that closes it.
+
+**Expansion is not a route and not a stored preference.** It is one boolean in the pane, reset when the pane's note
+changes, so every note opens at its own peek and no note remembers being expanded on some other device — the same
+argument [§2.3 What is never in the Sync Folder](#23-what-is-never-in-the-sync-folder) makes about the collapse state,
+one step further: this one does not even persist locally, because a peek is a gesture rather than a setting.
+
+**The list stops being centred — X-23.** A centred column moves sideways whenever the space around it changes, so
+opening the note would shift the list under the pointer and closing it would shift it back. Left-aligned, the list is
+where it was before the note opened and where it will be after, and the note pane is what appears and goes. That is why
+X-23 says "whether or not a note is open": a rule that only applied while the pane was there would be the jump it exists
+to prevent.
+
 ## 11. Import, export and backup
 
 _Not written yet._
@@ -818,6 +904,7 @@ every possible destination is a second navigation to build and to test, and the 
 | M6 | Fewer things | **Closed.** A milestone that mostly removed: the fourth kind (K-1, `list` folded into `folder` at the decoder), the second control for a kind change ([K-6, withdrawn](#4-item-kinds-and-attributes)), and the sidebar's copy of the whole tree (T-10, one level now). The one thing it added is K-9, a pasted paragraph becoming one row per line, which is the quick-add line answering a question it already had the machinery for. Nothing here changed the payload, the merge or the folder |
 
 | M7 | Formatting in a note body | **Closed.** B-1 to B-6 — [§4.3 Bold and headings in a note body](#43-bold-and-headings-in-a-note-body) — bold and two heading levels, as Markdown marks inside the body string. The one milestone so far that adds a feature and changes nothing about the payload: `body` was a string before it and is a string after, so the merge, the conflict rows and compaction never learned that a body can be formatted |
+| M8 | A note beside the list | **Closed.** X-21 to X-24 — [§10.3 A note beside the list](#103-a-note-beside-the-list) — a note opens beside the nearest list above it at `lg` and as a 60%-tall sheet over it below, a page's column is left-aligned so nothing moves when it does, and the divider between the two columns is dragged. Like M7 it adds a feature and changes nothing about the payload: no route, no op, no field. The one thing it stores is X-24's width, and that is device-local like every other width here. It is one composition change in `src/ui/App.svelte`, one new view, and one grip that the sidebar now shares |
 
 M2 is closed against a folder, not against a provider. The three adapters it added are the three methods every other
 adapter already offers, so what remains untested is the client underneath them, and observing that needs a Windows and

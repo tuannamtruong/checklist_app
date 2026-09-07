@@ -458,19 +458,109 @@ async function main() {
       (await titlesUnder(page, 'Shopping')).join('|'),
     );
 
-    // --- the note page ----------------------------------------------------
+    // --- the note pane, beside the list — X-21, X-23 ----------------------
+    // The left edge is measured rather than looked at: X-23's whole claim is
+    // that the list does not move when the pane opens, and a centred column
+    // would slide sideways by half the pane's width every time.
+    const listLeft = async () =>
+      Math.round((await page.locator('[data-testid="page-header"]').boundingBox()).x);
+    const closedLeft = await listLeft();
+    const rowsListOnly = await page.locator('[data-testid="tree"] [data-testid="row"]').count();
+
     await (await rowByTitle(page, 'Trip notes')).locator('[data-testid="open"]').click();
-    await page.waitForSelector('[data-testid="note-body"]');
+    await page.waitForSelector('[data-testid="note-pane"]');
+    const pane = page.locator('[data-testid="note-pane"]');
     check(
       'a note opens its own page with its body — K-3',
       (await page.locator('[data-testid="note-body"]').inputValue()).startsWith('Ferry leaves'),
     );
     check(
       'a note still owns its checklist children — K-4',
-      (await page.locator('[data-testid="tree"] [data-testid="title"]').evaluateAll((i) => i.map((x) => x.value)))
+      (await pane.locator('[data-testid="tree"] [data-testid="title"]').evaluateAll((i) => i.map((x) => x.value)))
         .includes('Book the ferry'),
     );
-    check('breadcrumbs name the path back up — T-9', await page.locator('[data-testid="breadcrumbs"]').isVisible());
+    const paneBox = await pane.boundingBox();
+    const listBox = await page.locator('[data-testid="page-header"]').boundingBox();
+    check(
+      'and the list it was opened from is still on screen, beside it — X-21',
+      (await page.locator('[data-testid="tree"] [data-testid="row"]').count()) > rowsListOnly &&
+        paneBox.x > listBox.x + listBox.width - 1,
+      `list ${Math.round(listBox.x)}+${Math.round(listBox.width)}, pane at ${Math.round(paneBox.x)}`,
+    );
+    const openLeft = await listLeft();
+    await page.locator('[data-testid="note-close"]').click();
+    await page.waitForTimeout(150);
+    const reclosedLeft = await listLeft();
+    check(
+      'and the list did not move sideways to make room for it — X-23',
+      closedLeft === openLeft && openLeft === reclosedLeft,
+      `${closedLeft} then ${openLeft} then ${reclosedLeft}`,
+    );
+    // --- X-21: a note inside a note swaps the pane, and only the pane ------
+    // The count of bodies is what catches the old drawing rather than the
+    // pane's own title, which said "Packing list" either way: the parent note
+    // used to be drawn as the list on the left, editor and all.
+    await (await rowByTitle(page, 'Trip notes')).locator('[data-testid="open"]').click();
+    await page.waitForSelector('[data-testid="note-pane"]');
+    const listTitle = async () =>
+      (await page.locator('[data-testid="page-title"]').first().innerText()).trim();
+    const beforeSub = await listTitle();
+    await (await rowByTitle(pane, 'Packing list')).locator('[data-testid="open"]').click();
+    await page.waitForFunction(() => location.hash.endsWith('n_seed0012'));
+    // The hash changing is the route; the pane redrawing is a frame later, and
+    // its own path is what says the redraw happened rather than a timer.
+    await pane.locator('[data-testid="breadcrumbs"]').getByText('Trip notes').waitFor();
+    const paneTitle = await pane.locator('[data-testid="page-title"]').inputValue();
+    check('a note inside a note opens in the pane — X-21', paneTitle === 'Packing list', paneTitle);
+    const bodies = await page.locator('[data-testid="note-body"]').count();
+    check(
+      'and the list beside it is the one already there, not the parent note — X-21',
+      (await listTitle()) === beforeSub && bodies === 1,
+      `${beforeSub} -> ${await listTitle()}, ${bodies} body on screen`,
+    );
+    await page.screenshot({ path: join(shots, 'note-nested.png'), fullPage: true });
+
+    // --- X-24: the divider between the list and the note -------------------
+    // The pane's own left edge, so the drag runs the other way from X-20's and
+    // the sign in `WidthGrip` is the thing under test.
+    const paneWidth = async () => Math.round((await pane.boundingBox()).width);
+    const startPane = await paneWidth();
+    const gripBox = await page.locator('[data-testid="note-resize"]').boundingBox();
+    await page.mouse.move(gripBox.x + gripBox.width / 2, gripBox.y + 200);
+    await page.mouse.down();
+    await page.mouse.move(gripBox.x - 100, gripBox.y + 200, { steps: 8 });
+    await page.mouse.up();
+    const widerPane = await paneWidth();
+    check(
+      'the note is dragged wider by the divider on its left edge — X-24',
+      widerPane > startPane + 60,
+      `${startPane} -> ${widerPane}`,
+    );
+
+    await page.reload();
+    await page.waitForSelector('[data-testid="note-pane"]');
+    check(
+      "and that width is this device's own, so it survives a reload — §2.3",
+      (await paneWidth()) === widerPane,
+      `${widerPane} -> ${await paneWidth()}`,
+    );
+
+    // Back to the default, so every check below measures the layout it was
+    // written against.
+    await page.locator('[data-testid="note-resize"]').focus();
+    await page.keyboard.press('Home');
+    check(
+      'and the keyboard reaches this grip too',
+      (await paneWidth()) === startPane,
+      String(await paneWidth()),
+    );
+
+    await (await rowByTitle(page, 'Trip notes')).locator('[data-testid="open"]').click();
+    await page.waitForSelector('[data-testid="note-body"]');
+    check(
+      'breadcrumbs name the path back up — T-9',
+      await pane.locator('[data-testid="breadcrumbs"]').isVisible(),
+    );
     check(
       'and the only way to change what a row is, is the row menu — K-5, K-6 withdrawn',
       (await page.locator('[data-testid="promote-to-list"]').count()) === 0,
@@ -532,7 +622,7 @@ async function main() {
       (await page.locator('[data-testid="note-body"]').inputValue()).split('\n').at(-1),
     );
 
-    await page.locator('[data-testid="page-title"]').click();
+    await pane.locator('[data-testid="page-title"]').click();
     await page.waitForSelector('[data-testid="note-rendered"]');
     const rendered = page.locator('[data-testid="note-rendered"]');
     check(
@@ -564,7 +654,7 @@ async function main() {
       cycled === '2' && (await headingButton.getAttribute('data-level')) === '0',
       `${cycled} then ${await headingButton.getAttribute('data-level')}`,
     );
-    await page.locator('[data-testid="page-title"]').click();
+    await pane.locator('[data-testid="page-title"]').click();
     await page.waitForSelector('[data-testid="note-rendered"]');
     check(
       'pressing a heading level the line already has takes it off — B-4',
@@ -884,6 +974,64 @@ async function main() {
     await page.locator('[data-testid="drawer-backdrop"]').click({ position: { x: 340, y: 500 } });
     await page.waitForTimeout(300);
     await page.screenshot({ path: join(shots, 'phone.png'), fullPage: true });
+
+    // --- X-22: the note as a sheet over the list, sized to what is in it ----
+    // Three numbers and a tap, and none of them is reachable below the browser:
+    // the height is a `max-height` over rendered content, and the tap target
+    // exists only while the sheet is peeked — requirements.md §10.3.
+    await (await rowByTitle(page, 'Trip notes')).locator('[data-testid="open"]').click();
+    await page.waitForSelector('[data-testid="note-pane"]');
+    await page.waitForTimeout(300);
+    const sheet = page.locator('[data-testid="note-pane"]');
+    const cap = Math.round(844 * 0.6);
+    const peeked = await sheet.boundingBox();
+    const whole = await sheet.evaluate((el) => el.scrollHeight <= el.clientHeight + 1);
+    check(
+      'a short note is shown whole, under the 60% cap — X-22',
+      Math.round(peeked.height) < cap && whole,
+      `${Math.round(peeked.height)} of ${cap}, ${whole ? 'whole' : 'clipped'}`,
+    );
+    check(
+      'and the list it is over is still behind it — X-22',
+      await page.locator('[data-testid="tree"] [data-testid="row"]').first().isVisible(),
+    );
+
+    // The tap that opens it, and the thing it must not do on the way: B-3 keeps
+    // a transparent textarea over the rendered body, so a bare tap would put a
+    // caret and a keyboard into text the reader can see 60% of.
+    await page.locator('[data-testid="note-expand"]').click({ position: { x: 195, y: 120 } });
+    await page.waitForTimeout(300);
+    const opened = await sheet.boundingBox();
+    const focused = await page.evaluate(() => document.activeElement?.dataset?.testid ?? 'none');
+    check(
+      'a second tap opens it fully, and does not land in the field — X-22, B-3',
+      Math.round(opened.height) === 844 && focused !== 'note-body',
+      `${Math.round(opened.height)}px, focus ${focused}`,
+    );
+    check(
+      'and the note owns its list again once it is open — K-4, X-22',
+      await sheet.locator('[data-testid="note-children"]').isVisible(),
+    );
+    await page.screenshot({ path: join(shots, 'phone-note-open.png') });
+
+    // The other half of the rule, which is what makes it a rule rather than a
+    // fixed height: a body too long to fit stops at the cap.
+    const longBody = Array.from({ length: 40 }, (_, i) => `Line ${i + 1} of a much longer note.`);
+    await page.locator('[data-testid="note-body"]').fill(longBody.join('\n'));
+    await page.locator('[data-testid="note-close"]').click();
+    await page.waitForTimeout(300);
+    await (await rowByTitle(page, 'Trip notes')).locator('[data-testid="open"]').click();
+    await page.waitForSelector('[data-testid="note-pane"]');
+    await page.waitForTimeout(300);
+    const tall = await sheet.boundingBox();
+    check(
+      'and a long one stops at 60% of the viewport rather than taking it — X-22',
+      Math.round(tall.height) === cap,
+      `${Math.round(tall.height)} of ${cap}`,
+    );
+    await page.screenshot({ path: join(shots, 'phone-note-peek.png') });
+    await page.locator('[data-testid="note-close"]').click();
+    await page.waitForTimeout(200);
 
     for (const width of [390, 768, 1280]) {
       await page.setViewportSize({ width, height: 900 });

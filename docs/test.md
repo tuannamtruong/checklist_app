@@ -204,6 +204,27 @@ events that happen outside the browser, and the run that could see them is the o
 What a unit test does hold is the seam: `providers.test.ts` fails if the catalog names an Android package the manifest's
 `<queries>` does not, which is the same drift `themes.test.ts` catches between the catalog and the palettes.
 
+M8's split is a browser check almost entirely, because every claim it makes is about what is on screen at a given width.
+Above `lg` the run opens a note and asserts both panes are there at once — the list it came from still showing its rows,
+the note beside it with its body — and that closing the note leaves the list where it was rather than sliding it back to
+the middle (X-21, X-23). The left edge is measured, not eyeballed: the list's column has the same `x` with the pane open
+and with it shut, which is the whole of X-23 and the one thing a screenshot would not catch.
+
+Two more numbers come out of the same page. Opening a note *nested inside* the open note swaps the pane and leaves the
+left column showing the same list, which is X-21's walk past every note ancestor — asserted as the left column's title
+being unchanged while the pane's is the sub-note's, since a check that only read the pane would pass on the old drawing
+too. And the divider is dragged, which is X-20's check on the other grip: the pane is wider by roughly what the pointer
+moved, it survives a reload, and the arrow keys move it without a pointer at all (X-24). `listAbove` is the unit half of
+the first — `tree.test.ts` walks a note under a note under a folder — and `view-state.svelte.test.ts` the unit half of
+the second.
+
+The phone half is X-22, and it is checked as three numbers and a tap. A long note's sheet is no taller than 60% of the
+viewport; a short one is shorter than that, which is what "depends on the length of the content" means and what
+distinguishes the rule from a fixed height; and a tap anywhere on the peeked sheet — on the body, where B-3's
+transparent textarea is waiting — expands it without putting a caret in the field. The unit layer holds none of this:
+the height is a CSS rule over rendered content and the tap target is a layer that exists only while the sheet is peeked,
+so a real browser at 390px is the only thing that can see either.
+
 The prototype's `android-bridge.mjs` drives the same page in the same browser with `window.AndroidFolder` replaced by an
 in-page stub, which is how the Android startup path — first-run folder pick, edit, conflict, resolution — is exercised
 without a JVM. It is a UI test wearing the phone's clothes, not a platform test; the platform layer starts where the

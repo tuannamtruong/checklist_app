@@ -19,7 +19,19 @@
   import type { Session } from '../app/Session.svelte';
   import { textRect } from './text-rect';
 
-  let { session, id }: { session: Session; id: NodeId } = $props();
+  /**
+   * `compact` is the note pane's floor rather than the page's — X-21. The
+   * 16rem minimum exists so a full page's body is a target worth clicking; in a
+   * pane the pane's own height already does that job, and on the phone's sheet
+   * the floor would eat X-22's 60% before the note had said anything.
+   */
+  let {
+    session,
+    id,
+    compact = false,
+  }: { session: Session; id: NodeId; compact?: boolean } = $props();
+
+  const floor = $derived(compact ? 'min-h-32' : 'min-h-64');
 
   const STORE_DEBOUNCE_MS = 1_000;
   const EMIT_AFTER_MS = 60_000;
@@ -217,8 +229,15 @@
        assistive technology: the textarea below carries the text itself, and one
        value announced twice is one value too many. -->
   {#if !editing}
+    <!-- `break-words` because the rendered view has to wrap everywhere the
+         textarea over it does. A browser wraps a textarea's long run for us and
+         wraps a paragraph's only between words, so a body with no spaces in it —
+         a pasted URL, a key, a line of one repeated letter — was drawn running
+         off the pane's right edge and clipped, and no width the divider could
+         reach would ever have been enough. Marks are what B-2 keeps in the
+         string; a line too long to fit is not one of them. -->
     <div
-      class="min-h-64 w-full rounded-lg border border-line bg-surface-raised p-3 text-sm leading-relaxed"
+      class="w-full rounded-lg border border-line bg-surface-raised p-3 text-sm leading-relaxed break-words {floor}"
       aria-hidden="true"
       data-testid="note-rendered"
     >
@@ -251,8 +270,7 @@
   <textarea
     bind:this={field}
     bind:value={draft}
-    class="w-full rounded-lg border border-line bg-surface-raised p-3 text-sm leading-relaxed outline-none focus:border-accent"
-    class:min-h-64={editing}
+    class="w-full rounded-lg border border-line bg-surface-raised p-3 text-sm leading-relaxed outline-none focus:border-accent {editing ? floor : ''}"
     class:resize-y={editing}
     class:absolute={!editing}
     class:inset-0={!editing}

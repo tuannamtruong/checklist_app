@@ -4,16 +4,21 @@ import {
   ancestorsOf,
   childrenOf,
   isAncestorOrSelf,
+  listAbove,
   parentOf,
   resolveTree,
   siblingAt,
 } from './tree';
-import { ROOT, type Op, type ParentId } from './types';
+import { ROOT, type Kind, type Op, type ParentId } from './types';
 
 let counter = 0;
 
 function create(id: string, parent: ParentId, order: string, dev = 'aaaa0001', at = 1): Op {
   return { op: 'create', id, parent, kind: 'task', order, c: ++counter, at, dev };
+}
+
+function createOf(id: string, parent: ParentId, order: string, kind: Kind): Op {
+  return { op: 'create', id, parent, kind, order, c: ++counter, at: 1, dev: 'aaaa0001' };
 }
 
 function move(id: string, parent: ParentId, order: string, dev: string, at: number): Op {
@@ -210,5 +215,42 @@ describe('resolveTree — T-11 finished rows', () => {
     const tree = treeOf([...list, tick('n_b'), remove('n_b')]);
     expect(tree.deleted.has('n_b')).toBe(true);
     expect(childrenOf(tree, ROOT)).toEqual(['n_a', 'n_c']);
+  });
+});
+
+describe('listAbove — X-21', () => {
+  // A folder, a note in it, a note in that note, and a task under the inner
+  // note: the shape the pane's own list (K-4) makes reachable in two clicks.
+  const nested = [
+    createOf('n_f', ROOT, 'a1', 'folder'),
+    createOf('n_note', 'n_f', 'a1', 'note'),
+    createOf('n_sub', 'n_note', 'a1', 'note'),
+    createOf('n_task', 'n_sub', 'a1', 'task'),
+  ];
+
+  it('is the parent when the parent is not a note', () => {
+    expect(listAbove(treeOf(nested), 'n_note')).toBe('n_f');
+  });
+
+  it('walks past every note above it, however deep the chain', () => {
+    // The whole of X-21: opening n_sub from n_note's pane leaves the left
+    // column on n_f, which is where the reader put it.
+    const tree = treeOf(nested);
+    expect(listAbove(tree, 'n_sub')).toBe('n_f');
+    // Two notes deep is still n_f: the walk stops at a kind, not at a count.
+    expect(listAbove(tree, 'n_task')).toBe('n_f');
+  });
+
+  it('is the root when there is no list above at all', () => {
+    const tree = treeOf([createOf('n_a', ROOT, 'a1', 'note'), createOf('n_b', 'n_a', 'a1', 'note')]);
+    expect(listAbove(tree, 'n_b')).toBe(ROOT);
+  });
+
+  it("reads T-6's repaired parent rather than the one in the file", () => {
+    // A re-rooted note hangs where it is drawn, so the pane beside it is the
+    // list it is drawn in — anything else would put a page on the left that the
+    // tree on the left does not contain.
+    const tree = treeOf([createOf('n_x', 'n_missing', 'a1', 'note')]);
+    expect(listAbove(tree, 'n_x')).toBe(ROOT);
   });
 });

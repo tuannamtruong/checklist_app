@@ -5,9 +5,9 @@
   import type { Snippet } from 'svelte';
   import type { Session } from '../app/Session.svelte';
   import type { Dismissals } from '../app/dismissals.svelte';
-  import type { ViewState } from '../app/view-state.svelte';
+  import { SIDEBAR_WIDTH, type ViewState } from '../app/view-state.svelte';
   import SidebarLinks from './SidebarLinks.svelte';
-  import SidebarResizer from './SidebarResizer.svelte';
+  import WidthGrip from './WidthGrip.svelte';
   import { CONFLICTS_HREF, DONE_HREF, SEARCH_HREF, SETTINGS_HREF } from '../app/router.svelte';
 
   let {
@@ -179,7 +179,18 @@
       </div>
     </footer>
 
-    <SidebarResizer {view} />
+    <!-- X-20. The grip is the sidebar's own right edge, and the width it
+         reports is clamped by `view-state.svelte.ts` rather than here. -->
+    <WidthGrip
+      width={view.sidebarWidth}
+      min={SIDEBAR_WIDTH.min}
+      max={SIDEBAR_WIDTH.max}
+      initial={SIDEBAR_WIDTH.default}
+      label="Resize sidebar"
+      testid="sidebar-resize"
+      class="absolute inset-y-0 -right-1 z-10 hidden w-2 cursor-col-resize hover:bg-accent-soft focus-visible:bg-accent-soft md:block"
+      onwidth={(px) => view.setSidebarWidth(px)}
+    />
   </aside>
 
   <div class="flex min-w-0 flex-1 flex-col">

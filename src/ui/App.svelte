@@ -6,7 +6,8 @@
   // all — architecture.md §4 — so the shell can be a setup screen rather than a
   // tree; and the sync cycle runs from here, driven by activity and focus
   // rather than by a timer (S-19).
-  import { isVisible } from '../core/tree';
+  import { isVisible, listAbove } from '../core/tree';
+  import { ROOT } from '../core/types';
   import { deviceId, suggestedDeviceName } from '../app/device';
   import { chooseFolder, type FolderChoice } from '../app/folder-choice';
   import { Dismissals } from '../app/dismissals.svelte';
@@ -23,6 +24,7 @@
   import FolderSetup from './FolderSetup.svelte';
   import LogPage from './LogPage.svelte';
   import NodePage from './NodePage.svelte';
+  import NotePane from './NotePane.svelte';
   import RecoveryPage from './RecoveryPage.svelte';
   import SearchPage from './SearchPage.svelte';
   import SettingsPage from './SettingsPage.svelte';
@@ -71,6 +73,39 @@
   const query = $derived(router.route.name === 'search' ? router.route.query : '');
 
   /**
+   * X-21. A note's route draws two things: the note, and the page of the list it
+   * hangs under. Both are derived from the one route rather than remembered
+   * beside it, which is why there is no second route and no stored pair — a link
+   * pasted into another device opens the same two panes (X-8), and Back closes
+   * the note by leaving the route exactly as it always did. requirements.md §10.3.
+   *
+   * Only a note splits. A folder is a list, and a list beside a list is the same
+   * drawing twice; a task has no page to open.
+   */
+  const noteId = $derived.by(() => {
+    const open = session;
+    if (!open || currentId === null) return null;
+    if (!isVisible(open.tree, currentId)) return null;
+    return open.tree.nodes[currentId]?.kind === 'note' ? currentId : null;
+  });
+
+  /**
+   * The list behind the note: the nearest ancestor that is not itself a note,
+   * over T-6-resolved parents, or the root.
+   *
+   * The walk is what keeps a sub-note out of the left column — X-21. A note's
+   * children are in the pane (K-4), so opening one is a click *inside* the pane,
+   * and the pane is the only thing that should answer it; the list on the left
+   * is the one the reader navigated to and stays there until they navigate it.
+   */
+  const listId = $derived.by(() => {
+    const open = session;
+    if (!open || noteId === null) return currentId;
+    const above = listAbove(open.tree, noteId);
+    return above === ROOT ? null : above;
+  });
+
+  /**
    * F-5. Typing replaces the fragment rather than pushing it, or every keystroke
    * would be a history entry and Back would walk the query backwards one letter
    * at a time.
@@ -109,10 +144,14 @@
   }
 </script>
 
+<!-- X-24. The window's width is told to the view state rather than read from
+     it: the class is constructed once and a window is resized all day, and what
+     the divider is allowed to do depends on the room the window has. -->
 <svelte:window
   onpagehide={flush}
   onfocus={refresh}
   onkeydown={globalKey}
+  onresize={() => view.setViewport(window.innerWidth)}
   onvisibilitychange={() => (document.visibilityState === 'hidden' ? flush() : refresh())}
 />
 
@@ -147,7 +186,18 @@
     {:else if currentId !== null && !isVisible(session.tree, currentId)}
       <RecoveryPage {session} id={currentId} />
     {:else}
-      <NodePage {session} {view} {focus} id={currentId} />
+      <!-- X-21 and X-22. Beside above `lg`, over below it: the pane takes itself
+           out of the flow at the narrow width, so the list under it is the same
+           single column it was before the note opened. The padding is what keeps
+           the last rows out from under the peeked sheet — §10.3. -->
+      <div class="flex flex-col lg:flex-row lg:items-start">
+        <div class="min-w-0 flex-1 {noteId !== null ? 'pb-[60dvh] lg:pb-0' : ''}">
+          <NodePage {session} {view} {focus} id={listId} />
+        </div>
+        {#if noteId !== null}
+          <NotePane {session} {view} {focus} id={noteId} />
+        {/if}
+      </div>
     {/if}
   </Shell>
 {:else if choice && choice.kind === 'setup'}

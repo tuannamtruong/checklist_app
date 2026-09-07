@@ -192,6 +192,22 @@ export function siblingAt(tree: ResolvedTree, id: NodeId, offset: number): NodeI
   return siblings[index + offset];
 }
 
+/**
+ * X-21. The nearest ancestor that is not a `note`, or `ROOT`.
+ *
+ * The list a note is drawn beside, and a walk rather than one `parentOf`
+ * because a note's children may be notes: opening one is a click inside the
+ * pane, and the pane is what should answer it — the column on the left keeps
+ * the list it was already showing. requirements.md §10.3.
+ */
+export function listAbove(tree: ResolvedTree, id: NodeId): ParentId {
+  let cursor: ParentId = parentOf(tree, id);
+  while (cursor !== ROOT && tree.nodes[cursor]?.kind === 'note') {
+    cursor = parentOf(tree, cursor);
+  }
+  return cursor;
+}
+
 /** Present and not tombstoned — what a route may open, per X-11. */
 export function isVisible(tree: ResolvedTree, id: NodeId): boolean {
   return tree.nodes[id] !== undefined && !tree.deleted.has(id);

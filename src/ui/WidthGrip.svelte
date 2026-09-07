@@ -1,5 +1,8 @@
 <script lang="ts">
-  // X-20. The grip on the sidebar's right edge, and the whole of the gesture.
+  // X-20 and X-24. The grip on a column's edge, and the whole of both gestures:
+  // the sidebar's right edge and the note pane's left one are the same drag with
+  // the sign flipped, so the second divider is a call site rather than a second
+  // file.
   //
   // Pointer events rather than a mouse-only drag, for the reason T-14 uses them
   // (`drag.svelte.ts`): a tablet is wide enough for the `md` layout and has no
@@ -11,9 +14,31 @@
   // focusable, the arrow keys move it a step at a time — the only way to reach
   // it without a pointing device — and what a reader announces is the width
   // itself. `Home` puts the column back where it started.
-  import { SIDEBAR_WIDTH, type ViewState } from '../app/view-state.svelte';
-
-  let { view }: { view: ViewState } = $props();
+  //
+  // The width itself is not held here. It is bounded and stored in
+  // `view-state.svelte.ts`, so a caller cannot get a width the grip would refuse.
+  let {
+    width,
+    min,
+    max,
+    initial,
+    label,
+    testid,
+    sign = 1,
+    class: klass,
+    onwidth,
+  }: {
+    width: number;
+    min: number;
+    max: number;
+    initial: number;
+    label: string;
+    testid: string;
+    /** +1 when dragging right widens the column, -1 when dragging left does. */
+    sign?: 1 | -1;
+    class: string;
+    onwidth: (px: number) => void;
+  } = $props();
 
   /** Where the drag began, so the width tracks the pointer rather than jumping. */
   let fromX = 0;
@@ -24,7 +49,7 @@
   function down(event: PointerEvent): void {
     const grip = event.currentTarget as HTMLElement;
     fromX = event.clientX;
-    fromWidth = view.sidebarWidth;
+    fromWidth = width;
     grip.setPointerCapture(event.pointerId);
     // Otherwise the drag selects the text it passes over.
     event.preventDefault();
@@ -33,7 +58,7 @@
   function move(event: PointerEvent): void {
     const grip = event.currentTarget as HTMLElement;
     if (!grip.hasPointerCapture(event.pointerId)) return;
-    view.setSidebarWidth(fromWidth + event.clientX - fromX);
+    onwidth(fromWidth + sign * (event.clientX - fromX));
   }
 
   function up(event: PointerEvent): void {
@@ -41,10 +66,12 @@
     if (grip.hasPointerCapture(event.pointerId)) grip.releasePointerCapture(event.pointerId);
   }
 
+  // The keys move the *divider*, not the width: right is right on both edges,
+  // which is the only reading that matches what the hand just did with it.
   function key(event: KeyboardEvent): void {
-    if (event.key === 'ArrowLeft') view.setSidebarWidth(view.sidebarWidth - STEP);
-    else if (event.key === 'ArrowRight') view.setSidebarWidth(view.sidebarWidth + STEP);
-    else if (event.key === 'Home') view.setSidebarWidth(SIDEBAR_WIDTH.default);
+    if (event.key === 'ArrowLeft') onwidth(width - sign * STEP);
+    else if (event.key === 'ArrowRight') onwidth(width + sign * STEP);
+    else if (event.key === 'Home') onwidth(initial);
     else return;
     event.preventDefault();
   }
@@ -54,12 +81,12 @@
   type="button"
   role="slider"
   aria-orientation="horizontal"
-  aria-label="Resize sidebar"
-  aria-valuenow={view.sidebarWidth}
-  aria-valuemin={SIDEBAR_WIDTH.min}
-  aria-valuemax={SIDEBAR_WIDTH.max}
-  class="sidebar-grip absolute inset-y-0 -right-1 z-10 hidden w-2 cursor-col-resize hover:bg-accent-soft focus-visible:bg-accent-soft md:block"
-  data-testid="sidebar-resize"
+  aria-label={label}
+  aria-valuenow={width}
+  aria-valuemin={min}
+  aria-valuemax={max}
+  class="width-grip {klass}"
+  data-testid={testid}
   onpointerdown={down}
   onpointermove={move}
   onpointerup={up}

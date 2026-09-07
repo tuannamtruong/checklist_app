@@ -129,6 +129,10 @@ export function seedLog(device = DEVICE) {
     { id: 'n_seed0007', parent: 'n_seed0006', kind: 'task', order: 'a1', title: 'Descale the kettle' },
     { id: 'n_seed0008', parent: 'root', kind: 'note', order: 'a3', title: 'Trip notes' },
     { id: 'n_seed0009', parent: 'n_seed0008', kind: 'task', order: 'a1', title: 'Book the ferry' },
+    // A note inside a note, which is the shape X-21's walk exists for: opening
+    // it is a click in the pane's own list, and the column on the left has to
+    // stay where the reader put it.
+    { id: 'n_seed0012', parent: 'n_seed0008', kind: 'note', order: 'a2', title: 'Packing list' },
     { id: 'n_seed0010', parent: 'root', kind: 'note', order: 'a4', title: 'Old receipts', deleted: true },
     // Inside a tombstoned parent and never deleted on its own — T-7 inherits at
     // read time. It is what makes the T-13 restore worth checking: one op has
@@ -147,6 +151,7 @@ export function seedLog(device = DEVICE) {
     id: 'n_seed0008',
     body: 'Ferry leaves at 07:40.\nPassports are in the top drawer.',
   });
+  emit({ op: 'set', id: 'n_seed0012', body: 'Boots, and the thick socks.' });
 
   const header = JSON.stringify({ v: 1, dev: device, clock: { [device]: counter } });
   return { device, text: [header, ...lines].join('\n') + '\n' };

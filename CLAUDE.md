@@ -5,12 +5,13 @@
 A checklist and notes app for one person across several devices. Local-first, no application server: devices synchronise
 through a folder that a cloud provider's own client keeps in sync.
 
-**Status: milestones M1 to M7 are built** — the local-first core, sync through the folder, then compaction, search,
+**Status: milestones M1 to M8 are built** — the local-first core, sync through the folder, then compaction, search,
 device names, undelete and the two platform bundles, then the settings screen and its six themes, then M5: the sync
 folder section, drag and drop, tags and priority with a filter, and the quick-add line. M6 mostly removed: three kinds
 rather than four (`list` is gone), one control for a kind change rather than two, a sidebar one level deep — and one
 addition, a pasted paragraph becoming one row per line. M7 is bold and headings in a note body, as marks inside the body
-string. The production tree is `src/`, driven by `package.json`.
+string, and M8 opens a note beside the list rather than instead of it. The production tree is `src/`, driven by
+`package.json`.
 
 ## Development
 
@@ -136,9 +137,9 @@ it. Never a peer's file: one writer per file, and that is also why the cut needs
 lower this device's top counter, or every peer reads the file as a partial download and skips it forever. sync-flow.md
 §4.8.
 
-Never in a file, always `localStorage`: the device id, collapse state, the drawer's state, the sidebar's width, which
-folder this device chose, which cloud app it belongs to, the chosen theme, the tag filter, and dismissed conflict rows.
-The File System Access handle is the exception, and only because it is an object: IndexedDB.
+Never in a file, always `localStorage`: the device id, collapse state, the drawer's state, the sidebar's and the note
+pane's widths, which folder this device chose, which cloud app it belongs to, the chosen theme, the tag filter, and
+dismissed conflict rows. The File System Access handle is the exception, and only because it is an object: IndexedDB.
 
 ### Component catalog
 
@@ -194,6 +195,40 @@ document is what raises the controls — a field fires nothing of its own when a
 over the rendered blocks, so the click that reaches it is the click that focuses it; swapping two elements would drop
 the focus on the way through, and a `contenteditable` would hand the caret to the browser — which K-7's debounce and
 X-10's repaint-without-eating-the-caret both need to keep.
+
+### The note pane
+
+`#/n/<id>` of a **note** draws two things: the note, and the page of the nearest list above it (X-21). Both come out of
+the one route — `src/ui/App.svelte` derives `noteId` and `listId` from it — so there is no second route and no stored
+pair, and Back closes the note by leaving the route exactly as it always did. A `folder` or a `task` renders the single
+page it always did: a list beside a list is the same drawing twice.
+
+**"The nearest list above it" is a walk, not the parent.** `listAbove` in `src/core/tree.ts` climbs T-6's resolved
+parents past every `note`, so opening a note *inside* a note swaps the pane and leaves the left column exactly where the
+reader put it — its children are in the pane (K-4), so that click is a click inside the pane and the pane is what
+answers it. Drawing the parent note on the left instead was the first cut: it put a second body and a second K-7
+debounce on screen, and moved the list on every step down. `closeHref` walks the same way, or ✕ on a nested note would
+open its parent rather than close anything.
+
+**The divider between them is dragged — X-24.** `src/ui/WidthGrip.svelte` is X-20's sidebar grip generalised: the same
+pointer capture and the same `role="slider"`, with `sign={-1}` at the pane because the divider is the pane's *left*
+edge. The width is `notePaneWidth` in `src/app/view-state.svelte.ts`, bounded there rather than at the grip and stored
+in `localStorage` like the sidebar's. What stops the divider is the room in the window — everything but the sidebar and
+a 176px strip for the list, the same `SIDEBAR_WIDTH.min` — so `App.svelte` reports `innerWidth` on every resize and
+`NOTE_WIDTH.ceiling` is read only when no window has said. Above `lg` only — below it the pane is the sheet and its
+width is the viewport's.
+
+The breakpoint is **`lg`, not X-2's `md`**: the sidebar asks whether there is room for a column of nav, and this asks
+whether there is room for two columns of content. Below it `src/ui/NotePane.svelte` is a bottom sheet instead —
+`max-h-[60dvh]` over an auto height, so a short note shows whole and a long one stops at 60% with no measurement
+anywhere (X-22). A peeked sheet is covered by one transparent button that swallows the tap and opens it; without it the
+tap would land in B-3's always-mounted textarea. The peek hides the note's own children in CSS (`note-children`), or
+every note would sit at the cap and "as tall as its content" would mean nothing. Expansion is one boolean in the pane,
+reset when the note changes — a gesture, not a setting.
+
+Pages are **left-aligned rather than centred** (X-23), so the list does not slide sideways when the pane opens.
+`src/ui/PageTitle.svelte` is the title-and-flag heading both the page and the pane use. requirements.md §10.3,
+past_decision.md §14.
 
 ### Kinds
 

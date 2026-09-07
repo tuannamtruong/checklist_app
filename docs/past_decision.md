@@ -17,6 +17,7 @@ History of project's decision. The situation, its options and resolution.
 | [Retiring the `list` kind](#11-retiring-the-list-kind) | Read `list` as `folder` at the decoder, and leave every file alone | -  keeping the kind<br>-  a migration pass that rewrites the log<br>-  a log version bump |
 | [Formatting in a note body](#12-formatting-in-a-note-body) | A Markdown subset stored in the body string | -  a rich editor over `contenteditable`, storing HTML<br>-  a JSON document model in a new field<br>-  a `heading` kind of row<br>-  no formatting at all |
 | [One archive rather than two lists](#13-one-archive-rather-than-two-lists) | One list of everything the tree no longer shows, ordered by when it left | -  keeping the finished and deleted lists apart<br>-  one list with a badge saying which kind of gone<br>-  a separate `archived_at` field on the op |
+| [A note beside the list](#14-a-note-beside-the-list-rather-than-instead-of-it) | One route drawing two panes, the list derived from the note | -  a second route carrying both ids<br>-  the pane as device-local state beside the route<br>-  splitting every kind, not just notes<br>-  a preview popover over the row |
 
 ---
 
@@ -381,3 +382,73 @@ and drop straight into the archive again.
 An archive long enough to need finding rather than scanning. The answer then is a filter or a search over it — F-4
 already reaches these rows by name — and not a second list: splitting by the reason a row left would still be splitting
 by the thing the reader does not remember.
+
+## 14. A note beside the list rather than instead of it
+
+**One route draws two panes: the note, and the page of the nearest list above it. Above `lg` they are columns; below it
+the note is a sheet over the list.**
+
+A note was a full page from M1, which is the obvious reading of K-3 — "its own full-page editor" — and it was wrong for
+the way the app is used. The tree is the thing on screen almost all of the time, and a note is the one kind of row that
+is read rather than ticked; opening one to check a ferry time replaced the list and cost a breadcrumb to get back to
+what was already there. The other two kinds do not have this problem: a folder *is* a list, so navigating to it is the
+point, and a task never opens at all.
+
+### 14.1 The options
+
+| | Option | Cost |
+| --- | --- | --- |
+| A | **One route, two panes derived from it** — chosen | The left pane is a function of the right, so the parent has to be resolvable from the route — which T-6 already guarantees. Two node pages can be on screen at once, so anything that assumed one has to say which |
+| B | A second route — `#/n/<list>/note/<id>` | The pair is stored where the derivation would have produced it anyway, and every existing link to `#/n/<id>` becomes a link to the old drawing. A route that carries redundant state is a route that can carry *wrong* state — a note under a list it does not belong to |
+| C | The pane is device-local state beside the route | A deep link no longer says what is on screen (X-8), and the Back button stops closing the note. The peek's expansion *is* this option, applied to the one piece of state that genuinely is a gesture |
+| D | Split every kind, not just notes | A folder beside a folder is the same drawing twice, one of which is always narrower — the argument T-10 already made against the sidebar carrying the whole tree |
+| E | Keep the full page and add a preview popover to the row | A third rendering of a body, which B-3's transparent textarea makes expensive: the popover either cannot be edited, or is a second editor with its own K-7 debounce and its own S-20 emission |
+
+Option A costs nothing at the payload and nothing at the layer below the views: no op, no field, no route, and `Session`
+never learns that two nodes can be on screen. It stored nothing either, until
+[§14.3 The divider — reopened and taken](#143-the-divider--reopened-and-taken) gave the pane a width. What it does cost
+is that `data-testid` attributes on a node page are no longer unique on a note route, which is why the pane carries one
+of its own and the smoke run scopes to it.
+
+**The phone's peek is the same composition, not a second one.** X-1 has held since M1 — one markup, breakpoints only —
+and a sheet is what "beside" becomes when there is no room beside. The 60% cap and the second tap are the two things the
+narrow drawing needs that the wide one does not: the cap so the list stays visible behind it, and the tap because B-3's
+always-mounted textarea would otherwise take a caret into text that is 60% on screen.
+
+### 14.2 Which node the left pane draws
+
+The first cut of option A read "the node it hangs under" literally, and said that a parent which is itself a note
+renders as the list it is — two bodies on screen, honest because one is the page you are in and the other is the note
+you opened out of it. Using it says otherwise. A note's children are in the pane (K-4), so opening a sub-note is a click
+*inside the pane*, and the pane is the one thing on screen that should answer it; instead the left column was replaced
+as well, by the very note whose list the click came from.
+
+| | Option | Cost |
+| --- | --- | --- |
+| A | **The nearest ancestor that is not a note** — chosen | The left pane is no longer "the parent" but a walk, so `listAbove` is a second function beside `parentOf` and a nested note's *siblings* are only in the tree on the left rather than in a list of their own |
+| B | The parent, whatever its kind — the first cut | A second body and a second editor, each with K-7's debounce and a caret, for a note nobody asked to edit; and the left column changes on every step down a chain of notes, which is exactly the movement X-23 was written to stop |
+| C | The parent, with its body suppressed on the left | Keeps the movement and adds a rule: a node page that draws itself differently depending on who is beside it. `NodePage` is one drawing on its own route and on the left of a note's, and that is what makes the second pane free |
+
+What A gives up is small because the tree does not stop at one level: the nested note is drawn, and highlighted, inside
+the tree the left pane already shows — T-10's "one level deep" is the sidebar's rule, not the tree's. What it buys is
+that the left column moves when the *user* navigates it and at no other time.
+
+### 14.3 The divider — reopened and taken
+
+The predecessor of [§14.2 Which node the left pane draws](#142-which-node-the-left-pane-draws) said the pane's own width
+would reopen when somebody actually dragged the divider, and somebody did. X-24 is X-20 a second time and shares its
+component: the same pointer capture for T-14's reason, the same bounds in `view-state.svelte.ts` rather than at the
+grip, the same `localStorage` key shape, and the same "above the breakpoint only" — below `lg` the pane is a sheet and
+its width is the viewport's. The sign is the one difference, because the divider is the pane's *left* edge, and it is a
+prop rather than a second file.
+
+The bounds are absolute pixels rather than a share of the window, for X-20's reason: a stored width that meant something
+different per window would drift from the pointer that set it. A person who drags the pane wide enough to squeeze the
+list can drag it back, and the list column keeps `min-w-0` so it narrows rather than overflowing.
+
+### 14.4 What reopens the rest
+
+A device that is wide *and* touch-only, where the peek's tap-to-expand and the split's always-open pane disagree about
+what a tap on a note means — the breakpoint answers that today by assuming width implies a pointer. The other opening is
+a second kind worth splitting: D stays refused for folders, but a `task` that grew a body would be K-3's question again
+rather than this one.
