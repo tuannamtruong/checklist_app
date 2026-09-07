@@ -7,6 +7,17 @@
     <link rel="icon" type="image/svg+xml" href="./icons/icon.svg" />
     <link rel="apple-touch-icon" href="./icons/icon-192.png" />
     <title>Checklist</title>
+    <script>
+      // X-14. The theme has to be on the root before the first paint, or a dark
+      // one flashes white while the bundle loads — past_decision.md §9. It reads
+      // the key `src/app/theme.svelte.ts` writes and sets the attribute
+      // `src/app.css` keys its palettes on; anything unreadable falls through to
+      // the light default already in the stylesheet.
+      try {
+        var t = localStorage.getItem('checklist.theme');
+        if (t) document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="app"></div>

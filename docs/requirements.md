@@ -2,7 +2,7 @@
 
 Requirement docs and its current state.
 
-**Milestones M1, M2 and M3 are built** — the production tree is `src/`, and every ✅ row below names the file that
+**Milestones M1, M2, M3 and M4 are built** — the production tree is `src/`, and every ✅ row below names the file that
 implements it.
 
 Two commands verify the ✅ rows:
@@ -89,9 +89,9 @@ the rule is [sync-flow.md §4.8 The compaction cut](sync-flow.md#48-the-compacti
 
 Device-local state, held in `localStorage` and never written to a shared file: the device id, collapse/expand state
 (T-8), the sync cadence (S-19), which folder this device reaches the tree through
-([architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter)), dismissed conflict notices (C-6), and
-any filter the Done view grows (T-12). Anything the user would not want to converge across devices belongs here rather
-than in the tree.
+([architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter)), dismissed conflict notices (C-6), the
+chosen theme (X-14), and any filter the Done view grows (T-12). Anything the user would not want to converge across
+devices belongs here rather than in the tree.
 
 The **search index** is not state at all, in the same sense the Done view is not: F-4 scans the materialised tree on
 each keystroke, so there is nothing to store, nothing to invalidate and nothing to sync.
@@ -182,6 +182,7 @@ helper and to the Android WebView unchanged. `src/app/router.svelte.ts` holds th
 | `#/done` | The Done view of T-12: every finished row, then every deleted one | `src/ui/DonePage.svelte` |
 | `#/conflicts` | What the merge decided without asking — [§9 Conflict presentation](#9-conflict-presentation) | `src/ui/ConflictsPage.svelte` |
 | `#/search` and `#/search/<query>` | The search results of [§6 Search](#6-search) | `src/ui/SearchPage.svelte` |
+| `#/settings` | Everything about this device rather than about the tree — its name, its log, its theme. X-12 in [§10 Application shell, PWA, offline](#10-application-shell-pwa-offline) | `src/ui/SettingsPage.svelte` |
 | `#/devices` | The device list of [§8 Device management](#8-device-management) | `src/ui/DevicesPage.svelte` |
 | `#/logs` | This device's own op log, newest first — D-4 in [§8 Device management](#8-device-management) | `src/ui/LogPage.svelte` |
 | anything else | The recovery page, per X-11 | `src/ui/RecoveryPage.svelte` |
@@ -194,7 +195,7 @@ page, which tells deletion from absence because T-7 keeps the two distinguishabl
 — T-11 hides a row from its parent's page, not from its own — so a row opened from `#/done` gets the page it always had.
 
 Two navigations exist besides the routes: the sidebar (T-10, containers only, and T-11 takes finished ones out of it)
-and breadcrumbs (T-9). Both climb the T-6-resolved parent, never the stored one. `#/done`, `#/search` and `#/devices`
+and breadcrumbs (T-9). Both climb the T-6-resolved parent, never the stored one. `#/done`, `#/search` and `#/settings`
 are permanent entries in the sidebar's nav, because a view that appeared only when it had something in it would be a
 view the user could not learn.
 
@@ -202,10 +203,11 @@ view the user could not learn.
 because a permanent one would be empty almost always — [§9 Conflict presentation](#9-conflict-presentation). It is
 reachable by typing the fragment even then, and answers "nothing to report" rather than the recovery page.
 
-`#/logs` is not in the sidebar either, and for the opposite reason: it is always there to be found, but it is reached
-from `#/devices` rather than from the nav, because it says something about *one* device and the device screen is where
-that device is already the subject. A fifth permanent nav entry for a diagnostic would cost every user of the tree a
-line of nav for a page opened when something looks wrong.
+`#/logs` and `#/devices` are not in the sidebar either, and for the opposite reason: both are always there to be found,
+but both are reached from `#/settings`, because what they say is about *this* device and settings is where this device
+is already the subject. A permanent nav entry for a diagnostic would cost every user of the tree a line of nav for a
+page opened when something looks wrong. The nav went from four entries to three when X-12 gathered them: **Search**,
+**Done**, **Settings**, plus **Merged** when there is something in it.
 
 ## 6. Search
 
@@ -291,10 +293,10 @@ presentation.
 
 | ID | Requirement | State | Where |
 | --- | --- | --- | --- |
-| D-1 | A settings screen lists known devices by id, with a name the user can set | ✅ | `src/core/devices.ts` reads the list out of the header lines; `src/ui/DevicesPage.svelte` at `#/devices`. The name is data and syncs; the id is minted locally |
+| D-1 | A settings screen lists known devices by id, with a name the user can set | ✅ | `src/core/devices.ts` reads the list out of the header lines; `src/ui/DevicesPage.svelte` at `#/devices` lists them, and `src/ui/SettingsPage.svelte` at `#/settings` is the one place the name is typed — X-12. The name is data and syncs; the id is minted locally |
 | D-2 | Each device carries an advisory `lastSeen`, so a dormant one is visible as dormant | ✅ | The `at` on the header line, stamped by the writing device on every write. Advisory only — the merge never reads it |
 | D-3 | Nothing in the merge path depends on the device list being complete or current | ✅ | Structural: `src/core/devices.ts` is the only reader of `name` and `at`, and neither `merge.ts` nor `materialise.ts` imports it. A header with neither field is a device that has not been named, not an error |
-| D-4 | The op log this device has written is readable inside the app, newest first, each op naming the row it touched | ✅ | `src/core/log-view.ts` turns ops into rows; `src/ui/LogPage.svelte` at `#/logs`, reached from the "this device" row of `#/devices`. Read-only — nothing on the page writes an op |
+| D-4 | The op log this device has written is readable inside the app, newest first, each op naming the row it touched | ✅ | `src/core/log-view.ts` turns ops into rows; `src/ui/LogPage.svelte` at `#/logs`, reached from the "This device" section of `#/settings`. Read-only — nothing on the page writes an op |
 
 **D-4 shows the file as it stands, not the history.** The rows are this device's own ops in the order it wrote them,
 which after S-14 has run is the ops that survived the cut rather than everything ever written —
@@ -311,6 +313,11 @@ naming stays inside the one-writer-per-file rule (S-3) that the whole design res
 own: there is exactly one writer of any given name, so two devices can never disagree about one. The cost is that
 renaming the phone means opening the app on the phone. That is the honest trade — the alternative is writing into a file
 this device does not own, which is the one thing the design never does.
+
+**One editor, on the settings screen.** `#/devices` lists every device and edits none of them, including this one: a
+name is a thing this device says about itself, so it is typed where the other statements about this device are, and the
+list is the view of what every device has said. The self row there names the setting rather than repeating it, because
+two inputs bound to one value is two places for it to look edited and one place for it to actually be.
 
 The list is what closes row 9 of
 [§15 Deviations and defects found during verification](#15-deviations-and-defects-found-during-verification): a conflict
@@ -378,10 +385,52 @@ to empty, and a dismissal is only for a row the user is content to leave as it l
 | X-8 | Deep links survive a cold launch from a home-screen icon | ✅ | The fragment never reaches the network; a reload on `#/n/<id>` is checked in `scripts/ui-smoke.mjs`. The home-screen launch itself is [test.md §3.6 Platform](test.md#36-platform) |
 | X-10 | UI repaints automatically on any data change, including a merged remote one | ✅ | The store publishes; rows hold a draft so a repaint cannot eat the caret — `src/ui/Row.svelte` |
 | X-11 | Deleted/missing node renders a recovery page rather than a crash | ✅ | `src/ui/RecoveryPage.svelte`; it tells absence from deletion, per T-7 |
+| X-12 | One settings screen holds everything that is about this device rather than about the tree: its name, its log, its appearance | ✅ | `src/ui/SettingsPage.svelte` at `#/settings`, in the nav. It writes exactly one op kind — the D-1 rename — and everything else on it is device-local |
+| X-13 | Six themes: light, dark, green, orange, yellow and teal | ✅ | `src/core/themes.ts` is the catalog and `src/app.css` holds one palette per id; `themes.test.ts` fails if the two drift. Switching swaps the semantic tokens of [§10.1 Themes](#101-themes), so no component names a colour |
+| X-14 | The theme is device-local and takes effect before the first paint | ✅ | `src/app/theme.svelte.ts` — the id in `localStorage` and `data-theme` on the document root, set by a boot line in `index.html` so a dark theme never flashes light. Never in a file, never synced — [§2.3 What is never in the Sync Folder](#23-what-is-never-in-the-sync-folder) |
 
 Packaging decides which of these are reachable, and it answers them per target rather than once — see
 [architecture.md §7 Packaging](architecture.md#7-packaging). X-3 in particular is a PWA install on Chromium and an APK
 on Android, but a desktop shortcut on Firefox, which does not install PWAs.
+
+X-12 is what makes X-13 cheap rather than a fourth nav entry: appearance is a device's own taste, the device's name is a
+device's own statement about itself, and its log is a device's own record — three things that had no home between them
+and now share one.
+
+### 10.1 Themes
+
+**A theme is eleven semantic tokens and nothing else.** `src/app.css` names roles — `surface`, `surface-sunken`,
+`surface-raised`, `line`, `ink`, `ink-muted`, `ink-faint`, `accent`, `accent-soft`, `danger`, `scrim` — and every
+component spells a role rather than a colour. A theme is therefore one block of eleven custom properties under a
+`[data-theme='…']` selector, and adding a seventh theme is that block plus one line in the catalog. No component
+changes, and none ever can: a component that named a colour would be the bug.
+
+| ID | What it is |
+| --- | --- |
+| `light` | The palette the app shipped with, and the default for a device that has never chosen |
+| `dark` | The same roles inverted — a dark surface with light ink, not a filter over the light one |
+| `green`, `teal` | Cool tints: a tinted surface and an accent from the same hue family |
+| `orange`, `yellow` | Warm tints, where `danger` moves off red's neighbourhood so the destructive action is still the one that reads as destructive |
+
+Two constraints on any palette, and they are why the list is not longer:
+
+**`ink` on `surface` must stay readable, and `danger` must not read as `accent`.** A warm accent and a red danger sit
+close enough on the wheel that a careless yellow makes "Delete" look like a link, which is why the two warm themes move
+`danger` rather than only shifting the accent.
+
+**A role that is a *relationship* cannot be derived from another token.** `scrim` — what the phone's drawer lays over
+the page — was `ink` at 20% until the dark theme existed, and under a dark palette that is a white veil that brightens
+what it is meant to dim. It is the eleventh token because "darken whatever is behind this" is a role, and no arithmetic
+on `ink` expresses it in both directions. `color-scheme` is the same argument for the things CSS does not own: a
+scrollbar, a caret and a form control's default read the browser's own setting, so the dark palette declares it.
+
+**A theme never changes a layout, a size or a font.** Switching one repaints and moves nothing, so it cannot become a
+second UI to test — [test.md §3.5 UI](test.md#35-ui) drives one theme for behaviour and checks the rest for contrast
+only.
+
+The choice does not sync, and that is the point rather than a limitation: the phone is read in bed and the laptop in an
+office, and a preference that converged across them would be one the user has to fight on whichever device they are not
+holding. It is `localStorage`, beside the collapse state (T-8) that is device-local for the same reason.
 
 ## 11. Import, export and backup
 
@@ -421,9 +470,14 @@ bug — `npm test` and `npm run ui-smoke` both pass.
 
 ## 16. Explicitly out of scope
 
-Backlogged deliberately, not overlooked: dynamic lists, Google Calendar sync, colour modes and themes, recurring tasks,
-reminders and notifications, attachments, attributes (tags, priority, dates, quick add), sharing or multi-user, and any
-form of application server or hosted database.
+Backlogged deliberately, not overlooked: dynamic lists, Google Calendar sync, recurring tasks, reminders and
+notifications, attachments, attributes (tags, priority, dates, quick add), sharing or multi-user, and any form of
+application server or hosted database.
+
+Themes were on this list until M4 and are now X-13. What took them off it is that the shell had always spelled roles
+rather than colours, so the feature turned out to be a palette per theme and no component change at all —
+[§10.1 Themes](#101-themes). What stays off is anything that syncs a preference: a theme is device-local (X-14), and a
+converging one is a different requirement with a merge rule attached.
 
 ## 17. Milestones
 
@@ -433,6 +487,7 @@ form of application server or hosted database.
 | M1 | Local-first core | **Closed.** The tree, the item kinds, the keyboard model, the shell — [§3 Tree structure and editing](#3-tree-structure-and-editing), [§4 Item kinds](#4-item-kinds) and [§10 Application shell, PWA, offline](#10-application-shell-pwa-offline), on one device. The store is `src/app/Session.svelte.ts`, the payload is already the real op log (S-21), and what it left standing is [§15 Deviations and defects found during verification](#15-deviations-and-defects-found-during-verification) |
 | M2 | Sync | **Closed.** Every device's file read and folded together (`src/core/merge.ts`, `src/app/folder-sync.ts`), the activity-driven cycle (S-19), the conflict nav of [§9 Conflict presentation](#9-conflict-presentation), and the adapter set — `fsaa`, `http`, `android` beside the two M1 shipped, chosen by [architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter)'s flowchart. What it left standing is rows 1 and 4 of [§15 Deviations and defects found during verification](#15-deviations-and-defects-found-during-verification) |
 | M3 | Compaction and polish | **Closed.** Compaction (S-14) once its trigger fires, [§6 Search](#6-search), device management ([§8 Device management](#8-device-management)), the restore path T-13 owes the Done view, and the two bundles [architecture.md §7 Packaging](architecture.md#7-packaging) describes — `make windows` and `make apk`. What it left standing is rows 5 and 10 of [§15 Deviations and defects found during verification](#15-deviations-and-defects-found-during-verification) |
+| M4 | Settings and appearance | **Closed.** One screen for everything about this device rather than about the tree (X-12), and the six themes X-13 puts behind it — [§10.1 Themes](#101-themes). It moved the D-1 name editor and the D-4 log link onto that screen and took a nav entry away rather than adding one. It changed no component's colours, because no component ever named one |
 
 M2 is closed against a folder, not against a provider. The three adapters it added are the three methods every other
 adapter already offers, so what remains untested is the client underneath them, and observing that needs a Windows and

@@ -12,6 +12,7 @@
   import { Dismissals } from '../app/dismissals.svelte';
   import { Router } from '../app/router.svelte';
   import { Session } from '../app/Session.svelte';
+  import { Theme } from '../app/theme.svelte';
   import { SyncCadence } from '../app/sync-cadence';
   import { ViewState } from '../app/view-state.svelte';
   import { RowFocus } from './focus.svelte';
@@ -24,10 +25,14 @@
   import NodePage from './NodePage.svelte';
   import RecoveryPage from './RecoveryPage.svelte';
   import SearchPage from './SearchPage.svelte';
+  import SettingsPage from './SettingsPage.svelte';
   import Shell from './Shell.svelte';
 
   const router = new Router();
   const view = new ViewState();
+  // X-14. Constructed here rather than in the settings screen: the theme is the
+  // whole app's, and the screen that changes it is one of the pages wearing it.
+  const theme = new Theme();
   const focus = new RowFocus();
   const dismissals = new Dismissals();
 
@@ -55,9 +60,10 @@
   const doneOpen = $derived(router.route.name === 'done');
   const conflictsOpen = $derived(router.route.name === 'conflicts');
   const searchOpen = $derived(router.route.name === 'search');
+  const settingsOpen = $derived(router.route.name === 'settings');
+  // D-1's list and D-4's log both hang off the settings screen rather than the
+  // nav, so all three light one entry — requirements.md §5.
   const devicesOpen = $derived(router.route.name === 'devices');
-  // D-4 hangs off the device screen rather than the nav, so it lights the same
-  // entry: the log is where #/devices leads, not a fifth place to be.
   const logsOpen = $derived(router.route.name === 'logs');
   const query = $derived(router.route.name === 'search' ? router.route.query : '');
 
@@ -116,7 +122,7 @@
     {doneOpen}
     {conflictsOpen}
     {searchOpen}
-    devicesOpen={devicesOpen || logsOpen}
+    settingsOpen={settingsOpen || devicesOpen || logsOpen}
     folderLabel={folder.label}
     synced={folder.synced}
     onrefresh={refresh}
@@ -127,6 +133,8 @@
       <RecoveryPage {session} id={null} />
     {:else if searchOpen}
       <SearchPage {session} {query} onquery={setQuery} />
+    {:else if settingsOpen}
+      <SettingsPage {session} {theme} />
     {:else if devicesOpen}
       <DevicesPage {session} />
     {:else if logsOpen}

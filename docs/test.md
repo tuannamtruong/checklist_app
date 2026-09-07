@@ -146,9 +146,16 @@ M3 adds two more views to drive: `#/search` for [requirements.md §6 Search](req
 finds a title, a note body, and a row T-11 has hidden — and `#/devices` for D-1, that a name typed there survives a
 reload, which is the only way to see that it reached the file rather than the page.
 
-`#/logs` is driven from the device screen it hangs off, for D-4: that the link is on the "this device" row, and that the
-newest entry names the edit the run has just made. What the unit test cannot see is the ordering the page exists for —
-the log reads from the end, and every other list in the app reads from the start.
+`#/logs` is driven from the settings screen it hangs off, for D-4: that the link is in the "This device" section, and
+that the newest entry names the edit the run has just made. What the unit test cannot see is the ordering the page
+exists for — the log reads from the end, and every other list in the app reads from the start.
+
+M4 adds `#/settings`, and the two checks there are the two a unit test cannot make. The name typed into it survives a
+reload (D-1), which is the only way to see that it reached the file rather than the page; and picking a theme sets
+`data-theme` on the document root, repaints the tree, and is still set after a reload (X-13, X-14). Contrast is not
+asserted — it is a screenshot per theme, which is what a person can check and a script cannot. What the script does
+assert about the rest of the palette is that no theme changes the layout: the app is measured for horizontal overflow
+under the widest one, and every theme renders the same DOM.
 
 The prototype's `android-bridge.mjs` drives the same page in the same browser with `window.AndroidFolder` replaced by an
 in-page stub, which is how the Android startup path — first-run folder pick, edit, conflict, resolution — is exercised

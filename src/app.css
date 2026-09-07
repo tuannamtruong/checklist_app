@@ -1,8 +1,12 @@
 @import 'tailwindcss';
 
-/* Semantic tokens, so a component never names a colour. Colour modes and themes
-   are out of scope — requirements.md §16 — so there is one palette, and these
-   names are about role rather than about taste. */
+/* Semantic tokens, so a component never names a colour. These names are about
+   role rather than about taste, which is what makes X-13's six themes a block of
+   eleven properties each and no component change at all — requirements.md §10.1.
+
+   This block is the light palette *and* what Tailwind generates the utilities
+   from: `bg-surface` exists because `--color-surface` is declared here. The
+   `[data-theme]` blocks below only ever re-point those same eleven. */
 @theme {
   --color-surface: oklch(99% 0.003 250);
   --color-surface-sunken: oklch(96.5% 0.005 250);
@@ -14,12 +18,116 @@
   --color-accent: oklch(52% 0.14 250);
   --color-accent-soft: oklch(94% 0.03 250);
   --color-danger: oklch(52% 0.16 25);
+  --color-scrim: oklch(28% 0.02 255 / 0.25);
 
   --font-sans:
     ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 
+/* X-13. One block per id in `src/core/themes.ts`, keyed on an attribute rather
+   than on `:root`, so a swatch on the settings screen can carry `data-theme` and
+   preview the palette it names without the page changing under it.
+
+   These sit outside `@layer`, which is what makes them win over the `@theme`
+   defaults above regardless of specificity. `light` is spelled out rather than
+   left to the defaults for exactly that swatch: a preview that inherited the
+   surrounding theme would show every theme as the current one. */
+[data-theme='light'] {
+  --color-surface: oklch(99% 0.003 250);
+  --color-surface-sunken: oklch(96.5% 0.005 250);
+  --color-surface-raised: oklch(100% 0 0);
+  --color-line: oklch(90% 0.006 250);
+  --color-ink: oklch(28% 0.02 255);
+  --color-ink-muted: oklch(55% 0.015 255);
+  --color-ink-faint: oklch(70% 0.012 255);
+  --color-accent: oklch(52% 0.14 250);
+  --color-accent-soft: oklch(94% 0.03 250);
+  --color-danger: oklch(52% 0.16 25);
+  --color-scrim: oklch(28% 0.02 255 / 0.25);
+}
+
+/* The roles inverted, not a filter over the light palette: `surface-raised` has
+   to sit *above* `surface` here, so it is lighter where the light theme made it
+   whiter. `accent-soft` is a dark tint for the same reason — it is a background
+   for accent text, and a pale one would be a white flash in a dim room. */
+[data-theme='dark'] {
+  /* The one theme that has to tell the browser: it is what paints a scrollbar,
+     a caret and a form control's default, none of which read a custom property. */
+  color-scheme: dark;
+  --color-surface: oklch(21% 0.015 260);
+  --color-surface-sunken: oklch(17% 0.014 260);
+  --color-surface-raised: oklch(25% 0.016 260);
+  --color-line: oklch(34% 0.018 260);
+  --color-ink: oklch(94% 0.008 250);
+  --color-ink-muted: oklch(76% 0.014 250);
+  --color-ink-faint: oklch(61% 0.014 250);
+  --color-accent: oklch(74% 0.13 250);
+  --color-accent-soft: oklch(33% 0.06 255);
+  --color-danger: oklch(72% 0.15 25);
+  --color-scrim: oklch(10% 0.012 260 / 0.6);
+}
+
+[data-theme='green'] {
+  --color-surface: oklch(98.5% 0.012 150);
+  --color-surface-sunken: oklch(95% 0.022 150);
+  --color-surface-raised: oklch(100% 0.005 150);
+  --color-line: oklch(88% 0.032 150);
+  --color-ink: oklch(27% 0.03 155);
+  --color-ink-muted: oklch(50% 0.04 155);
+  --color-ink-faint: oklch(66% 0.032 152);
+  --color-accent: oklch(48% 0.13 152);
+  --color-accent-soft: oklch(92% 0.06 150);
+  --color-danger: oklch(52% 0.16 25);
+  --color-scrim: oklch(27% 0.03 155 / 0.25);
+}
+
+[data-theme='teal'] {
+  --color-surface: oklch(98.5% 0.012 195);
+  --color-surface-sunken: oklch(95% 0.022 195);
+  --color-surface-raised: oklch(100% 0.005 195);
+  --color-line: oklch(88% 0.03 195);
+  --color-ink: oklch(26% 0.03 210);
+  --color-ink-muted: oklch(49% 0.04 205);
+  --color-ink-faint: oklch(65% 0.032 200);
+  --color-accent: oklch(50% 0.11 205);
+  --color-accent-soft: oklch(92% 0.05 195);
+  --color-danger: oklch(52% 0.16 25);
+  --color-scrim: oklch(26% 0.03 210 / 0.25);
+}
+
+/* The two warm themes move `danger` off red's neighbourhood as well as shifting
+   the accent. A warm accent beside a red danger reads as one family, and the one
+   button in the app that destroys something must not read as a link — §10.1. */
+[data-theme='orange'] {
+  --color-surface: oklch(98.5% 0.014 70);
+  --color-surface-sunken: oklch(95.5% 0.03 70);
+  --color-surface-raised: oklch(100% 0.006 70);
+  --color-line: oklch(88.5% 0.04 70);
+  --color-ink: oklch(28% 0.03 55);
+  --color-ink-muted: oklch(50% 0.042 55);
+  --color-ink-faint: oklch(66% 0.038 60);
+  --color-accent: oklch(55% 0.15 52);
+  --color-accent-soft: oklch(93% 0.06 68);
+  --color-danger: oklch(48% 0.19 15);
+  --color-scrim: oklch(28% 0.03 55 / 0.25);
+}
+
+[data-theme='yellow'] {
+  --color-surface: oklch(98.5% 0.02 95);
+  --color-surface-sunken: oklch(95.5% 0.04 95);
+  --color-surface-raised: oklch(100% 0.008 95);
+  --color-line: oklch(89% 0.05 95);
+  --color-ink: oklch(28% 0.03 85);
+  --color-ink-muted: oklch(50% 0.04 85);
+  --color-ink-faint: oklch(66% 0.04 90);
+  --color-accent: oklch(50% 0.12 80);
+  --color-accent-soft: oklch(92% 0.09 95);
+  --color-danger: oklch(48% 0.19 15);
+  --color-scrim: oklch(28% 0.03 85 / 0.25);
+}
+
 html {
+  color-scheme: light;
   background-color: var(--color-surface);
   color: var(--color-ink);
   font-family: var(--font-sans);

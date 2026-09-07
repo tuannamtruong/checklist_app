@@ -156,7 +156,7 @@ device. The label travels inside the file.
 | Sync Folder | provider's storage | the shared state; every device holds a full replica |
 | Local Folder | device disk | the replica this device reads and writes |
 | IndexedDB | browser | the folder handle, so startup does not re-prompt |
-| `localStorage` | browser | device id and label, which folder this device chose, collapse state, dismissed conflict rows |
+| `localStorage` | browser | device id and label, which folder this device chose, collapse state, dismissed conflict rows, the chosen theme |
 
 No a local database sits between the UI and the Local Folder. The device id is per-origin, which
 [§7.1 The two Windows bundles](#71-the-two-windows-bundles) turns into a live concern.

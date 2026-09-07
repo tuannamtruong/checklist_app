@@ -5,8 +5,9 @@
 A checklist and notes app for one person across several devices. Local-first, no application server: devices synchronise
 through a folder that a cloud provider's own client keeps in sync.
 
-**Status: milestones M1, M2 and M3 are built** — the local-first core, sync through the folder, and then compaction,
-search, device names, undelete and the two platform bundles. The production tree is `src/`, driven by `package.json`.
+**Status: milestones M1, M2, M3 and M4 are built** — the local-first core, sync through the folder, then compaction,
+search, device names, undelete and the two platform bundles, and lastly the settings screen and its six themes. The
+production tree is `src/`, driven by `package.json`.
 
 ## Development
 
@@ -111,8 +112,8 @@ lower this device's top counter, or every peer reads the file as a partial downl
 §4.8.
 
 Never in a file, always `localStorage`: the device id, collapse state, the drawer's state, which folder this device
-chose, and dismissed conflict rows. The File System Access handle is the exception, and only because it is an object:
-IndexedDB.
+chose, the chosen theme, and dismissed conflict rows. The File System Access handle is the exception, and only because
+it is an object: IndexedDB.
 
 ### Component catalog
 
@@ -158,10 +159,22 @@ and a deleted one restored — T-13, one `restore` op, and the subtree comes bac
 descendants individually.
 
 `src/core/search.ts` at `#/search/<query>` is the other way back to both, and the only one that finds them by name: it
-scans the materialised tree per query and stores no index at all (F-4). `#/devices` lists every device the folder knows
-about and is where this device gets a name, and the "this device" row there is the only way to `#/logs` — D-4, this
-device's own ops read back newest first by `src/core/log-view.ts`, with the header line's vector above them. Nothing on
-that page writes.
+scans the materialised tree per query and stores no index at all (F-4).
+
+### Settings
+
+`#/settings` (`src/ui/SettingsPage.svelte`) is everything about *this device* rather than about the tree — X-12 — and it
+is the third and last nav entry, beside Search and Done. Three things sit on it, and only the first writes an op:
+
+- **The device name** (D-1). The one editor for it; `#/devices` lists what every device calls itself and edits none of
+  them, including this one.
+- **The log** (D-4). `#/logs` reads this device's own ops back newest first through `src/core/log-view.ts`, with the
+  header line's vector above them. Nothing on that page writes.
+- **The theme** (X-13). `src/core/themes.ts` is the catalog of six ids, `src/app.css` holds one eleven-token palette per
+  id under `[data-theme='…']`, and `src/app/theme.svelte.ts` applies it. `themes.test.ts` fails if catalog and
+  stylesheet drift. **No component ever names a colour** — that is what makes a seventh theme a CSS block and nothing
+  else. The id is applied by a boot line in `index.html` so a dark theme never flashes light, and it never syncs
+  (X-14).
 
 ### What the merge decided without asking
 
