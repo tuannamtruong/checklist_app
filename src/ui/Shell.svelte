@@ -72,7 +72,17 @@
     data-open={view.drawerOpen}
   >
     <div class="flex items-center justify-between border-b border-line px-3 py-3">
-      <a href="#/" class="sidebar-text font-semibold" onclick={() => view.setDrawer(false)}>Checklist</a>
+      <!-- X-28. Named for the page it opens rather than for the application:
+           this is the way back to the top of the tree, and that page has been
+           headed "All lists" since it existed — requirements.md §10. -->
+      <a
+        href="#/"
+        class="sidebar-text font-semibold"
+        data-testid="all-lists-link"
+        onclick={() => view.setDrawer(false)}
+      >
+        All lists
+      </a>
       <button
         type="button"
         class="sidebar-text row-control rounded px-2 text-ink-muted hover:text-ink md:hidden"

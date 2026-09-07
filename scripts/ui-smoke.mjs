@@ -106,6 +106,15 @@ async function main() {
       sidebar.join(','),
     );
 
+    const corner = page.locator('[data-testid="all-lists-link"]');
+    check(
+      'the sidebar’s corner is named for the page it opens, not for the app — X-28',
+      (await corner.innerText()).trim() === 'All lists' &&
+        (await corner.getAttribute('href')) === '#/' &&
+        !/checklist/i.test(await page.locator('[data-testid="sidebar"]').innerText()),
+      (await corner.innerText()).trim(),
+    );
+
     // --- X-20: the sidebar's width is dragged, and it stays dragged ---------
     // The grip is a pointer gesture over a two-pixel strip, so a browser is the
     // only place the capture and the clamp can both be exercised.
