@@ -115,6 +115,37 @@ async function main() {
       (await corner.innerText()).trim(),
     );
 
+    // --- X-29: the sidebar scrolls apart from the page ----------------------
+    // A short window is what makes the seeded tree taller than the viewport, so
+    // the check needs no rows of its own: the question is only whether scrolling
+    // the page moves the sidebar with it.
+    await page.setViewportSize({ width: 1280, height: 420 });
+    const sidebarTop = async () => Math.round((await page.locator('[data-testid="sidebar"]').boundingBox()).y);
+    const pageColumn = page.locator('[data-testid="page-scroll"]');
+    check(
+      'the shell clips rather than letting the document scroll — X-29',
+      await page.evaluate(() => document.scrollingElement.scrollHeight <= window.innerHeight + 1),
+      `${await page.evaluate(() => document.scrollingElement.scrollHeight)} vs ${await page.evaluate(() => window.innerHeight)}`,
+    );
+    const topBefore = await sidebarTop();
+    const scrolled = await pageColumn.evaluate((column) => {
+      column.scrollTop = 400;
+      return column.scrollTop;
+    });
+    check(
+      'the list scrolls in its own column, and the sidebar stays where it is — X-29',
+      scrolled > 0 && (await sidebarTop()) === topBefore,
+      `scrollTop ${scrolled}, sidebar y ${topBefore} -> ${await sidebarTop()}`,
+    );
+    check(
+      'and the sidebar is the window\u2019s height rather than the page\u2019s — X-29',
+      Math.round((await page.locator('[data-testid="sidebar"]').boundingBox()).height) ===
+        (await page.evaluate(() => window.innerHeight)),
+      String(Math.round((await page.locator('[data-testid="sidebar"]').boundingBox()).height)),
+    );
+    await pageColumn.evaluate((column) => (column.scrollTop = 0));
+    await page.setViewportSize({ width: 1280, height: 900 });
+
     // --- X-20: the sidebar's width is dragged, and it stays dragged ---------
     // The grip is a pointer gesture over a two-pixel strip, so a browser is the
     // only place the capture and the clamp can both be exercised.

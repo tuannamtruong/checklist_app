@@ -232,6 +232,14 @@ transparent textarea is waiting — expands it without putting a caret in the fi
 the height is a CSS rule over rendered content and the tap target is a layer that exists only while the sheet is peeked,
 so a real browser at 390px is the only thing that can see either.
 
+X-29 is checked at a deliberately short window, because that is the cheapest way to make the seeded tree taller than the
+viewport and the claim is only about what scrolling one column does to the other. Three numbers say it: the document
+itself does not scroll at all, the sidebar's box has the same `y` after the page column is scrolled as before, and the
+sidebar is exactly the window's height rather than the page's. The last one is what would fail if the shell ever went
+back to a `min-height`, which is the shape of the bug — the nav's `overflow-y-auto` was there the whole time and could
+not fire inside a column with no ceiling. There is no unit half: a height that comes from a flex parent is layout, and
+layout is the browser's answer.
+
 The prototype's `android-bridge.mjs` drives the same page in the same browser with `window.AndroidFolder` replaced by an
 in-page stub, which is how the Android startup path — first-run folder pick, edit, conflict, resolution — is exercised
 without a JVM. It is a UI test wearing the phone's clothes, not a platform test; the platform layer starts where the

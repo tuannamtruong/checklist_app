@@ -683,6 +683,7 @@ to empty, and a dismissal is only for a row the user is content to leave as it l
 | X-26 | The add group is pinned to the top of the list's column, so it stays on screen however far the list is scrolled | ✅ | `src/ui/NodePage.svelte` — `sticky top-0` over the page's own surface, which is the same argument K-8 made for leaving the end of the list and made once more against the top of a page that scrolls away. It costs no measurement and no scroll listener |
 | X-27 | On a phone the add group **is** the top bar: the bar that carried the application's name carries the line and its two buttons instead, and the name is gone | ✅ | `src/ui/Shell.svelte` takes the group as a snippet from `src/ui/App.svelte`, which fills it only on the routes that draw a list; `src/ui/NodePage.svelte`'s own header is `md` and up, so the group is drawn once at either width. The bar is `sticky` for X-26's reason — `scripts/ui-smoke.mjs` drives both widths |
 | X-28 | The link in the sidebar's top corner is named for the page it opens — `All lists` — rather than for the application | ✅ | `src/ui/Shell.svelte`, and the word is the only thing that changed: the same `#/`, the same drawer close, the same `sidebar-text`. It is what `src/ui/NodePage.svelte` already writes at the head of that page — `scripts/ui-smoke.mjs` |
+| X-29 | The sidebar scrolls in its own column: a page long enough to scroll moves the list and leaves the sidebar whole, and the sidebar scrolls itself when its own entries outgrow the window | ✅ | `src/ui/Shell.svelte` — the shell is one `h-dvh` row holding two scrollers rather than one document that scrolls entire. The nav has been `overflow-y-auto` since X-2 and never got the chance to use it; what it lacked was a column the height of the window rather than of the page — `scripts/ui-smoke.mjs` |
 
 **A phone's top bar holds the add group rather than the application's name — X-27.** The bar existed to carry a `☰` and
 said `Checklist` beside it, which is a thing to read once on an application with one tree in it: every screen it
@@ -690,6 +691,15 @@ appeared on was already this application, and the name is on the icon that opene
 layout — X-26 pins it, so whatever is in it is on screen for the whole session — and the control the app is mostly used
 for is what earns it. Above `md` the page header carries the group as it always did and the bar is not drawn at all, so
 the group exists once at either width rather than twice with one hidden.
+
+**The sidebar scrolls apart from the page — X-29.** The shell was one column of markup as tall as whatever was in it, so
+a list long enough to scroll made the *document* scroll, and the sidebar — a flex child of that document — was as tall
+as the list and went up with it. The nav inside it already asked for `overflow-y-auto` and never reached it: an element
+given the page's height never overflows. The fix is the height, not the overflow: the shell is `h-dvh` and clips, the
+sidebar and the page area each scroll inside it, and the two are now independent in both directions — a scrolled list
+leaves the nav in place, and a nav with more entries than the window has room for scrolls without moving the list. It is
+also what X-26's pinned add group and the note pane's `sticky` edge were always drawn against: both now stick to the
+column they live in rather than to a window the page slides under.
 
 **The corner says where the link goes — X-28.** It said `Checklist`, which was the application naming itself in the one
 place a person looks to find their way back to the top of the tree, and the page it opens has been headed `All lists`

@@ -47,7 +47,12 @@
   const pending = $derived(session.conflicts.filter((row) => !dismissals.has(row.id)).length);
 </script>
 
-<div class="flex min-h-dvh bg-surface text-ink">
+<!-- X-29. The shell is the window's height and clips, rather than being the
+     page's height and letting the document scroll: the sidebar is a flex child
+     of this row, so a row as tall as a long list made a sidebar as tall as a
+     long list, and the whole thing scrolled together. Each column below scrolls
+     on its own instead — requirements.md §10. -->
+<div class="flex h-dvh overflow-hidden bg-surface text-ink">
   <!-- The drawer's backdrop only exists while the drawer does. -->
   {#if view.drawerOpen}
     <button
@@ -93,7 +98,7 @@
       </button>
     </div>
 
-    <nav class="flex-1 overflow-y-auto p-2" aria-label="Lists">
+    <nav class="min-h-0 flex-1 overflow-y-auto p-2" aria-label="Lists">
       <SidebarLinks {session} {currentId} onNavigate={() => view.setDrawer(false)} />
 
       <!-- T-12 and F-5. Both are here even when empty: a view that appeared
@@ -206,7 +211,11 @@
     />
   </aside>
 
-  <div class="flex min-w-0 flex-1 flex-col">
+  <!-- X-29. The page area is the other scroller. Everything `sticky` inside it —
+       X-26's add group, the phone's top bar, the note pane's edge — sticks to
+       this column now rather than to a window the page slid under, which is the
+       same behaviour by the same rules, one box in. -->
+  <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto" data-testid="page-scroll">
     <!-- X-27. The `☰` and, beside it, whatever the route gives this bar — which
          on a list is K-10's add group. It used to say the application's name,
          which is a thing to read once on an application with one tree in it,
