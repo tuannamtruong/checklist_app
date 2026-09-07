@@ -230,6 +230,21 @@ transparent textarea is waiting — expands it without putting a caret in the fi
 the height is a CSS rule over rendered content and the tap target is a layer that exists only while the sheet is peeked,
 so a real browser at 390px is the only thing that can see either.
 
+X-30 is two halves and the unit half carries most of it. `panes.test.ts` is a table over the one derivation — which note
+the pane draws and which list is beside it, given a route and the note the caret is in — and `focus.svelte.test.ts` is
+the rule that feeds it: a note's title raises the pane, a folder's and a task's leave it exactly where it was, and only
+the ✕ and a navigation clear it. Between them they hold the cases a browser would be slow to reach, including the two
+that close a pane without touching the caret at all: a peer deleting the note under it (T-7) and the row menu turning it
+into a folder (K-5).
+
+The browser half is the claim the unit tests cannot make, and it is one measurement: the caret goes into a nested note's
+title, the pane opens, and the left column's title and `x` are both what they were before — the route's list, not the
+note's parent, and not moved sideways. The run then checks what the composition owns and the unit layer cannot see: the
+✕ on a caret-raised pane clears it without changing the hash, a caret moved to a folder and then to a task leaves both
+columns alone, a navigation closes it rather than carrying it to the next page, and at 390px the same caret raises no
+sheet at all. The contrast is checked beside it, because it is the requirement's own argument: the icon on that same row
+*does* move the left column, to the list above the note.
+
 X-29 is checked at a deliberately short window, because that is the cheapest way to make the seeded tree taller than the
 viewport and the claim is only about what scrolling one column does to the other. Three numbers say it: the document
 itself does not scroll at all, the sidebar's box has the same `y` after the page column is scrolled as before, and the

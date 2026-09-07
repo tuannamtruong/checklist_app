@@ -643,6 +643,116 @@ async function main() {
       String(await paneWidth()),
     );
 
+    // --- X-30: the caret raises the pane, and the list does not move --------
+    // A note two levels down, because that is the only place the requirement
+    // can be seen: `listAbove` it is Kitchen and the page on screen is House,
+    // so a caret that navigated would move the left column and a caret that
+    // does not, does not. The icon on the same row still moves it, and the last
+    // check here is that contrast.
+    await page.goto(`${BASE_URL}#/n/n_seed0005`);
+    await page.waitForSelector('[data-testid="tree"]');
+    await page.locator('[data-testid="add-note"]:visible').click();
+    await page.waitForSelector('[data-testid="note-pane"]');
+    check(
+      'a note made from the line opens beside it, because the caret is in it — X-30',
+      (await pane.getAttribute('data-from-caret')) === 'true' &&
+        (await page.evaluate(() => location.hash)) === '#/n/n_seed0005',
+      await page.evaluate(() => location.hash),
+    );
+    await page.keyboard.type('Boiler manual');
+    await page.keyboard.press('Tab');
+    // The line commits the title on the way past; the caret leaving the field
+    // is not the caret leaving the note, so the pane is still here — §10.3.
+    await page.locator('[data-testid="page-header"] [data-testid="quick-add"]').click();
+    await page.waitForTimeout(150);
+    const caretPane = await page.evaluate(() => ({
+      hash: location.hash,
+      panes: document.querySelectorAll('[data-testid="note-pane"]').length,
+      note: document.querySelector('[data-testid="note-pane"] [data-testid="page-title"]')?.value,
+      list: document.querySelector('[data-testid="page-header"] ~ div [data-testid="page-title"]')
+        ?.value,
+    }));
+    check(
+      'the caret in a note opens it beside the list, and the list is the one on screen — X-30',
+      caretPane.hash === '#/n/n_seed0005' &&
+        caretPane.panes === 1 &&
+        caretPane.note === 'Boiler manual' &&
+        caretPane.list === 'House',
+      `${caretPane.list} | ${caretPane.note} | ${caretPane.hash}`,
+    );
+    check(
+      'and the pane says whose it is, so its ✕ has something to clear — X-30',
+      (await pane.getAttribute('data-from-caret')) === 'true' &&
+        (await pane.locator('[data-testid="note-close"]').evaluate((el) => el.tagName)) === 'BUTTON',
+    );
+    await page.screenshot({ path: join(shots, 'note-caret.png'), fullPage: true });
+
+    await pane.locator('[data-testid="note-close"]').click();
+    await page.waitForTimeout(150);
+    check(
+      'the ✕ on a caret-raised pane closes it and navigates nowhere — X-30',
+      (await page.locator('[data-testid="note-pane"]').count()) === 0 &&
+        (await page.evaluate(() => location.hash)) === '#/n/n_seed0005',
+      await page.evaluate(() => location.hash),
+    );
+
+    await (await rowByTitle(page, 'Boiler manual')).locator('[data-testid="title"]').click();
+    await page.waitForSelector('[data-testid="note-pane"]');
+    // The caret raises a note and nothing else lowers it: a folder's title and
+    // a task's both leave the pane exactly where it was — X-30.
+    await (await rowByTitle(page, 'Kitchen')).locator('[data-testid="title"]').click();
+    await page.waitForTimeout(150);
+    const afterFolder = await page.evaluate(() => ({
+      note: document.querySelector('[data-testid="note-pane"] [data-testid="page-title"]')?.value,
+      list: document.querySelector('[data-testid="page-header"] ~ div [data-testid="page-title"]')
+        ?.value,
+    }));
+    await (await rowByTitle(page, 'Descale the kettle')).locator('[data-testid="title"]').click();
+    await page.waitForTimeout(150);
+    const afterTask = await page.evaluate(
+      () => document.querySelector('[data-testid="note-pane"] [data-testid="page-title"]')?.value,
+    );
+    check(
+      'a caret in a folder or a task leaves the pane as it is — X-30',
+      afterFolder.note === 'Boiler manual' &&
+        afterFolder.list === 'House' &&
+        afterTask === 'Boiler manual',
+      `${afterFolder.list} | ${afterFolder.note} then ${afterTask}`,
+    );
+
+    // Navigating is the reader choosing what is on screen, so the route decides
+    // both panes again and the caret's note does not follow them — X-30.
+    await page.goto(`${BASE_URL}#/n/n_seed0001`);
+    await page.waitForSelector('[data-testid="tree"]');
+    check(
+      'and a navigation closes it, rather than carrying it to the next page — X-30',
+      (await page.locator('[data-testid="note-pane"]').count()) === 0,
+    );
+    await page.goto(`${BASE_URL}#/n/n_seed0005`);
+    await page.waitForSelector('[data-testid="tree"]');
+
+    // The contrast the requirement is written against: the icon is a link and
+    // behaves like one, so it *does* move the left column — to Kitchen.
+    await (await rowByTitle(page, 'Boiler manual')).locator('[data-testid="open"]').click();
+    await page.waitForSelector('[data-testid="note-pane"]');
+    await page.waitForTimeout(150);
+    const iconOpened = await page.evaluate(() => ({
+      hash: location.hash,
+      list: document.querySelector('[data-testid="page-header"] ~ div [data-testid="page-title"]')
+        ?.value,
+      caret: document.querySelector('[data-testid="note-pane"]')?.dataset.fromCaret,
+    }));
+    check(
+      'the icon on the same row navigates, and the list becomes the note’s own — X-21',
+      iconOpened.hash !== '#/n/n_seed0005' &&
+        iconOpened.list === 'Kitchen' &&
+        iconOpened.caret === 'false',
+      `${iconOpened.list} | ${iconOpened.hash}`,
+    );
+
+    await page.goto(`${BASE_URL}#/n/n_seed0012`);
+    await page.waitForSelector('[data-testid="note-pane"]');
+
     await (await rowByTitle(page, 'Trip notes')).locator('[data-testid="open"]').click();
     await page.waitForSelector('[data-testid="note-body"]');
     check(
@@ -1237,6 +1347,18 @@ async function main() {
     await page.screenshot({ path: join(shots, 'phone-note-peek.png') });
     await page.locator('[data-testid="note-close"]').click();
     await page.waitForTimeout(200);
+
+    // X-30 stops at the breakpoint: a sheet raised by putting the caret in a
+    // title would cover the row being typed into, with the keyboard under it.
+    await (await rowByTitle(page, 'Trip notes')).locator('[data-testid="title"]').click();
+    await page.waitForTimeout(200);
+    check(
+      'the caret raises no sheet on a phone — X-30, X-22',
+      (await page.locator('[data-testid="note-pane"]').count()) === 0 ||
+        !(await page.locator('[data-testid="note-pane"]').isVisible()),
+    );
+    await page.locator('[data-testid="topbar"] [data-testid="quick-add"]').click();
+    await page.keyboard.press('Escape');
 
     for (const width of [390, 768, 1280]) {
       await page.setViewportSize({ width, height: 900 });

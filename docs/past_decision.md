@@ -18,6 +18,7 @@ History of project's decision. The situation, its options and resolution.
 | [Formatting in a note body](#12-formatting-in-a-note-body) | A Markdown subset stored in the body string | -  a rich editor over `contenteditable`, storing HTML<br>-  a JSON document model in a new field<br>-  a `heading` kind of row<br>-  no formatting at all |
 | [One archive rather than two lists](#13-one-archive-rather-than-two-lists) | One list of everything the tree no longer shows, ordered by when it left | -  keeping the finished and deleted lists apart<br>-  one list with a badge saying which kind of gone<br>-  a separate `archived_at` field on the op |
 | [A note beside the list](#14-a-note-beside-the-list-rather-than-instead-of-it) | One route drawing two panes, the list derived from the note | -  a second route carrying both ids<br>-  the pane as device-local state beside the route<br>-  splitting every kind, not just notes<br>-  a preview popover over the row |
+| [The caret opens the note pane](#144-the-caret-opens-the-pane-too) | The caret raises the pane and the route does not move | -  the caret navigating like the icon<br>-  a route carrying both ids<br>-  remembering the list beside the route<br>-  the icon as the only way in |
 | [Retiring the cloud-app launcher](#16-retiring-the-cloud-app-launcher) | Remove X-17 outright — no catalog, no stored provider, no launch capability | -  keeping the button and dropping only the picker<br>-  a free-text command instead of a catalog<br>-  detecting the provider from the folder's path |
 
 ---
@@ -452,7 +453,54 @@ The bounds are absolute pixels rather than a share of the window, for X-20's rea
 different per window would drift from the pointer that set it. A person who drags the pane wide enough to squeeze the
 list can drag it back, and the list column keeps `min-w-0` so it narrows rather than overflowing.
 
-### 14.4 What reopens the rest
+### 14.4 The caret opens the pane too
+
+X-30 gives the pane a second way in, and it is not a link. The icon on a row navigates — that is what an icon that is an
+`<a>` should do — and navigating means the left column becomes `listAbove` the note, which is the list the reader was on
+only when the note is a child of it. A note two levels down is opened from a list and lands beside a *different* one.
+That is right for a click on a link and wrong for a caret: putting the caret in a title is something done inside the
+list already on screen, and moving that list out from under it is the movement X-23 exists to stop, now fired by typing.
+
+| | Option | Cost |
+| --- | --- | --- |
+| A | **The caret raises the pane; the route does not move** — chosen | A pane that is device-local for as long as the caret holds it: a reload draws the route's pane and not the caret's, Back does not close it, and the ✕ needs a second meaning. A second way in that is not a link |
+| B | The caret navigates, like the icon | One rule rather than two, and the left column jumps to the note's own parent every time the caret passes a nested note. Every keystroke of arrow-key navigation is then a history entry as well — F-5's argument against pushing per keystroke, applied to a list |
+| C | A route carrying both — `#/n/<list>/n/<note>` | [§14.1 The options](#141-the-options)'s option B under a new name, refused for the reason it was refused then: a route that carries redundant state is a route that can carry wrong state |
+| D | Remember the list beside the route | The stored pair A was chosen to avoid. It also has to be invalidated — a remembered list that a peer deleted is a left column pointing at nothing (T-7) |
+| E | Leave the icon as the only way in | The row's own title is where the caret already is for every other edit, and a note is the one kind whose content does not fit in it. The reader types the title and then has to go and find the icon to see what is under it |
+
+**A is [§14.1 The options](#141-the-options)'s option C at the size of a caret, and it costs what C costs.** A deep link
+does not describe a caret-raised pane, and the Back button does not close one. C was refused because those are the wrong
+prices for the *only* way to open a note; they are the right prices for a second way whose trigger is itself
+device-local and does not survive a reload. Nothing is stored either way — the pane is derived from the route and the
+focused row, and `RowFocus` was already there.
+
+**The caret leaving the title is not the caret leaving the note.** The note is set when a title takes the caret and is
+never cleared when it loses it, which reads like a bug and is what this needs: clicking into the note's body blurs the
+row's title, and a pane that closed on blur would close under the click that was about to edit it.
+
+**What a caret in a `folder` or a `task` does was the second cut, and it was wrong first.** The first reading derived
+the pane from the row holding the caret, so a caret in anything that was not a note closed it. It is the simpler rule
+and it is the wrong one: the pane flicked open and shut on every note an arrow-key walk passed, and clicking a folder to
+collapse it took away a note nobody had asked to close.
+
+| | Option | Cost |
+| --- | --- | --- |
+| A | **Only a note changes the pane** — chosen | The caret's note is remembered rather than derived from `RowFocus.id`, so there is one more field and one more thing the ✕ has to clear. A pane can outlive the caret being in it, which is why a navigation has to end it explicitly |
+| B | Any row changes it, and a non-note closes it — the first cut | Every walk through a list is a pane opening and shutting, and the reader loses an open note to a click meant for a disclosure triangle |
+| C | Any row changes it, and a non-note leaves the *last* note | A is this, written down: "leaves the last note" is a remembered note however it is phrased |
+
+So `RowFocus` carries two things: the row holding the caret, which the keyboard model already needed, and the note that
+caret is in, which only a note's title writes. The pane ends at the ✕ — the only place the two ways in differ, because a
+caret-raised pane is on no route to leave — or at a navigation, which is the reader choosing what is on screen and hands
+the question back to the route. Without that second one the note followed the reader onto the next page, where nothing
+on screen explained why it was there.
+
+**Below `lg` the caret does not raise it.** There the pane is X-22's sheet over the list, and a sheet raised by putting
+a caret in a title would cover the row being typed into with the keyboard under it. The icon still opens the sheet,
+because a tap on a link is somewhere the reader asked to go.
+
+### 14.5 What reopens the rest
 
 A device that is wide *and* touch-only, where the peek's tap-to-expand and the split's always-open pane disagree about
 what a tap on a note means — the breakpoint answers that today by assuming width implies a pointer. The other opening is

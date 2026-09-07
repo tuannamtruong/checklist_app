@@ -9,9 +9,14 @@
   // than one of its own rows needs.
   //
   // Nothing here is a route and nothing here is stored. The pane exists because
-  // the route names a note, and the one piece of state it owns — whether the
-  // sheet is peeked or open — is a gesture rather than a setting, so it resets
-  // whenever the pane's note changes and never reaches `localStorage`.
+  // the route names a note or because the caret is in one (X-30), and the one
+  // piece of state it owns — whether the sheet is peeked or open — is a gesture
+  // rather than a setting, so it resets whenever the pane's note changes and
+  // never reaches `localStorage`.
+  //
+  // A caret-raised pane is the column and never the sheet: below `lg` it would
+  // cover the row being typed into with the phone's keyboard under it, so the
+  // caret raises nothing there and the icon still opens the sheet — §10.3.
   import { listAbove } from '../core/tree';
   import { ROOT, type NodeId } from '../core/types';
   import type { Session } from '../app/Session.svelte';
@@ -31,7 +36,18 @@
     view,
     focus,
     id,
-  }: { session: Session; view: ViewState; focus: RowFocus; id: NodeId } = $props();
+    fromCaret = false,
+    onclose,
+  }: {
+    session: Session;
+    view: ViewState;
+    focus: RowFocus;
+    id: NodeId;
+    /** X-30. Whether the caret raised this pane rather than the route. */
+    fromCaret?: boolean;
+    /** What ✕ does when there is no route to leave — §10.3. */
+    onclose?: () => void;
+  } = $props();
 
   const node = $derived(session.tree.nodes[id]);
 
@@ -61,7 +77,7 @@
      long one is cut at 60%, with nothing measured and nothing to re-measure when
      a peer's edit changes the body under it (X-10). -->
 <aside
-  class="fixed inset-x-0 bottom-0 z-20 flex flex-col rounded-t-2xl border-t border-line bg-surface-raised shadow-lg
+  class="fixed inset-x-0 bottom-0 z-20 {fromCaret ? 'hidden lg:flex' : 'flex'} flex-col rounded-t-2xl border-t border-line bg-surface-raised shadow-lg
          lg:sticky lg:inset-auto lg:top-0 lg:z-auto lg:h-dvh lg:w-[var(--note-width)] lg:shrink-0
          lg:rounded-none lg:border-t-0 lg:border-l lg:shadow-none
          {expanded ? 'top-0 max-h-none' : 'max-h-[60dvh]'} lg:top-0 lg:max-h-none"
@@ -69,6 +85,7 @@
   aria-label="Note"
   data-testid="note-pane"
   data-expanded={expanded}
+  data-from-caret={fromCaret}
 >
   <!-- X-24. The divider is this pane's left edge, so the drag runs the other
        way: right is narrower. Above `lg` only — the sheet's width is the
@@ -94,14 +111,28 @@
     <div class="min-w-0 flex-1"><Breadcrumbs {session} {id} /></div>
     <!-- Above the peek's tap layer: everything on a peeked sheet means "open
          this" except the one control that means the opposite — §10.3. -->
-    <a
-      href={closeHref}
-      class="row-control relative z-20 shrink-0 rounded px-2 py-1 text-ink-faint hover:text-ink"
-      aria-label="Close the note"
-      data-testid="note-close"
-    >
-      ✕
-    </a>
+    {#if fromCaret}
+      <!-- X-30. Nothing to navigate away from: the pane is the caret's, so
+           closing it is putting the caret down. -->
+      <button
+        type="button"
+        class="row-control relative z-20 shrink-0 rounded px-2 py-1 text-ink-faint hover:text-ink"
+        aria-label="Close the note"
+        data-testid="note-close"
+        onclick={() => onclose?.()}
+      >
+        ✕
+      </button>
+    {:else}
+      <a
+        href={closeHref}
+        class="row-control relative z-20 shrink-0 rounded px-2 py-1 text-ink-faint hover:text-ink"
+        aria-label="Close the note"
+        data-testid="note-close"
+      >
+        ✕
+      </a>
+    {/if}
   </div>
 
   <div

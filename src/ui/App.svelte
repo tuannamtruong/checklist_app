@@ -6,7 +6,7 @@
   // all — architecture.md §4 — so the shell can be a setup screen rather than a
   // tree; and the sync cycle runs from here, driven by activity and focus
   // rather than by a timer (S-19).
-  import { isVisible, listAbove } from '../core/tree';
+  import { isVisible } from '../core/tree';
   import { ROOT } from '../core/types';
   import { deviceId, suggestedDeviceName } from '../app/device';
   import { chooseFolder, type FolderChoice } from '../app/folder-choice';
@@ -18,6 +18,7 @@
   import { SyncCadence } from '../app/sync-cadence';
   import { ViewState } from '../app/view-state.svelte';
   import { RowFocus } from './focus.svelte';
+  import { panesFor } from './panes';
   import { searchHref } from '../app/router.svelte';
   import ConflictsPage from './ConflictsPage.svelte';
   import DevicesPage from './DevicesPage.svelte';
@@ -78,37 +79,30 @@
   const query = $derived(router.route.name === 'search' ? router.route.query : '');
 
   /**
-   * X-21. A note's route draws two things: the note, and the page of the list it
-   * hangs under. Both are derived from the one route rather than remembered
-   * beside it, which is why there is no second route and no stored pair — a link
-   * pasted into another device opens the same two panes (X-8), and Back closes
-   * the note by leaving the route exactly as it always did. requirements.md §10.3.
+   * X-21 and X-30. What the two columns draw, from the route and from the row
+   * holding the caret — `src/ui/panes.ts`, which is the whole of both rules and
+   * is unit-tested there rather than guessed at from the markup here.
    *
-   * Only a note splits. A folder is a list, and a list beside a list is the same
-   * drawing twice; a task has no page to open.
-   */
-  const noteId = $derived.by(() => {
-    const open = session;
-    if (!open || currentId === null) return null;
-    if (!isVisible(open.tree, currentId)) return null;
-    return open.tree.nodes[currentId]?.kind === 'note' ? currentId : null;
-  });
-
-  /**
-   * The list behind the note: the nearest ancestor that is not itself a note,
-   * over T-6-resolved parents, or the root.
+   * A note's route draws two things: the note, and the page of the list it
+   * hangs under. Both are derived rather than remembered, which is why there is
+   * no second route and no stored pair — a link pasted into another device opens
+   * the same two panes (X-8), and Back closes the note by leaving the route
+   * exactly as it always did. Only a note splits: a folder is a list, and a list
+   * beside a list is the same drawing twice; a task has no page to open.
    *
-   * The walk is what keeps a sub-note out of the left column — X-21. A note's
-   * children are in the pane (K-4), so opening one is a click *inside* the pane,
-   * and the pane is the only thing that should answer it; the list on the left
-   * is the one the reader navigated to and stays there until they navigate it.
+   * X-30 adds the caret as a second way in, and it moves nothing: the left
+   * column is a function of the route alone, so a note whose title is being
+   * typed opens beside the list the reader is already on. Only a *note's* title
+   * feeds it — `focus.noteId` — so a caret landing in a folder or a task leaves
+   * the pane exactly as it was. requirements.md §10.3.
    */
-  const listId = $derived.by(() => {
-    const open = session;
-    if (!open || noteId === null) return currentId;
-    const above = listAbove(open.tree, noteId);
-    return above === ROOT ? null : above;
-  });
+  const panes = $derived(
+    session === null
+      ? { listId: currentId, noteId: null, fromCaret: false }
+      : panesFor(session.tree, currentId, focus.noteId),
+  );
+  const noteId = $derived(panes.noteId);
+  const listId = $derived(panes.listId);
 
   /**
    * X-27. Whether this route draws a list, which is the one question the phone's
@@ -153,8 +147,13 @@
 
   // S-20's "on navigating away": leaving a note's page emits its body, and so
   // does leaving the page altogether.
+  //
+  // X-30's other end, on the same signal: a navigation is the reader choosing
+  // what is on screen, so the route decides both panes again and a note the
+  // caret raised on the page being left does not follow them to the next one.
   $effect(() => {
     router.route;
+    focus.clearNote();
     session?.commitAllBodies();
   });
 
@@ -224,11 +223,21 @@
            single column it was before the note opened. The padding is what keeps
            the last rows out from under the peeked sheet — §10.3. -->
       <div class="flex flex-col lg:flex-row lg:items-start">
-        <div class="min-w-0 flex-1 {noteId !== null ? 'pb-[60dvh] lg:pb-0' : ''}">
+        <div class="min-w-0 flex-1 {noteId !== null && !panes.fromCaret ? 'pb-[60dvh] lg:pb-0' : ''}">
           <NodePage {session} {view} {focus} id={listId} />
         </div>
         {#if noteId !== null}
-          <NotePane {session} {view} {focus} id={noteId} />
+          <!-- X-30. The ✕ is the only thing that differs by how the pane was
+               opened: a route's closes by leaving the route, and the caret's
+               has no route to leave, so it clears the caret instead. -->
+          <NotePane
+            {session}
+            {view}
+            {focus}
+            id={noteId}
+            fromCaret={panes.fromCaret}
+            onclose={() => focus.clearNote()}
+          />
         {/if}
       </div>
     {/if}

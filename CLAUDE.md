@@ -10,8 +10,8 @@ device names, undelete and the two platform bundles, then the settings screen an
 folder section, drag and drop, tags and priority with a filter, and the quick-add line. M6 mostly removed: three kinds
 rather than four (`list` is gone), one control for a kind change rather than two, a sidebar one level deep — and one
 addition, a pasted paragraph becoming one row per line. M7 is bold and headings in a note body, as marks inside the body
-string, and M8 opens a note beside the list rather than instead of it. The production tree is `src/`, driven by
-`package.json`.
+string, and M8 opens a note beside the list rather than instead of it — from the icon, which navigates, and from the
+caret (X-30), which does not. The production tree is `src/`, driven by `package.json`.
 
 ## Development
 
@@ -226,6 +226,17 @@ anywhere (X-22). A peeked sheet is covered by one transparent button that swallo
 tap would land in B-3's always-mounted textarea. The peek hides the note's own children in CSS (`note-children`), or
 every note would sit at the cap and "as tall as its content" would mean nothing. Expansion is one boolean in the pane,
 reset when the note changes — a gesture, not a setting.
+
+**The caret is a second way in, and it moves nothing — X-30.** Putting the caret in a **note** row's title raises that
+note in the pane; the route, the history and the left column stay exactly where the reader left them. `src/ui/panes.ts`
+is the whole of both rules — the pane is the note the caret is in, or the note the route names, and the list is the
+route's *always*, which is what makes X-30 true by construction. The caret's note is `RowFocus.noteId`, written only by
+a note's title: a caret in a folder or a task leaves the pane as it is, because the caret raises a note and nothing else
+lowers it. It is not cleared on blur either — clicking from the title into the note's own body would otherwise close the
+pane under the click about to edit it — so exactly two things end it: the ✕, the one control that differs by how the
+pane was opened, and a navigation, which hands the question back to the route. Above `lg` only: below it the pane is
+X-22's sheet, and a sheet raised by typing would cover the row being typed. The icon on the row still navigates, which
+is what moves the left column to `listAbove` the note.
 
 Pages are **left-aligned rather than centred** (X-23), so the list does not slide sideways when the pane opens.
 `src/ui/PageTitle.svelte` is the title-and-flag heading both the page and the pane use. requirements.md §10.3,

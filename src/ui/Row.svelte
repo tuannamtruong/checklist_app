@@ -231,7 +231,11 @@
       data-testid="title"
       onfocus={() => {
         editing = true;
-        focus.id = id;
+        // X-30 reads this: a caret landing in a *note's* title is what raises
+        // the pane, and one landing in a folder's or a task's leaves whatever
+        // is there alone. Never cleared on blur either, which is what lets the
+        // reader click from the title into the note's own body — §10.3.
+        focus.enter(id, node.kind);
       }}
       oninput={() => (editing = true)}
       onblur={commit}

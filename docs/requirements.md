@@ -458,6 +458,10 @@ pane is derived from the route, so a cold launch on `#/n/<id>` draws the same tw
 `#/n/<id>` of a `folder` or a `task` is the single page it always was. Which pane goes where is a breakpoint —
 [§10.3 A note beside the list](#103-a-note-beside-the-list).
 
+**The pane has a second way in that is not a route at all.** X-30 raises it from the caret: a note whose title is being
+typed shows beside the list, with the route, the history and the left column untouched. The caret is device-local like
+the collapse state, so none of it reaches the fragment and a reload draws the route's pane alone.
+
 Two navigations exist besides the routes: the sidebar (T-10, top-level folders and notes, and T-11 takes finished ones
 out of it) and breadcrumbs (T-9). Breadcrumbs climb the T-6-resolved parent, never the stored one, and the sidebar reads
 the same resolved set. `#/done` and `#/search` are permanent entries in the sidebar's nav and `#/settings` is a
@@ -683,6 +687,7 @@ to empty, and a dismissal is only for a row the user is content to leave as it l
 | X-27 | On a phone the add group **is** the top bar: the bar that carried the application's name carries the line and its two buttons instead, and the name is gone | ✅ | `src/ui/Shell.svelte` takes the group as a snippet from `src/ui/App.svelte`, which fills it only on the routes that draw a list; `src/ui/NodePage.svelte`'s own header is `md` and up, so the group is drawn once at either width. The bar is `sticky` for X-26's reason — `scripts/ui-smoke.mjs` drives both widths |
 | X-28 | The link in the sidebar's top corner is named for the page it opens — `All lists` — rather than for the application | ✅ | `src/ui/Shell.svelte`, and the word is the only thing that changed: the same `#/`, the same drawer close, the same `sidebar-text`. It is what `src/ui/NodePage.svelte` already writes at the head of that page — `scripts/ui-smoke.mjs` |
 | X-29 | The sidebar scrolls in its own column: a page long enough to scroll moves the list and leaves the sidebar whole, and the sidebar scrolls itself when its own entries outgrow the window | ✅ | `src/ui/Shell.svelte` — the shell is one `h-dvh` row holding two scrollers rather than one document that scrolls entire. The nav has been `overflow-y-auto` since X-2 and never got the chance to use it; what it lacked was a column the height of the window rather than of the page — `scripts/ui-smoke.mjs` |
+| X-30 | Putting the caret in a **note** row's title raises that note in the pane, and the list beside it does not move: a caret is not a navigation, so the route, the history and the left column are exactly where the reader left them. A caret in a folder's or a task's title leaves the pane as it is; the ✕ and a navigation are what end it | ✅ | `src/ui/panes.ts` derives both panes from the route and `RowFocus.noteId`, which only a note's title ever writes, and `src/ui/App.svelte` composes them as it already did. Above `lg` only — below it the pane is X-22's sheet, and a sheet raised by typing would cover the row being typed. How the pane was opened changes exactly one thing, the ✕: a link out of the route, or a button that clears the caret's note — [§10.3 A note beside the list](#103-a-note-beside-the-list). `panes.test.ts`, `focus.svelte.test.ts`, `scripts/ui-smoke.mjs` |
 
 **A phone's top bar holds the add group rather than the application's name — X-27.** The bar existed to carry a `☰` and
 said `Checklist` beside it, which is a thing to read once on an application with one tree in it: every screen it
@@ -891,6 +896,37 @@ opening the note would shift the list under the pointer and closing it would shi
 where it was before the note opened and where it will be after, and the note pane is what appears and goes. That is why
 X-23 says "whether or not a note is open": a rule that only applied while the pane was there would be the jump it exists
 to prevent.
+
+**The caret opens it too, and nothing moves — X-30.** The icon on a row is a link and behaves like one: it changes the
+route, and the left column becomes the nearest list above the note, which is the list being read only when the note is a
+child of it. A caret is not a link. Typing in a row's title is done *inside* the list the reader already chose, and the
+note under the caret is what they are touching rather than somewhere they are going — so the pane follows the caret and
+the route does not move at all. The left column stays the list the route names, which is X-23's argument made a second
+time: the thing that appears is the pane, and nothing else on screen answers it.
+
+**The caret raises a note and nothing else lowers it.** A caret in a `folder`'s or a `task`'s title is not a caret in a
+note, so the pane stays exactly as it was: ticking a task beside an open note is not a request for the note to go, and a
+walk down a list with the arrow keys would otherwise flick the pane open and shut on every note it passed. `RowFocus`
+therefore carries two things — the row holding the caret, which the keyboard model already needed, and the note that
+caret is in, which only a note's title ever writes. The pane is that note, or the note the route names when no note has
+held the caret; one derivation over the two, with no stored pane and no second route, so
+[past_decision.md §14.1 The options](past_decision.md#141-the-options)'s costs are not paid a second time.
+
+**The caret leaving the title is not the caret leaving the note.** The note is set when a title takes the caret and is
+never cleared when it loses it, and the pane needs exactly that: clicking into the note's own body blurs the row's
+title, and a pane that closed on blur would close under the click that was about to edit it. Two things end it, and only
+two. The ✕ — which is the one control that differs by how the pane was opened, because a caret-raised pane is on no
+route to leave, and clearing it falls back to the route's note where there is one. And a navigation, because a
+navigation is the reader choosing what is on screen: the route decides both panes again, so a note raised on the page
+being left does not follow them to the next one, and what is drawn after it is what a reload would draw.
+
+A note that stops being one closes the pane too, and that is the derivation rather than a rule of its own: a peer's
+delete (T-7) and a kind change from the row menu (K-5) both leave the caret pointing at something that is no longer a
+note, and neither goes anywhere near the caret to say so.
+
+**Above `lg` only.** Below it the pane is X-22's sheet over the list, and a sheet raised by putting a caret in a title
+would cover the row being typed into with the phone's keyboard under it. The icon still opens the sheet there, because a
+tap on a link is somewhere the reader asked to go.
 
 ### 10.4 The sidebar's type size
 
