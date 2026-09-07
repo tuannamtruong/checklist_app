@@ -14,6 +14,7 @@
     session,
     view,
     dismissals,
+    topbar,
     currentId,
     doneOpen,
     conflictsOpen,
@@ -27,6 +28,8 @@
     session: Session;
     view: ViewState;
     dismissals: Dismissals;
+    /** X-27. The phone's top bar, when the route has one to give it. */
+    topbar?: Snippet;
     currentId: string | null;
     doneOpen: boolean;
     conflictsOpen: boolean;
@@ -194,17 +197,29 @@
   </aside>
 
   <div class="flex min-w-0 flex-1 flex-col">
-    <header class="flex items-center gap-2 border-b border-line px-3 py-2 md:hidden">
+    <!-- X-27. The `☰` and, beside it, whatever the route gives this bar — which
+         on a list is K-10's add group. It used to say the application's name,
+         which is a thing to read once on an application with one tree in it,
+         and this is the row X-26 pins: what is in it is on screen for the whole
+         session, so the control the app is mostly used for is what earns it.
+         Above `md` the bar is not drawn and the page header carries the group —
+         requirements.md §10. -->
+    <header
+      class="sticky top-0 z-20 flex items-center gap-2 border-b border-line bg-surface px-3 py-2 md:hidden"
+      data-testid="topbar"
+    >
       <button
         type="button"
-        class="row-control rounded px-2 py-1 text-ink-muted hover:text-ink"
+        class="row-control shrink-0 rounded px-2 py-1 text-ink-muted hover:text-ink"
         aria-label="Open navigation"
         data-testid="drawer-button"
         onclick={() => view.setDrawer(true)}
       >
         ☰
       </button>
-      <span class="text-sm font-semibold">Checklist</span>
+      {#if topbar}
+        {@render topbar()}
+      {/if}
     </header>
 
     {#if session.problem}

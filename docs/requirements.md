@@ -681,6 +681,14 @@ to empty, and a dismissal is only for a row the user is content to leave as it l
 | X-24 | The divider between the list and the note pane is dragged, and the width is this device's own | ✅ | `src/ui/WidthGrip.svelte` over `notePaneWidth` in `src/app/view-state.svelte.ts` — X-20's grip with the sign flipped, since the pane's edge is its left one. Above `lg` only: below it the pane is X-22's sheet and its width is the viewport's. `view-state.svelte.test.ts`, `scripts/ui-smoke.mjs` |
 | X-25 | The sidebar's type size is a four-step choice on the settings screen: normal, a fifth smaller, a fifth larger, two fifths larger | ✅ | `src/core/sidebar-size.ts` is the catalog and `src/app.css` holds one `--sidebar-type` multiplier per id, applied by `src/app/sidebar-size.svelte.ts` as `data-sidebar-size` on the document root. It scales X-19's two type rules and the icons beside them and nothing else — not the column's width, which is X-20's and stays where the grip left it. Device-local and set before the first paint, for X-14's reasons. `sidebar-size.test.ts`, `scripts/ui-smoke.mjs` |
 | X-26 | The add group is pinned to the top of the list's column, so it stays on screen however far the list is scrolled | ✅ | `src/ui/NodePage.svelte` — `sticky top-0` over the page's own surface, which is the same argument K-8 made for leaving the end of the list and made once more against the top of a page that scrolls away. It costs no measurement and no scroll listener |
+| X-27 | On a phone the add group **is** the top bar: the bar that carried the application's name carries the line and its two buttons instead, and the name is gone | ✅ | `src/ui/Shell.svelte` takes the group as a snippet from `src/ui/App.svelte`, which fills it only on the routes that draw a list; `src/ui/NodePage.svelte`'s own header is `md` and up, so the group is drawn once at either width. The bar is `sticky` for X-26's reason — `scripts/ui-smoke.mjs` drives both widths |
+
+**A phone's top bar holds the add group rather than the application's name — X-27.** The bar existed to carry a `☰` and
+said `Checklist` beside it, which is a thing to read once on an application with one tree in it: every screen it
+appeared on was already this application, and the name is on the icon that opened it. The row is the scarcest one on the
+layout — X-26 pins it, so whatever is in it is on screen for the whole session — and the control the app is mostly used
+for is what earns it. Above `md` the page header carries the group as it always did and the bar is not drawn at all, so
+the group exists once at either width rather than twice with one hidden.
 
 Packaging decides which of these are reachable, and it answers them per target rather than once — see
 [architecture.md §7 Packaging](architecture.md#7-packaging). X-3 in particular is a PWA install on Chromium and an APK

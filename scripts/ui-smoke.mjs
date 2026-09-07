@@ -255,7 +255,10 @@ async function main() {
     );
 
     // --- K-8: the quick-add line -------------------------------------------
-    const quickAdd = page.locator('[data-testid="quick-add"]');
+    // `:visible` because X-27 puts a group in the phone's top bar and X-26 puts
+    // one in the page header, and the layout hides one of them in CSS rather
+    // than rendering only the width it is at — X-1.
+    const quickAdd = page.locator('[data-testid="quick-add"]:visible');
     await quickAdd.fill('Batteries');
     await page.keyboard.press('Enter');
     const added = await rowByTitle(page, 'Batteries');
@@ -278,7 +281,9 @@ async function main() {
     await quickAdd.focus();
     await quickAdd.fill('Buy ');
     await page.evaluate(() => {
-      const line = document.querySelector('[data-testid="quick-add"]');
+      const line = [...document.querySelectorAll('[data-testid="quick-add"]')].find(
+        (input) => input.getClientRects().length > 0,
+      );
       line.setSelectionRange(line.value.length, line.value.length);
       const data = new DataTransfer();
       data.setData('text/plain', 'apples\r\n\n  pears  \nplums\n');
@@ -338,7 +343,7 @@ async function main() {
 
     // --- K-11: the typed title is the kind button's title ------------------
     await quickAdd.fill('Packing tips');
-    await page.locator('[data-testid="add-note"]').first().click();
+    await page.locator('[data-testid="add-note"]:visible').click();
     const typedNote = await rowByTitle(page, 'Packing tips');
     check(
       'a title typed in the line and “+ Note” pressed is one note carrying it — K-11',
@@ -393,7 +398,7 @@ async function main() {
 
     // A-6: a row created under a filter carries it, or it would vanish as it
     // was typed.
-    await page.locator('[data-testid="quick-add"]').fill('Errand run');
+    await quickAdd.fill('Errand run');
     await page.keyboard.press('Enter');
     await page.locator('[data-testid="filter-clear"]').click();
     const errand = await rowByTitle(page, 'Errand run');
@@ -1031,6 +1036,33 @@ async function main() {
       (await page.locator('[data-testid="sidebar"]').getAttribute('data-open')) === 'false' &&
         (await page.locator('[data-testid="drawer-button"]').isVisible()),
     );
+    // X-27. The bar the name used to sit in is the add group's, and the page
+    // header is not drawn a second time under it.
+    const bar = await page.evaluate(() => {
+      const topbar = document.querySelector('[data-testid="topbar"]');
+      const header = document.querySelector('[data-testid="page-header"]');
+      return {
+        holdsTheGroup: topbar.querySelectorAll('[data-testid="add-row"]').length,
+        named: /checklist/i.test(topbar.innerText),
+        headerDrawn: header !== null && header.getClientRects().length > 0,
+        pinned: getComputedStyle(topbar).position,
+      };
+    });
+    check(
+      'the phone’s top bar holds the add group and no longer names the app — X-27',
+      bar.holdsTheGroup === 1 && !bar.named && !bar.headerDrawn,
+      `${bar.holdsTheGroup} groups, named ${bar.named}, page header ${bar.headerDrawn}`,
+    );
+    check('and it is pinned there, as the page header is above `md` — X-26', bar.pinned === 'sticky', bar.pinned);
+    const phoneQuickAdd = page.locator('[data-testid="topbar"] [data-testid="quick-add"]');
+    await phoneQuickAdd.fill('Torch batteries');
+    await page.keyboard.press('Enter');
+    check(
+      'and typing in it adds to the list under it — K-8, X-27',
+      (await topLevelTitles(page)).includes('Torch batteries'),
+      (await topLevelTitles(page)).join('|'),
+    );
+
     await page.locator('[data-testid="drawer-button"]').click();
     await page.waitForTimeout(300);
     check('the drawer opens', await page.locator('[data-testid="drawer-backdrop"]').isVisible());

@@ -26,6 +26,7 @@
   import LogPage from './LogPage.svelte';
   import NodePage from './NodePage.svelte';
   import NotePane from './NotePane.svelte';
+  import QuickAdd from './QuickAdd.svelte';
   import RecoveryPage from './RecoveryPage.svelte';
   import SearchPage from './SearchPage.svelte';
   import SettingsPage from './SettingsPage.svelte';
@@ -110,6 +111,24 @@
   });
 
   /**
+   * X-27. Whether this route draws a list, which is the one question the phone's
+   * top bar asks: a bar over Search, Settings or the Done archive has nothing to
+   * add to, so it carries the `☰` alone rather than a line that would write into
+   * whatever list was last open.
+   */
+  const listOpen = $derived(
+    session !== null &&
+      router.route.name !== 'unknown' &&
+      !doneOpen &&
+      !conflictsOpen &&
+      !searchOpen &&
+      !settingsOpen &&
+      !devicesOpen &&
+      !logsOpen &&
+      (currentId === null || isVisible(session.tree, currentId)),
+  );
+
+  /**
    * F-5. Typing replaces the fragment rather than pushing it, or every keystroke
    * would be a history entry and Back would walk the query backwards one letter
    * at a time.
@@ -160,10 +179,20 @@
 />
 
 {#if session && folder}
+  <!-- X-27. The phone's top bar, handed to the shell rather than built there:
+       the group belongs to a list and only this route knows which list that is —
+       the same `listId` the page on the left is drawn from. -->
+  {#snippet topbar()}
+    {#if listOpen && session}
+      <QuickAdd {session} {view} {focus} parent={listId ?? ROOT} />
+    {/if}
+  {/snippet}
+
   <Shell
     {session}
     {view}
     {dismissals}
+    {topbar}
     {currentId}
     {doneOpen}
     {conflictsOpen}

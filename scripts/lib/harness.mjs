@@ -172,16 +172,17 @@ const PEER = '5eed0002';
 export function peerLog(device = PEER) {
   const at = Date.UTC(2026, 7, 18, 10, 0, 0);
   const lines = [
-    { op: 'create', id: 'n_peer0001', parent: 'n_seed0001', kind: 'task', order: 'a5', c: 1, at },
+    { op: 'create', id: 'n_peer0001', parent: 'n_seed0001', kind: 'task', order: 'az', c: 1, at },
     { op: 'set', id: 'n_peer0001', title: 'Tea', c: 2, at: at + 1_000 },
     { op: 'set', id: 'n_seed0004', title: 'Coffee', c: 3, at: at + 2_000 },
     // K-1. A kind this build no longer has, written by a peer that still does.
     // It has to arrive as a folder rather than as a line that will not parse,
     // or upgrading one device would lose a row on every other — past_decision.md §11.
-    // `az` rather than the next key up: the run adds rows of its own at the
-    // root, and a peer landing on the key one of them has just been minted is a
-    // C-3 order conflict the run never meant to raise — the checks that follow
-    // expect the one title race and nothing else.
+    // `az` for the same reason `n_peer0001` has it: the run adds and drags rows
+    // of its own, and a peer landing on a key one of them has been minted is a
+    // C-3 order conflict this file never meant to write — the checks that
+    // follow expect the one title race and nothing else. `az` is past every key
+    // an append or a split mints here, so no row of ours can arrive on it.
     { op: 'create', id: 'n_peer0002', parent: 'root', kind: 'list', order: 'az', c: 4, at: at + 3_000 },
     { op: 'set', id: 'n_peer0002', title: 'Garage', c: 5, at: at + 4_000 },
   ].map((line) => JSON.stringify(line));

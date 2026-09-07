@@ -38,8 +38,14 @@
 
      K-10 puts the two kind buttons in it, and X-26 pins the header to the top of
      the window: one `sticky` and an opaque surface, so the one control the app is
-     mostly used for is where it was however far the list has scrolled. -->
-<header class="sticky top-0 z-20 border-b border-line bg-surface px-4 py-3" data-testid="page-header">
+     mostly used for is where it was however far the list has scrolled.
+
+     `md` and up only: below it the group is the phone's top bar rather than a
+     second header under it — X-27, and one group at either width. -->
+<header
+  class="sticky top-0 z-20 hidden border-b border-line bg-surface px-4 py-3 md:block"
+  data-testid="page-header"
+>
   <div class="flex max-w-3xl">
     <div class="flex max-w-xl flex-1">
       <QuickAdd {session} {view} {focus} {parent} />
