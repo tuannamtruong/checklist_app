@@ -11,7 +11,15 @@
 // device drops the same edge without agreeing with anyone — sync-flow.md §6.2.
 
 import { compareSiblings } from './order';
-import { ROOT, SIDEBAR_KINDS, type Node, type NodeId, type NodeMap, type ParentId } from './types';
+import {
+  isRoot,
+  ROOT,
+  SIDEBAR_KINDS,
+  type Node,
+  type NodeId,
+  type NodeMap,
+  type ParentId,
+} from './types';
 
 export type RepairReason = 'cycle' | 'missing-parent';
 
@@ -72,7 +80,10 @@ export function resolveTree(nodes: NodeMap): ResolvedTree {
       path.push(cursor);
 
       const parent: ParentId = nodes[cursor]!.parent;
-      if (parent === ROOT) break;
+      // G-1. Two parents are not nodes, and neither is a parent that failed to
+      // arrive: reading `agenda` as missing would repair every agenda item into
+      // the tree the moment it was folded.
+      if (isRoot(parent)) break;
       if (nodes[parent] === undefined) {
         // A half-synced folder can hold a child whose parent has not arrived.
         // Re-rooting shows it rather than hiding it, and the next fold puts it
@@ -101,7 +112,7 @@ export function resolveTree(nodes: NodeMap): ResolvedTree {
     const chain: NodeId[] = [];
     let cursor: ParentId = start;
     let answer = false;
-    while (cursor !== ROOT) {
+    while (!isRoot(cursor)) {
       const cached = known.get(cursor);
       if (cached !== undefined) {
         answer = cached;
@@ -164,7 +175,7 @@ export function childrenOf(tree: ResolvedTree, parent: ParentId): readonly NodeI
 export function ancestorsOf(tree: ResolvedTree, id: NodeId): NodeId[] {
   const path: NodeId[] = [];
   let cursor: ParentId = parentOf(tree, id);
-  while (cursor !== ROOT) {
+  while (!isRoot(cursor)) {
     path.push(cursor);
     cursor = parentOf(tree, cursor);
   }
@@ -174,7 +185,7 @@ export function ancestorsOf(tree: ResolvedTree, id: NodeId): NodeId[] {
 /** T-5's question: would this move put a node inside itself? */
 export function isAncestorOrSelf(tree: ResolvedTree, candidate: NodeId, id: ParentId): boolean {
   let cursor: ParentId = id;
-  while (cursor !== ROOT) {
+  while (!isRoot(cursor)) {
     if (cursor === candidate) return true;
     cursor = parentOf(tree, cursor);
   }
@@ -202,7 +213,7 @@ export function siblingAt(tree: ResolvedTree, id: NodeId, offset: number): NodeI
  */
 export function listAbove(tree: ResolvedTree, id: NodeId): ParentId {
   let cursor: ParentId = parentOf(tree, id);
-  while (cursor !== ROOT && tree.nodes[cursor]?.kind === 'note') {
+  while (!isRoot(cursor) && tree.nodes[cursor]?.kind === 'note') {
     cursor = parentOf(tree, cursor);
   }
   return cursor;
@@ -221,6 +232,22 @@ export function sidebarChildren(tree: ResolvedTree, parent: ParentId): readonly 
     const kind = tree.nodes[id]?.kind;
     return kind !== undefined && SIDEBAR_KINDS.includes(kind);
   });
+}
+
+/**
+ * G-1. Which of the two roots a node hangs under, walked through T-6's repair.
+ * It is what tells an agenda item from a tree row, and the only thing that has
+ * to ask is a view naming the place a row came from — a breadcrumb, the Done
+ * view's path, a search result's.
+ */
+export function rootOf(tree: ResolvedTree, id: NodeId): ParentId {
+  let cursor: ParentId = id;
+  while (!isRoot(cursor)) {
+    const next = parentOf(tree, cursor);
+    if (next === cursor) return ROOT;
+    cursor = next;
+  }
+  return cursor;
 }
 
 /** Present and not tombstoned — what a route may open, per X-11. */

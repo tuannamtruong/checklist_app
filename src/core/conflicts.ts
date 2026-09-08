@@ -18,7 +18,7 @@ import { compareOps } from './materialise';
 import { opVectors, type DeviceOps } from './merge';
 import { concurrent } from './sclock';
 import type { ResolvedTree } from './tree';
-import { ROOT, type DeviceId, type NodeId, type Op, type ParentId } from './types';
+import { AGENDA, ROOT, type DeviceId, type NodeId, type Op, type ParentId } from './types';
 
 /** The fields two devices can write independently. */
 export type ConflictField =
@@ -29,7 +29,8 @@ export type ConflictField =
   | 'parent'
   | 'deleted'
   | 'tags'
-  | 'priority';
+  | 'priority'
+  | 'day';
 
 /**
  * A-3 widened this: a tag set is one value, so the value a race dropped can be
@@ -92,6 +93,7 @@ function writesOf(op: Op): readonly (readonly [ConflictField, FieldValue])[] {
   if (op.kind !== undefined) writes.push(['kind', op.kind]);
   if (op.tags !== undefined) writes.push(['tags', op.tags]);
   if (op.priority !== undefined) writes.push(['priority', op.priority]);
+  if (op.day !== undefined) writes.push(['day', op.day]);
   return writes;
 }
 
@@ -246,6 +248,8 @@ export function describeField(field: ConflictField): string {
       return 'tags';
     case 'priority':
       return 'priority';
+    case 'day':
+      return 'day';
   }
 }
 
@@ -259,6 +263,7 @@ export function describeValue(field: ConflictField, value: FieldValue, tree: Res
     return value.join(', ');
   }
   if (field === 'parent') {
+    if (value === AGENDA) return 'Today or Tomorrow';
     if (value === ROOT || typeof value !== 'string') return 'the top level';
     return tree.nodes[value]?.title || 'an untitled row';
   }

@@ -103,6 +103,13 @@ function isPriority(value: unknown): value is Priority {
   return typeof value === 'string' && (PRIORITIES as readonly string[]).includes(value);
 }
 
+/** G-2. The one shape a day may take, checked at the decoder like a tag's. */
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+function isDay(value: unknown): value is string {
+  return typeof value === 'string' && DAY.test(value);
+}
+
 function isClock(value: unknown): value is SClock {
   return isRecord(value) && Object.values(value).every((counter) => typeof counter === 'number');
 }
@@ -164,6 +171,11 @@ function parseOp(line: string, dev: DeviceId): Op | null {
       // device typed, or two spellings of one tag would be two tags.
       if (Array.isArray(value['tags'])) op.tags = cleanTags(value['tags']);
       if (isPriority(value['priority'])) op.priority = value['priority'];
+      // G-2. A day is `YYYY-MM-DD` or null, and a line carrying anything else
+      // is read as a line that did not write the field — the same shape every
+      // other field's read has, so one malformed value costs one field rather
+      // than the row it belongs to.
+      if (isDay(value['day']) || value['day'] === null) op.day = value['day'] as string | null;
       return op;
     }
     case 'move': {

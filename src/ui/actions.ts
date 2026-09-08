@@ -7,8 +7,9 @@
 // something the menu does not show.
 
 import * as edit from '../core/edit';
-import { childrenOf, parentOf } from '../core/tree';
-import { KINDS, type Kind, type NodeId } from '../core/types';
+import { dayKey, nextDayKey } from '../core/agenda';
+import { childrenOf, parentOf, rootOf } from '../core/tree';
+import { AGENDA, KINDS, type Kind, type NodeId } from '../core/types';
 import type { Session } from '../app/Session.svelte';
 import type { ViewState } from '../app/view-state.svelte';
 import type { RowFocus } from './focus.svelte';
@@ -56,6 +57,32 @@ export function rowActions(ctx: RowActionContext): RowAction[] {
     const created = ops[0];
     if (created) focus.request(created.id);
   };
+
+  /**
+   * G-6. An agenda item's one extra control: the other list. Which entry it is
+   * follows from the day the item carries, so a row offers one move rather than
+   * two, and a row in the tree offers neither — it has no day and no list to be
+   * moved to. The clock is read here rather than in `core/`, where nothing may
+   * read one.
+   */
+  const inAgenda = rootOf(tree, id) === AGENDA;
+  const today = dayKey(Date.now());
+  const filedForToday = node.day === null || node.day <= today;
+  const dayMove: RowAction[] = !inAgenda
+    ? []
+    : [
+        {
+          name: filedForToday ? 'move-to-tomorrow' : 'move-to-today',
+          label: filedForToday ? 'Move to Tomorrow' : 'Move to Today',
+          keys: null,
+          enabled: true,
+          run: () => {
+            const now = Date.now();
+            const day = filedForToday ? nextDayKey(now) : dayKey(now);
+            session.run((t, c) => edit.setDay(t, c, id, day));
+          },
+        },
+      ];
 
   return [
     {
@@ -116,6 +143,7 @@ export function rowActions(ctx: RowActionContext): RowAction[] {
         focus.request(id);
       },
     },
+    ...dayMove,
     {
       name: 'tags',
       label: node.tags.length === 0 ? 'Add tags' : `Tags (${node.tags.length})`,

@@ -7,10 +7,30 @@ export type DeviceId = string;
 
 export type NodeId = string;
 
-/** The one parent that is not a node. Nothing carries a node with this id. */
+/** The top of the tree. Nothing carries a node with this id. */
 export const ROOT = 'root';
 
-export type ParentId = NodeId | typeof ROOT;
+/**
+ * G-1. The second parent that is not a node: Today and Tomorrow hang here
+ * rather than in the tree, so nothing in `All` holds them and nothing in them
+ * belongs to a folder. Which of the two lists an item is in is not stored — it
+ * is `day` compared with today, which is what makes G-3's rollover a read
+ * rather than a write. requirements.md §4.4.
+ */
+export const AGENDA = 'agenda';
+
+export type ParentId = NodeId | typeof ROOT | typeof AGENDA;
+
+/**
+ * The parents that are not nodes. Every walk that climbs a parent chain stops
+ * at one of these, and `resolveTree` must not read either as a node that failed
+ * to arrive — a missing-parent repair would put an agenda item in the tree.
+ */
+export const ROOTS: readonly ParentId[] = [ROOT, AGENDA];
+
+export function isRoot(parent: ParentId): boolean {
+  return parent === ROOT || parent === AGENDA;
+}
 
 /**
  * K-1. Kind drives rendering, never structure: any kind may own children.
@@ -72,6 +92,13 @@ export interface Node {
   tags: readonly string[];
   /** A-2. Never absent: an unflagged row carries `none`. */
   priority: Priority;
+  /**
+   * G-2. The day an agenda item is filed for, as `YYYY-MM-DD` in the writing
+   * device's own local time, and null on every row in the tree. Today is every
+   * agenda item whose day has come; Tomorrow is every one whose day has not —
+   * `core/agenda.ts` is the only module that compares one.
+   */
+  day: string | null;
   /** Fractional index among siblings — T-2, sync-flow.md §5. */
   order: string;
   /** The device that minted `order`, and the sort tiebreak — sync-flow.md §5.3. */
@@ -120,6 +147,8 @@ export interface SetOp extends OpBase {
   /** A-3. The whole set, which is what makes it one field — past_decision.md §10. */
   tags?: readonly string[];
   priority?: Priority;
+  /** G-2, G-6. Moving an item between the two lists is this field and no other. */
+  day?: string | null;
 }
 
 export interface MoveOp extends OpBase {

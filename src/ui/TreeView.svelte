@@ -6,7 +6,7 @@
   // land on the row above it, whatever their depths — rows.ts.
   import { filteredIds } from '../core/filter';
   import { childrenOf } from '../core/tree';
-  import type { ParentId } from '../core/types';
+  import type { NodeId, ParentId } from '../core/types';
   import type { Session } from '../app/Session.svelte';
   import type { ViewState } from '../app/view-state.svelte';
   import type { RowFocus } from './focus.svelte';
@@ -19,7 +19,21 @@
     view,
     focus,
     parent,
-  }: { session: Session; view: ViewState; focus: RowFocus; parent: ParentId } = $props();
+    only = null,
+  }: {
+    session: Session;
+    view: ViewState;
+    focus: RowFocus;
+    parent: ParentId;
+    /**
+     * G-3. The ids this list may draw, or null for all of them. It is A-4's
+     * filter mechanism with a second caller: the agenda's two pages are one
+     * parent asked two questions about a day, and the rows they leave out are
+     * left out the way a filtered row is — so `↑`, `Alt-↓` and `Enter` move
+     * through what is on screen here as well.
+     */
+    only?: ReadonlySet<NodeId> | null;
+  } = $props();
 
   // T-14. One drag at a time, and it belongs to the list being dragged within:
   // a page renders one tree, and a pointer is in one of them.
@@ -29,15 +43,24 @@
   // three levels down a collapsed folder is a row the filter promised and did
   // not deliver. T-8's state is remembered rather than cleared — §4.2.
   const filtered = $derived(filteredIds(session.tree, view.tagFilter));
+  // Two filters and one set: a tag filter on an agenda page has to mean both,
+  // or the page would answer a question nobody asked.
+  const allowed = $derived.by(() => {
+    if (only == null) return filtered;
+    if (filtered === null) return only;
+    return new Set([...only].filter((id) => filtered.has(id)));
+  });
   const rows = $derived(
     visibleRows(
       session.tree,
       parent,
       (id) => filtered === null && view.isCollapsed(id),
-      filtered,
+      allowed,
     ),
   );
-  const isEmpty = $derived(childrenOf(session.tree, parent).length === 0);
+  const isEmpty = $derived(
+    only == null ? childrenOf(session.tree, parent).length === 0 : only.size === 0,
+  );
 </script>
 
 <div class="flex flex-col" data-testid="tree">

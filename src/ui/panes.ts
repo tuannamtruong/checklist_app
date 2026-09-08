@@ -16,7 +16,7 @@
 // never reads it. requirements.md §10.3.
 
 import { isVisible, listAbove } from '../core/tree';
-import { ROOT, type NodeId } from '../core/types';
+import { isRoot, type NodeId } from '../core/types';
 import type { ResolvedTree } from '../core/tree';
 
 export interface Panes {
@@ -71,5 +71,6 @@ export function panesFor(
 
 function nearestList(tree: ResolvedTree, noteId: NodeId): NodeId | null {
   const above = listAbove(tree, noteId);
-  return above === ROOT ? null : above;
+  // G-1. Either root means there is no list row to draw beside the note.
+  return isRoot(above) ? null : above;
 }

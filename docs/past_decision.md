@@ -642,3 +642,38 @@ A third level, if the two-click trip turns out to have moved down a step rather 
 complaint would be identical and the fix would be the same code with a depth of three. What would *not* reopen it is B:
 a depth that is a function of the tree is the thing this design is built to avoid, and a bound that is unlimited is not
 a bound.
+
+## 18. Today and Tomorrow
+
+Two lists that are not the tree, and one sentence to satisfy: an item put in Tomorrow is in Today a day later. The
+question was never what the lists look like — it was what makes that sentence true on four devices that are rarely awake
+at the same time.
+
+### 18.1 What the two lists are
+
+| # | Option | What it costs |
+| --- | --- | --- |
+| A | **A second root, `agenda`, holding rows that carry the day they are filed for** — chosen | One more parent that is not a node, one more field in the payload, and two views that read it. Every walk that stopped at `root` has to stop at two roots instead |
+| B | Two folders at the top of the tree | They are in `All`, which is the one thing the lists are not, and they can be dragged into, renamed and deleted like any other row. Two devices that both create them make two of each, because a folder's id is minted by whoever made it |
+| C | A `day` field on any tree row, with Today and Tomorrow as saved searches over it | The lists become a view of the tree rather than something separate — which is a good feature and is not the one asked for. It also puts a date on rows nobody dated, and every list in the app grows a second meaning |
+| D | A file of their own beside the op log | A second format, a second merge and a second compaction rule, for rows that are already exactly the rows this format carries |
+
+### 18.2 What makes the day turn
+
+| # | Option | What it costs |
+| --- | --- | --- |
+| A | **Derive it: Today is `day <= today`, Tomorrow is `day > today`** — chosen | The lists are a read over a field, so nothing is stored about *which* list an item is in. An item's day is the truth and the two pages are two questions about it |
+| B | A rollover that writes `move` ops at midnight | Every device has to run it; a device shut for three days runs it late; two devices awake at midnight both write it; and the order keys those moves mint raise C-3 rows for a move nobody made. A write nobody asked for is the one kind of write this application does not have |
+| C | A rollover written by one elected device | An election, in an application whose entire safety argument is that no device ever writes another's file |
+
+**The chosen pair is why almost nothing new exists.** An agenda item is an ordinary row: the same `create`, `set`,
+`move`, `delete` and `restore`, the same merge, the same conflict rows, the same compaction. `agenda.ts` is a filter
+over `childrenOf` and a date comparison, and the day turns because a computer's clock does.
+
+### 18.3 What reopens it
+
+Scheduling a row that is already in the tree — "this task, on Thursday" — which is option C above and a different
+feature: it would keep the `day` field exactly as it is and add a second reader for it, and the two lists would then
+show tree rows beside agenda items. What would *not* reopen it is B: a write fired by a clock rather than by a person is
+what [requirements.md §7.3 Fixed constraints](requirements.md#73-fixed-constraints) exists to keep out.
+

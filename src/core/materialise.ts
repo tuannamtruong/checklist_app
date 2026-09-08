@@ -6,7 +6,7 @@
 // correct without a stamp on every field: sort once, fold once, and the newest
 // write to a field is simply the last one applied.
 
-import { ROOT, type Node, type NodeMap, type Op } from './types';
+import { isRoot, type Node, type NodeMap, type Op } from './types';
 
 /**
  * The total order every device derives identically — sync-flow.md §4.6, rule 2.
@@ -32,6 +32,9 @@ function created(op: Extract<Op, { op: 'create' }>): Node {
     body: op.kind === 'note' ? '' : null,
     tags: [],
     priority: 'none',
+    // G-2. Null on a tree row and set by the `set` that follows the create on
+    // an agenda one, exactly as a title is.
+    day: null,
     order: op.order,
     orderBy: op.dev,
     deleted: false,
@@ -72,6 +75,7 @@ export function applyOp(nodes: NodeMap, op: Op): NodeMap {
       if (op.body !== undefined) next.body = op.body;
       if (op.tags !== undefined) next.tags = op.tags;
       if (op.priority !== undefined) next.priority = op.priority;
+      if (op.day !== undefined) next.day = op.day;
       if (op.kind !== undefined) {
         next.kind = op.kind;
         // A row turned into a note owes the editor a body to open on. Turning
@@ -118,5 +122,5 @@ export function foldOps(ops: readonly Op[]): NodeMap {
 
 /** True when the parent id names something that can hold children. */
 export function parentExists(nodes: NodeMap, parent: string): boolean {
-  return parent === ROOT || nodes[parent] !== undefined;
+  return isRoot(parent) || nodes[parent] !== undefined;
 }

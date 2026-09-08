@@ -7,7 +7,8 @@
   // tree; and the sync cycle runs from here, driven by activity and focus
   // rather than by a timer (S-19).
   import { isVisible } from '../core/tree';
-  import { ROOT } from '../core/types';
+  import { dayOfList } from '../core/agenda';
+  import { AGENDA, ROOT } from '../core/types';
   import { deviceId, suggestedDeviceName } from '../app/device';
   import { chooseFolder, type FolderChoice } from '../app/folder-choice';
   import { Dismissals } from '../app/dismissals.svelte';
@@ -20,6 +21,7 @@
   import { RowFocus } from './focus.svelte';
   import { panesFor } from './panes';
   import { searchHref } from '../app/router.svelte';
+  import AgendaPage from './AgendaPage.svelte';
   import ConflictsPage from './ConflictsPage.svelte';
   import DevicesPage from './DevicesPage.svelte';
   import DonePage from './DonePage.svelte';
@@ -44,6 +46,13 @@
   const focus = new RowFocus();
   const dismissals = new Dismissals();
 
+  /**
+   * G-3. What day it is, asked once and refreshed whenever the app comes back:
+   * the two lists turn over at midnight, and a tab left open overnight has to
+   * turn with them. The logic layer never reads a clock — this is the app layer
+   * holding one and handing it down, exactly as `now()` is handed to an edit.
+   */
+  let now = $state(Date.now());
   let choice = $state<FolderChoice | null>(null);
   let session = $state<Session | null>(null);
   let cadence: SyncCadence | null = null;
@@ -68,6 +77,10 @@
 
   const folder = $derived(choice !== null && choice.kind === 'folder' ? choice : null);
   const currentId = $derived(router.route.name === 'node' ? router.route.id : null);
+  const todayOpen = $derived(router.route.name === 'today');
+  const tomorrowOpen = $derived(router.route.name === 'tomorrow');
+  const agendaList = $derived(todayOpen ? 'today' : 'tomorrow');
+  const agendaOpen = $derived(todayOpen || tomorrowOpen);
   const doneOpen = $derived(router.route.name === 'done');
   const conflictsOpen = $derived(router.route.name === 'conflicts');
   const searchOpen = $derived(router.route.name === 'search');
@@ -114,6 +127,7 @@
     session !== null &&
       router.route.name !== 'unknown' &&
       !doneOpen &&
+      !agendaOpen &&
       !conflictsOpen &&
       !searchOpen &&
       !settingsOpen &&
@@ -153,6 +167,7 @@
   // caret raised on the page being left does not follow them to the next one.
   $effect(() => {
     router.route;
+    now = Date.now();
     focus.clearNote();
     session?.commitAllBodies();
   });
@@ -162,6 +177,7 @@
   }
 
   function refresh(): void {
+    now = Date.now();
     cadence?.refresh();
   }
 </script>
@@ -184,6 +200,9 @@
   {#snippet topbar()}
     {#if listOpen && session}
       <QuickAdd {session} {view} {focus} parent={listId ?? ROOT} />
+    {:else if agendaOpen && session}
+      <!-- G-5. The same line on a phone, filing under the page's own day. -->
+      <QuickAdd {session} {view} {focus} parent={AGENDA} day={dayOfList(agendaList, now)} />
     {/if}
   {/snippet}
 
@@ -193,6 +212,8 @@
     {dismissals}
     {topbar}
     {currentId}
+    {todayOpen}
+    {tomorrowOpen}
     {doneOpen}
     {conflictsOpen}
     {searchOpen}
@@ -203,6 +224,8 @@
   >
     {#if conflictsOpen}
       <ConflictsPage {session} {dismissals} />
+    {:else if agendaOpen}
+      <AgendaPage {session} {view} {focus} list={agendaList} {now} />
     {:else if router.route.name === 'unknown'}
       <RecoveryPage {session} id={null} />
     {:else if searchOpen}

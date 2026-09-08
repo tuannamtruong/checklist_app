@@ -20,8 +20,9 @@ import {
   toggleDone,
   turnInto,
 } from './edit';
+import { setDay } from './edit';
 import { Replica, settle } from './test-support';
-import { ROOT, type Kind, type NodeId } from './types';
+import { AGENDA, ROOT, type Kind, type NodeId } from './types';
 
 function pair(): { a: Replica; b: Replica } {
   return { a: new Replica('aaaa0001', 1_000), b: new Replica('bbbb0002', 1_000) };
@@ -204,6 +205,31 @@ describe('taking the dropped value back — C-1', () => {
     settle([a, b]);
     expect(b.nodes[row]!.title).toBe('Oat milk');
     expect(rowsOf(a)).toEqual([]);
+    expect(rowsOf(b)).toEqual([]);
+  });
+});
+
+describe('the day two devices filed one item for — G-2', () => {
+  it('is an ordinary raced field: newest wins and the row offers the other day', () => {
+    const { a, b } = pair();
+    const parcel = a.run((tree, ctx) =>
+      createLastChild(tree, ctx, AGENDA, { title: 'Parcel', day: '2026-09-08' }),
+    )[0]!.id;
+    b.pull(a);
+    a.at(2_000).run((tree, ctx) => setDay(tree, ctx, parcel, '2026-09-09'));
+    b.at(2_001).run((tree, ctx) => setDay(tree, ctx, parcel, '2026-09-10'));
+    settle([a, b]);
+
+    expect(a.tree.nodes[parcel]!.day).toBe('2026-09-10');
+    const rows = rowsOf(a).filter((row): row is FieldConflict => row.kind === 'field');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.field).toBe('day');
+    expect(rows[0]!.dropped).toBe('2026-09-09');
+
+    // And taking the dropped day back is what puts it in the other list.
+    a.at(3_000).run((tree, ctx) => restoreValue(tree, ctx, parcel, 'day', rows[0]!.dropped));
+    settle([a, b]);
+    expect(b.tree.nodes[parcel]!.day).toBe('2026-09-09');
     expect(rowsOf(b)).toEqual([]);
   });
 });

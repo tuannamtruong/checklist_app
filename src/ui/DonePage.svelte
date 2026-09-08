@@ -11,6 +11,7 @@
   // Every row carries the path it sat on, since a bare title out of its list is
   // not enough to recognise: three lists can each hold a "Milk".
   import { archivedRows, type ArchivedRow } from '../core/done';
+  import { pathLabelOf } from './paths';
   import { unarchive } from '../core/edit';
   import type { Session } from '../app/Session.svelte';
   import { nodeHref } from '../app/router.svelte';
@@ -22,8 +23,7 @@
 
   /** Root first, as T-9 renders it; the root itself has no title to show. */
   function pathLabel(row: ArchivedRow): string {
-    if (row.path.length === 0) return 'All lists';
-    return row.path.map((id) => session.tree.nodes[id]?.title || 'Untitled').join(' / ');
+    return pathLabelOf(session.tree, row.id, row.path, Date.now());
   }
 
   /**

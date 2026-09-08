@@ -27,7 +27,15 @@
     view,
     focus,
     parent,
-  }: { session: Session; view: ViewState; focus: RowFocus; parent: ParentId } = $props();
+    day = null,
+  }: {
+    session: Session;
+    view: ViewState;
+    focus: RowFocus;
+    parent: ParentId;
+    /** G-5. The day this page files under, and null on every list in the tree. */
+    day?: string | null;
+  } = $props();
 
   let draft = $state('');
   let input = $state<HTMLInputElement | null>(null);
@@ -38,7 +46,7 @@
     if (title === '') return;
     draft = '';
     const tags = [...view.tagFilter];
-    session.run((tree, ctx) => createLastChild(tree, ctx, parent, { title, tags }));
+    session.run((tree, ctx) => createLastChild(tree, ctx, parent, { title, tags, day }));
   }
 
   /**
@@ -60,7 +68,7 @@
     draft = '';
     if (titles.length === 0) return;
     const tags = [...view.tagFilter];
-    session.run((tree, ctx) => createLastChildren(tree, ctx, parent, titles, { tags }));
+    session.run((tree, ctx) => createLastChildren(tree, ctx, parent, titles, { tags, day }));
   }
 
   /**
@@ -77,7 +85,7 @@
     const tags = [...view.tagFilter];
     draft = '';
     const ops = session.run((tree, ctx) =>
-      createLastChild(tree, ctx, parent, title === '' ? { kind, tags } : { kind, title, tags }),
+      createLastChild(tree, ctx, parent, title === '' ? { kind, tags, day } : { kind, title, tags, day }),
     );
     if (title === '' && ops[0]) focus.request(ops[0].id);
   }

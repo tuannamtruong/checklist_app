@@ -19,7 +19,7 @@
 // would turn one delete into a page of them.
 
 import { ancestorsOf, parentOf, type ResolvedTree } from './tree';
-import { ROOT, type Node, type NodeId } from './types';
+import { isRoot, type Node, type NodeId } from './types';
 
 export interface ArchivedRow {
   id: NodeId;
@@ -47,7 +47,9 @@ function leftAt(node: Node): number | null {
 /** True when some resolved ancestor is already the entry that answers for this row. */
 function coveredByAncestor(tree: ResolvedTree, id: NodeId): boolean {
   let cursor = parentOf(tree, id);
-  while (cursor !== ROOT) {
+  // G-1. Either root ends the walk: an agenda item's chain stops at `agenda`,
+  // and reading that as a node would be reading a node that does not exist.
+  while (!isRoot(cursor)) {
     if (archived(tree.nodes[cursor]!)) return true;
     cursor = parentOf(tree, cursor);
   }

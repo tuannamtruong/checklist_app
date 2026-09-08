@@ -257,6 +257,30 @@ children — two levels, and it does not recurse (T-10). The second level is beh
 column M6 shipped. It is deliberately not T-8's collapse set — the nav and the page are two drawings and neither moves
 the other. Deeper than that is the tree view's, which is what draws the nesting.
 
+### Today and Tomorrow
+
+Two lists that are **not** the tree — G-1 to G-7, requirements.md §4.4. `AGENDA` in `src/core/types.ts` is a second
+parent that is not a node, exactly as `ROOT` is, and an item under it carries `day` (`YYYY-MM-DD`, local): Today is
+every agenda item whose day has come, Tomorrow every one whose day has not. **The rollover is a read.** Nothing is
+written at midnight and nothing can race — an item filed for tomorrow is in Today tomorrow because the comparison says
+so, on every device at its own midnight. past_decision.md §18 says what a `move`-writing rollover would have cost.
+
+`src/core/agenda.ts` is the whole of it: `dayKey`, `nextDayKey`, `agendaRows` and `agendaIds`, over a `now` the caller
+passes in — the logic layer still reads no clock. `src/ui/AgendaPage.svelte` is one page asked about two days, reusing
+K-8's line (which files under the page's day) and `TreeView`'s `only` set, which is A-4's filter mechanism with a second
+caller. The nav entries sit under `All`, above the tree's own rows.
+
+**A second root means every walk that stopped at one now stops at two.** `isRoot` in `types.ts` is what they call:
+`resolveTree`'s cycle and missing-parent walks — reading `agenda` as a parent that failed to arrive would repair every
+agenda item into `All` — the T-7 tombstone walk, `ancestorsOf`, `isAncestorOrSelf`, `listAbove`, `canRestore` and
+`canOutdent`, which is what stops Shift-Tab pushing a top-level agenda item into the tree. `rootOf` answers which root a
+row hangs under, and `src/ui/paths.ts` is the one place that turns that into a word: `All`, `Today` or `Tomorrow`, for
+the breadcrumb, the Done view and search.
+
+The items are otherwise ordinary rows — same ops, same merge, same Done view, same search, same conflict rows. `day` is
+an ordinary last-writer-wins field: `op-log.ts` reads and writes it, `compact.ts` drops a superseded one, `conflicts.ts`
+offers the one that lost, and `edit.ts`'s `setDay` is both the G-6 menu control and the C-1 restore.
+
 ### Attributes
 
 Any row carries **tags** (A-1) and a **priority** (A-2), and both are ordinary fields: one `set` op, last-writer-wins, a

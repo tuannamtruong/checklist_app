@@ -8,6 +8,8 @@ import type { NodeId } from '../core/types';
 export type Route =
   | { name: 'root' }
   | { name: 'node'; id: NodeId }
+  | { name: 'today' }
+  | { name: 'tomorrow' }
   | { name: 'done' }
   | { name: 'conflicts' }
   | { name: 'search'; query: string }
@@ -19,6 +21,10 @@ export type Route =
 export function routeOf(hash: string): Route {
   const path = hash.replace(/^#/, '');
   if (path === '' || path === '/') return { name: 'root' };
+  // G-7. Two routes rather than one carrying which list: they are two pages a
+  // person links to and returns to, and a day is not a parameter of anything.
+  if (path === '/today') return { name: 'today' };
+  if (path === '/tomorrow') return { name: 'tomorrow' };
   if (path === '/done') return { name: 'done' };
   if (path === '/conflicts') return { name: 'conflicts' };
   if (path === '/settings') return { name: 'settings' };
@@ -41,6 +47,10 @@ export function hrefOf(route: Route): string {
       return '#/';
     case 'node':
       return `#/n/${encodeURIComponent(route.id)}`;
+    case 'today':
+      return '#/today';
+    case 'tomorrow':
+      return '#/tomorrow';
     case 'done':
       return '#/done';
     case 'conflicts':
@@ -57,6 +67,10 @@ export function hrefOf(route: Route): string {
       return `#${route.hash}`;
   }
 }
+
+/** G-7's two, in the nav under `All` — requirements.md §4.4. */
+export const TODAY_HREF = hrefOf({ name: 'today' });
+export const TOMORROW_HREF = hrefOf({ name: 'tomorrow' });
 
 /** T-12's view, always in the nav — see requirements.md §5 Navigation and routing. */
 export const DONE_HREF = hrefOf({ name: 'done' });

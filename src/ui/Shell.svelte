@@ -8,7 +8,14 @@
   import { SIDEBAR_WIDTH, type ViewState } from '../app/view-state.svelte';
   import SidebarLinks from './SidebarLinks.svelte';
   import WidthGrip from './WidthGrip.svelte';
-  import { CONFLICTS_HREF, DONE_HREF, SEARCH_HREF, SETTINGS_HREF } from '../app/router.svelte';
+  import {
+    CONFLICTS_HREF,
+    DONE_HREF,
+    SEARCH_HREF,
+    SETTINGS_HREF,
+    TODAY_HREF,
+    TOMORROW_HREF,
+  } from '../app/router.svelte';
 
   let {
     session,
@@ -16,6 +23,8 @@
     dismissals,
     topbar,
     currentId,
+    todayOpen,
+    tomorrowOpen,
     doneOpen,
     conflictsOpen,
     searchOpen,
@@ -31,6 +40,9 @@
     /** X-27. The phone's top bar, when the route has one to give it. */
     topbar?: Snippet;
     currentId: string | null;
+    /** G-7. Which of the two day lists is open, if either. */
+    todayOpen: boolean;
+    tomorrowOpen: boolean;
     doneOpen: boolean;
     conflictsOpen: boolean;
     searchOpen: boolean;
@@ -79,14 +91,14 @@
     <div class="flex items-center justify-between border-b border-line px-3 py-3">
       <!-- X-28. Named for the page it opens rather than for the application:
            this is the way back to the top of the tree, and that page has been
-           headed "All lists" since it existed — requirements.md §10. -->
+           headed with the same word since it existed — requirements.md §10. -->
       <a
         href="#/"
         class="sidebar-text font-semibold"
         data-testid="all-lists-link"
         onclick={() => view.setDrawer(false)}
       >
-        All lists
+        All
       </a>
       <button
         type="button"
@@ -99,6 +111,29 @@
     </div>
 
     <nav class="min-h-0 flex-1 overflow-y-auto p-2" aria-label="Lists">
+      <!-- G-7. The two day lists sit directly under the corner that opens `All`,
+           above the tree's own rows: they are not in the tree and they are the
+           two places a day starts — requirements.md §4.4. The disclosure column
+           is empty here, so their titles line up with the rows below them. -->
+      {#each [{ href: TODAY_HREF, label: 'Today', icon: '☀', open: todayOpen }, { href: TOMORROW_HREF, label: 'Tomorrow', icon: '☾', open: tomorrowOpen }] as entry (entry.href)}
+        <div class="flex items-center">
+          <span class="sidebar-disclosure shrink-0" aria-hidden="true"></span>
+          <a
+            href={entry.href}
+            class="sidebar-text flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 hover:bg-surface-sunken"
+            class:bg-accent-soft={entry.open}
+            class:text-accent={entry.open}
+            class:text-ink-muted={!entry.open}
+            data-testid="agenda-link"
+            data-agenda={entry.label.toLowerCase()}
+            onclick={() => view.setDrawer(false)}
+          >
+            <span class="sidebar-icon text-center" aria-hidden="true">{entry.icon}</span>
+            <span class="truncate">{entry.label}</span>
+          </a>
+        </div>
+      {/each}
+
       <SidebarLinks {session} {view} {currentId} onNavigate={() => view.setDrawer(false)} />
 
       <!-- T-12 and F-5. Both are here even when empty: a view that appeared

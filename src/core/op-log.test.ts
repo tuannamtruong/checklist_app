@@ -8,7 +8,7 @@ import {
   LOG_VERSION,
   type LogHeader,
 } from './op-log';
-import { ROOT, type Op } from './types';
+import { AGENDA, ROOT, type Op } from './types';
 
 const DEV = 'aaaa0001';
 const header: LogHeader = { v: LOG_VERSION, dev: DEV, clock: { [DEV]: 3, bbbb0002: 4 } };
@@ -51,6 +51,26 @@ describe('tags and priority on the wire — A-3', () => {
     const line = JSON.stringify({ op: 'set', id: 'n_1', priority: 'urgent', c: 2, at: 200 });
     const back = decodeLog(`${JSON.stringify(header)}\n${line}\n`)!;
     expect(back.ops[0]).not.toHaveProperty('priority');
+  });
+});
+
+describe('the day on the wire — G-2', () => {
+  const filed: Op[] = [
+    { op: 'create', id: 'n_1', parent: AGENDA, kind: 'task', order: 'a1', c: 1, at: 100, dev: DEV },
+    { op: 'set', id: 'n_1', title: 'Ring back', day: '2026-09-09', c: 2, at: 200, dev: DEV },
+    { op: 'set', id: 'n_1', day: null, c: 3, at: 300, dev: DEV },
+  ];
+
+  it('survives a round trip, second root and all', () => {
+    expect(decodeLog(encodeLog(header, filed))!.ops).toEqual(filed);
+  });
+
+  it('drops a day that is not one, rather than the line carrying it', () => {
+    const line = JSON.stringify({ op: 'set', id: 'n_1', title: 'Ring back', day: 'tomorrow', c: 2, at: 200 });
+    const back = decodeLog(`${JSON.stringify(header)}\n${line}\n`)!;
+    expect(back.ops[0]).toMatchObject({ title: 'Ring back' });
+    expect(back.ops[0]).not.toHaveProperty('day');
+    expect(back.skipped).toBe(0);
   });
 });
 

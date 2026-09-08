@@ -12,9 +12,9 @@ import { keyBetween } from './order';
 import { cleanTags, sameTags } from './tags';
 import { childrenOf, isAncestorOrSelf, parentOf, siblingsOf, type ResolvedTree } from './tree';
 import {
+  isRoot,
   KINDS,
   PRIORITIES,
-  ROOT,
   type EditContext,
   type Kind,
   type Node,
@@ -70,6 +70,11 @@ export interface CreateOptions {
   title?: string;
   /** A-6. What the tree is filtered by, so a new row does not vanish as it is typed. */
   tags?: readonly string[];
+  /**
+   * G-5. The day an agenda item is filed for — the page's own day, so a row
+   * typed on Tomorrow is in Tomorrow rather than in Today for a moment.
+   */
+  day?: string | null;
 }
 
 /** A new row directly below `id`, among its siblings — `Enter` on a leaf row. */
@@ -138,10 +143,12 @@ function createAt(ctx: EditContext, parent: ParentId, order: string, options: Cr
   const kind = options.kind ?? 'task';
   const ops: Op[] = [{ op: 'create', id, parent, kind, order, ...stamp(ctx) }];
   const tags = cleanTags(options.tags ?? []);
-  if (options.title || tags.length > 0) {
+  const day = options.day ?? null;
+  if (options.title || tags.length > 0 || day !== null) {
     const set: Op = { op: 'set', id, ...stamp(ctx) };
     if (options.title) set.title = options.title;
     if (tags.length > 0) set.tags = tags;
+    if (day !== null) set.day = day;
     ops.push(set);
   }
   return ops;
@@ -225,6 +232,18 @@ export function setPriority(
 }
 
 /**
+ * G-6. Moving an item between Today and Tomorrow, which is one field and not a
+ * move at all: the two lists are a question about this day, so writing a new
+ * one is the whole edit. It merges like a flag — last write wins, and a device
+ * that filed it for a different day is a C-1 row rather than a lost item.
+ */
+export function setDay(tree: ResolvedTree, ctx: EditContext, id: NodeId, day: string | null): Op[] {
+  const node = tree.nodes[id];
+  if (!isWritable(node) || node.day === day) return [];
+  return [{ op: 'set', id, day, ...stamp(ctx) }];
+}
+
+/**
  * What the flag on the row does: one control, four states, highest first —
  * requirements.md §4.1. A menu of four entries would teach nothing this does not.
  */
@@ -285,6 +304,10 @@ export function restoreValue(
       return Array.isArray(value) ? setTags(tree, ctx, id, value) : [];
     case 'priority':
       return isPriority(value) ? setPriority(tree, ctx, id, value) : [];
+    // G-2, and taking the dropped day back is what puts the item in the list
+    // the other device filed it for.
+    case 'day':
+      return typeof value === 'string' || value === null ? setDay(tree, ctx, id, value) : [];
     case 'parent':
       return [];
   }
@@ -315,13 +338,15 @@ export function indent(tree: ResolvedTree, ctx: EditContext, id: NodeId): Op[] {
 }
 
 export function canOutdent(tree: ResolvedTree, id: NodeId): boolean {
-  return parentOf(tree, id) !== ROOT;
+  // G-1. Both roots stop it. Outdenting a top-level agenda item would ask for
+  // the parent of `agenda`, which is nothing, and land the item in the tree.
+  return !isRoot(parentOf(tree, id));
 }
 
 /** T-3: become the parent's next sibling, directly below it. */
 export function outdent(tree: ResolvedTree, ctx: EditContext, id: NodeId): Op[] {
   const parent = parentOf(tree, id);
-  if (parent === ROOT) return [];
+  if (isRoot(parent)) return [];
   const grandparent = parentOf(tree, parent);
   const uncles = siblingNodes(tree, grandparent);
   const index = uncles.findIndex((node) => node.id === parent);
@@ -364,7 +389,7 @@ export function moveDown(tree: ResolvedTree, ctx: EditContext, id: NodeId): Op[]
  */
 export function canMoveTo(tree: ResolvedTree, id: NodeId, newParent: ParentId): boolean {
   if (!tree.nodes[id]) return false;
-  if (newParent !== ROOT && !tree.nodes[newParent]) return false;
+  if (!isRoot(newParent) && !tree.nodes[newParent]) return false;
   return !isAncestorOrSelf(tree, id, newParent);
 }
 
@@ -499,7 +524,7 @@ export function canRestore(tree: ResolvedTree, id: NodeId): boolean {
   if (!node || !node.deleted) return false;
   // An ancestor's tombstone outlives this one, so the row would stay gone.
   let cursor = parentOf(tree, id);
-  while (cursor !== ROOT) {
+  while (!isRoot(cursor)) {
     if (tree.nodes[cursor]?.deleted) return false;
     cursor = parentOf(tree, cursor);
   }

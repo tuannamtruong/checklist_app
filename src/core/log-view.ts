@@ -10,7 +10,15 @@
 // this device's file, so the ops here are the survivors rather than the history.
 // The page says so; this module only reports what it was handed.
 
-import { ROOT, type DeviceId, type NodeId, type NodeMap, type Op, type ParentId } from './types';
+import {
+  AGENDA,
+  ROOT,
+  type DeviceId,
+  type NodeId,
+  type NodeMap,
+  type Op,
+  type ParentId,
+} from './types';
 
 export interface LogEntry {
   /** This device's counter for the op — its own position in the version vector. */
@@ -39,7 +47,10 @@ function quote(text: string): string {
 }
 
 function labelOfParent(parent: ParentId, nodes: NodeMap): string {
-  if (parent === ROOT) return 'All lists';
+  if (parent === ROOT) return 'All';
+  // G-1. The op names the parent, and the parent of both lists is one thing:
+  // which of the two an item is in is the `day` on the line after it.
+  if (parent === AGENDA) return 'Today or Tomorrow';
   return quote(nodes[parent]?.title ?? parent);
 }
 

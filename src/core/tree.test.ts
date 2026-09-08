@@ -7,10 +7,11 @@ import {
   listAbove,
   parentOf,
   resolveTree,
+  rootOf,
   sidebarChildren,
   siblingAt,
 } from './tree';
-import { ROOT, type Kind, type Op, type ParentId } from './types';
+import { AGENDA, ROOT, type Kind, type Op, type ParentId } from './types';
 
 let counter = 0;
 
@@ -291,5 +292,45 @@ describe('sidebarChildren — T-10', () => {
       remove('n_gone'),
     ]);
     expect(sidebarChildren(tree, 'n_a')).toEqual(['n_kept']);
+  });
+});
+
+describe('the second root — G-1', () => {
+  const ops = [
+    createOf('n_f', ROOT, 'a1', 'folder'),
+    createOf('n_a', AGENDA, 'a1', 'task'),
+    createOf('n_a_kid', 'n_a', 'a1', 'task'),
+  ];
+
+  it('buckets agenda items under `agenda` and never under the tree', () => {
+    const tree = treeOf(ops);
+    expect(childrenOf(tree, ROOT)).toEqual(['n_f']);
+    expect(childrenOf(tree, AGENDA)).toEqual(['n_a']);
+  });
+
+  it('is not a parent that failed to arrive: nothing is re-rooted', () => {
+    // The repair that shows a half-synced row would otherwise fire on every
+    // agenda item, and every one of them would appear in `All`.
+    const tree = treeOf(ops);
+    expect(tree.repairs).toEqual([]);
+    expect(parentOf(tree, 'n_a')).toBe(AGENDA);
+  });
+
+  it('ends an ancestor walk, so a breadcrumb stops where the list starts', () => {
+    const tree = treeOf(ops);
+    expect(ancestorsOf(tree, 'n_a')).toEqual([]);
+    expect(ancestorsOf(tree, 'n_a_kid')).toEqual(['n_a']);
+  });
+
+  it('is what rootOf answers, through the repair', () => {
+    const tree = treeOf(ops);
+    expect(rootOf(tree, 'n_a_kid')).toBe(AGENDA);
+    expect(rootOf(tree, 'n_f')).toBe(ROOT);
+  });
+
+  it('inherits a tombstone down its own chain — T-7', () => {
+    const tree = treeOf([...ops, remove('n_a')]);
+    expect(tree.deleted.has('n_a_kid')).toBe(true);
+    expect(childrenOf(tree, AGENDA)).toEqual([]);
   });
 });

@@ -8,11 +8,20 @@
 
 import { describe, expect, it } from 'vitest';
 import { compactOps, compactionDue, treeBytes } from './compact';
-import { createLastChild, moveTo, remove, restore, setBody, setTitle, toggleDone } from './edit';
+import {
+  createLastChild,
+  moveTo,
+  remove,
+  restore,
+  setBody,
+  setDay,
+  setTitle,
+  toggleDone,
+} from './edit';
 import { foldOps } from './materialise';
 import { allOps, opVectors, type DeviceOps } from './merge';
 import { Replica, random, settle } from './test-support';
-import { ROOT, type Kind, type NodeId, type Op, type ParentId } from './types';
+import { AGENDA, ROOT, type Kind, type NodeId, type Op, type ParentId } from './types';
 
 const SEED = Number(process.env['SEED'] ?? 20_260_819);
 
@@ -226,5 +235,22 @@ describe('the trigger — sync-flow.md §4.8.3', () => {
 
   it('does not fire before there is a device to fire for', () => {
     expect(compactionDue(1_000_000, 0, nodes)).toBe(false);
+  });
+});
+
+describe('a superseded day — G-2', () => {
+  it('is dropped like any other field this device overwrote, and the fold is identical', () => {
+    const replica = new Replica('aaaa0001', 1_000);
+    const parcel = replica.run((tree, ctx) =>
+      createLastChild(tree, ctx, AGENDA, { title: 'Parcel', day: '2026-09-08' }),
+    )[0]!.id;
+    replica.at(2_000).run((tree, ctx) => setDay(tree, ctx, parcel, '2026-09-09'));
+    replica.at(3_000).run((tree, ctx) => setDay(tree, ctx, parcel, '2026-09-10'));
+
+    const before = replica.own;
+    const after = compactOps(before);
+    expect(after.length).toBeLessThan(before.length);
+    expect(foldOps(after)).toEqual(foldOps(before));
+    expect(foldOps(after)[parcel]!.day).toBe('2026-09-10');
   });
 });

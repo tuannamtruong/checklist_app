@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { memoryFolder } from '../adapters/memory-folder';
-import { createFirstChild, createSiblingBelow } from '../core/edit';
+import { createFirstChild, createLastChild, createSiblingBelow } from '../core/edit';
 import { childrenOf } from '../core/tree';
-import { ROOT } from '../core/types';
+import { AGENDA, ROOT } from '../core/types';
 import { Session } from '../app/Session.svelte';
 import { ViewState } from '../app/view-state.svelte';
 import { actionNamed, rowActions, type RowActionContext } from './actions';
@@ -29,9 +29,21 @@ let session: Session;
 let view: ViewState;
 let focus: RowFocus;
 
-function context(id: string): RowActionContext {
-  const rows = visibleRows(session.tree, ROOT, (rowId) => view.isCollapsed(rowId));
+function context(id: string, parent: string = ROOT): RowActionContext {
+  const rows = visibleRows(session.tree, parent, (rowId) => view.isCollapsed(rowId));
   return { session, view, focus, rows, id };
+}
+
+/** G-5. One agenda item, filed for the day the caller names. */
+function fileFor(day: string): string {
+  return session.run((tree, ctx) => createLastChild(tree, ctx, AGENDA, { title: 'Parcel', day }))[0]!
+    .id;
+}
+
+function dayFrom(offset: number): string {
+  const at = new Date();
+  at.setDate(at.getDate() + offset);
+  return `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, '0')}-${String(at.getDate()).padStart(2, '0')}`;
 }
 
 /** Appends a row and answers its id — the rows themselves do not matter here. */
@@ -110,5 +122,36 @@ describe('visibleRows', () => {
     ]);
     view.toggleCollapsed(parent);
     expect(visibleRows(session.tree, ROOT, isCollapsed)).toEqual([{ id: parent, depth: 0 }]);
+  });
+});
+
+describe('the day move — G-6', () => {
+  it('offers the other list, and only the other list', () => {
+    const inToday = fileFor(dayFrom(0));
+    const names = rowActions(context(inToday, AGENDA)).map((action) => action.name);
+    expect(names).toContain('move-to-tomorrow');
+    expect(names).not.toContain('move-to-today');
+  });
+
+  it('turns around once the item is filed for a later day', () => {
+    const inTomorrow = fileFor(dayFrom(1));
+    const names = rowActions(context(inTomorrow, AGENDA)).map((action) => action.name);
+    expect(names).toContain('move-to-today');
+    expect(names).not.toContain('move-to-tomorrow');
+  });
+
+  it('is not offered at all in the tree, which has no day and no other list', () => {
+    const id = add(ROOT);
+    const names = rowActions(context(id)).map((action) => action.name);
+    expect(names).not.toContain('move-to-today');
+    expect(names).not.toContain('move-to-tomorrow');
+  });
+
+  it('runs as one `set day`, and the item stays where it is', () => {
+    const id = fileFor(dayFrom(1));
+    actionNamed(rowActions(context(id, AGENDA)), 'move-to-today')!.run();
+    expect(session.tree.nodes[id]!.day).toBe(dayFrom(0));
+    expect(session.tree.nodes[id]!.parent).toBe(AGENDA);
+    expect(rowActions(context(id, AGENDA)).map((a) => a.name)).toContain('move-to-tomorrow');
   });
 });

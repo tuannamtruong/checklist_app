@@ -46,7 +46,7 @@ and never replays per read — [sync-flow.md §4.6 The decision](sync-flow.md#46
 | Field | Type | Settles |
 | --- | --- | --- |
 | `id` | string | Minted by the creating device, never reused |
-| `parent` | node id or `root` | Always read through the cycle-repair resolver, never directly — T-6 |
+| `parent` | node id, `root` or `agenda` | Always read through the cycle-repair resolver, never directly — T-6. `agenda` is the second root, and the only thing that separates G-1's two lists from the tree |
 | `parentSetAt` | timestamp | When the move was written. The repair reads it; nothing reads the local clock |
 | `parentSetBy` | device id | The device that wrote the move, and the repair's tiebreak when two `parentSetAt` collide — [sync-flow.md §6.2 The repair](sync-flow.md#62-the-repair) |
 | `kind` | one of `folder`, `note`, `task` | K-1. Mutable after the fact — K-5. A `list` in an older file decodes as `folder` |
@@ -59,6 +59,7 @@ and never replays per read — [sync-flow.md §4.6 The decision](sync-flow.md#46
 | `order` | base-62 string | Fractional index among siblings — T-2 |
 | `orderBy` | device id | The device that minted `order`, and the sort tiebreak |
 | `deleted` | boolean | T-7. Absence and deletion must stay distinguishable |
+| `day` | `YYYY-MM-DD` or null | G-2. The day an agenda item is filed for, and null on every row in the tree. It is what makes G-3's rollover a read rather than a write |
 | `deletedAt` | timestamp or null | |
 
 Children sort on `(order, orderBy, id)`. Kind constrains rendering, not structure: any kind may own children, which is
@@ -74,7 +75,7 @@ receipt changes. The encoding and an example are in
 | Op | Carries |
 | --- | --- |
 | `create` | `id`, `parent`, `kind`, `order` |
-| `set` | `id` plus the fields that changed — `title`, `done`, `body`, `kind`, `tags`, `priority` |
+| `set` | `id` plus the fields that changed — `title`, `done`, `body`, `kind`, `tags`, `priority`, `day` |
 | `move` | `id`, `parent`, `order`; `at` becomes the node's `parentSetAt` |
 | `delete` | `id`; tombstones the subtree at read time, per T-7 |
 | `restore` | `id`; clears that node's own tombstone — T-13 |
@@ -435,6 +436,44 @@ selection" in any body long enough to scroll. `selectionchange` on the document 
 fires no event of its own when a drag ends outside it, and it is the one signal a mouse, a keyboard and a long press on
 a phone all produce.
 
+### 4.4 Today and Tomorrow
+
+Two lists that are not part of the tree. What is in them was put there by hand and belongs to nobody: an item in Today
+is not a row of some folder that also happens to be due, and no row in `All` can be dragged into either list. They are a
+second root beside `root`, holding rows of the ordinary kind — `src/core/agenda.ts` is what reads them back out.
+
+| ID | Requirement | State | Where / test |
+| --- | --- | --- | --- |
+| G-1 | `Today` and `Tomorrow` hold items of their own, outside the tree: nothing in them is a child of any row in `All`, and no row can be moved from one side to the other | ✅ | `AGENDA` in `src/core/types.ts` is a second parent that is not a node, exactly as `root` is; `resolveTree` in `src/core/tree.ts` treats both as roots, and `canMoveTo` refuses a move whose root would change. `tree.test.ts`, `edit.test.ts` |
+| G-2 | An agenda item carries the day it is filed for. Nothing in the tree carries one | ✅ | `day` on the node, written by one `set` op and merged last-writer-wins like a tag or a flag — [§2.1 The node](#21-the-node). `src/core/op-log.ts` reads and writes it, `src/core/compact.ts` drops a superseded one, `src/core/conflicts.ts` offers the value that lost. `op-log.test.ts`, `compact.test.ts`, `conflicts.test.ts` |
+| G-3 | An item in Tomorrow is in Today the next day, and it costs no write | ✅ | Today is every agenda item whose day has come and Tomorrow every one whose day has not — `todayRows` and `tomorrowRows` in `src/core/agenda.ts`, over a `now` the caller passes in. The day turns on every device at once because nothing has to happen for it to turn. `agenda.test.ts` |
+| G-4 | An item whose day has passed and which is not ticked stays in Today | ✅ | The cut is `day <= today` rather than `day === today`, so a day nobody got to does not empty itself — `src/core/agenda.ts`. A ticked item leaves by T-11 and lands in the Done view like any other row. `agenda.test.ts` |
+| G-5 | Items are added by the same line every list has, and land on the day of the page they were typed on | ✅ | `src/ui/AgendaPage.svelte` hands K-8's `src/ui/QuickAdd.svelte` the page's day, and `createLastChild` carries it into the `create`'s companion `set`. `edit.test.ts`, `scripts/ui-smoke.mjs` |
+| G-6 | An item is moved between the two lists from the row menu | ✅ | `setDay` in `src/core/edit.ts`, offered by `src/ui/actions.ts` as `move-to-tomorrow` and `move-to-today` — one `set day`, and the item is in the other list because that is what the other list means. `actions.test.ts`, `scripts/ui-smoke.mjs` |
+| G-7 | Both lists are nav entries under `All`, and both have a route of their own | ✅ | `#/today` and `#/tomorrow` — [§5 Navigation and routing](#5-navigation-and-routing) — rendered by `src/ui/AgendaPage.svelte` and linked from `src/ui/Shell.svelte` above the tree's top-level rows. `router.svelte.test.ts`, `scripts/ui-smoke.mjs` |
+
+**The rollover is a read, not a write, and that is the whole design.** "Tomorrow's items move into Today after a day"
+could have been two folders and a job that writes `move` ops at midnight. Every device would have had to run it, a
+device that was shut for three days would run it late, two devices awake at midnight would both write it, and the
+sibling order those moves minted would raise C-3 rows for a move nobody made. Instead the item records the day it is
+filed for and the two lists are questions asked of that day: Today is `day <= today`, Tomorrow is `day > today`. Nothing
+is written, nothing can race, and every device turns the day at its own midnight without agreeing with anyone.
+
+**The items are ordinary rows, which is why so little of this is new.** They are created, titled, ticked, tagged,
+flagged, dragged, deleted and restored by the same ops and the same code as everything else; they are in the Done view
+when they are ticked (T-12), in search results (F-4), and in the conflict rows when two devices raced (C-1). The two
+things that are theirs alone are the parent they hang under and the `day` they carry.
+
+**They order like every other list — T-2, and no second rule.** An overdue item is not floated to the top of Today: the
+list a person put in an order stays in that order, and a day-first sort would fight the drag that put it there (T-14).
+What tells an overdue item apart is that it is *there at all*, on a day it was not filed for.
+
+**A tree row cannot become an agenda item and an agenda item cannot become a tree row.** Both would be one `move` op and
+neither is offered: the two lists are separate because that is what was asked for, and `canMoveTo` enforces it rather
+than trusting that no view puts the two on screen together. Scheduling a row that already exists in the tree is a
+different feature, and [past_decision.md §18 Today and Tomorrow](past_decision.md#18-today-and-tomorrow) says what it
+would cost.
+
 ## 5. Navigation and routing
 
 Hash routing, per X-7, so the fragment never reaches a server and the app deploys to a static host, to the loopback
@@ -444,6 +483,8 @@ helper and to the Android WebView unchanged. `src/app/router.svelte.ts` holds th
 | --- | --- | --- |
 | `#/` | The root: every top-level row | `src/ui/NodePage.svelte` with no node |
 | `#/n/<node-id>` | One node's page — its path, its title, its body if it is a note, and its children. A **note** is drawn beside the nearest list above it rather than instead of it — X-21, X-22 | `src/ui/NodePage.svelte`, and `src/ui/NotePane.svelte` for a note |
+| `#/today` | Today: every agenda item whose day has come, including the ones it did not come *on* — G-3, G-4 | `src/ui/AgendaPage.svelte` |
+| `#/tomorrow` | Tomorrow: every agenda item whose day has not come yet — G-3 | `src/ui/AgendaPage.svelte`, the same page on the other day |
 | `#/done` | The Done view of T-12: every ticked and deleted row in one list, newest first | `src/ui/DonePage.svelte` |
 | `#/conflicts` | What the merge decided without asking — [§9 Conflict presentation](#9-conflict-presentation) | `src/ui/ConflictsPage.svelte` |
 | `#/search` and `#/search/<query>` | The search results of [§6 Search](#6-search) | `src/ui/SearchPage.svelte` |
@@ -693,7 +734,7 @@ to empty, and a dismissal is only for a row the user is content to leave as it l
 | X-25 | The sidebar's type size is a four-step choice on the settings screen: normal, a fifth smaller, a fifth larger, two fifths larger | ✅ | `src/core/sidebar-size.ts` is the catalog and `src/app.css` holds one `--sidebar-type` multiplier per id, applied by `src/app/sidebar-size.svelte.ts` as `data-sidebar-size` on the document root. It scales X-19's two type rules and the icons beside them and nothing else — not the column's width, which is X-20's and stays where the grip left it. Device-local and set before the first paint, for X-14's reasons. `sidebar-size.test.ts`, `scripts/ui-smoke.mjs` |
 | X-26 | The add group is pinned to the top of the list's column, so it stays on screen however far the list is scrolled | ✅ | `src/ui/NodePage.svelte` — `sticky top-0` over the page's own surface, which is the same argument K-8 made for leaving the end of the list and made once more against the top of a page that scrolls away. It costs no measurement and no scroll listener |
 | X-27 | On a phone the add group **is** the top bar: the bar that carried the application's name carries the line and its two buttons instead, and the name is gone | ✅ | `src/ui/Shell.svelte` takes the group as a snippet from `src/ui/App.svelte`, which fills it only on the routes that draw a list; `src/ui/NodePage.svelte`'s own header is `md` and up, so the group is drawn once at either width. The bar is `sticky` for X-26's reason — `scripts/ui-smoke.mjs` drives both widths |
-| X-28 | The link in the sidebar's top corner is named for the page it opens — `All lists` — rather than for the application | ✅ | `src/ui/Shell.svelte`, and the word is the only thing that changed: the same `#/`, the same drawer close, the same `sidebar-text`. It is what `src/ui/NodePage.svelte` already writes at the head of that page — `scripts/ui-smoke.mjs` |
+| X-28 | The link in the sidebar's top corner is named for the page it opens — `All` — rather than for the application, and the root is called that everywhere it is written to a person | ✅ | `src/ui/Shell.svelte` for the corner and `src/ui/NodePage.svelte` for the head of the page; `src/ui/Breadcrumbs.svelte`, `src/ui/DonePage.svelte`, `src/ui/SearchPage.svelte` and `src/core/log-view.ts` are the four places a path names the root, and they say the same word. It was `All lists` until the nav grew entries beside it — one word keeps the corner a corner. `log-view.test.ts`, `scripts/ui-smoke.mjs` |
 | X-29 | The sidebar scrolls in its own column: a page long enough to scroll moves the list and leaves the sidebar whole, and the sidebar scrolls itself when its own entries outgrow the window | ✅ | `src/ui/Shell.svelte` — the shell is one `h-dvh` row holding two scrollers rather than one document that scrolls entire. The nav has been `overflow-y-auto` since X-2 and never got the chance to use it; what it lacked was a column the height of the window rather than of the page — `scripts/ui-smoke.mjs` |
 | X-30 | Putting the caret in a **note** row's title raises that note in the pane, and the list beside it does not move: a caret is not a navigation, so the route, the history and the left column are exactly where the reader left them. A caret in a folder's or a task's title leaves the pane as it is; the ✕ and a navigation are what end it | ✅ | `src/ui/panes.ts` derives both panes from the route and `RowFocus.noteId`, which only a note's title ever writes, and `src/ui/App.svelte` composes them as it already did. Above `lg` only — below it the pane is X-22's sheet, and a sheet raised by typing would cover the row being typed. How the pane was opened changes exactly one thing, the ✕: a link out of the route, or a button that clears the caret's note — [§10.3 A note beside the list](#103-a-note-beside-the-list). `panes.test.ts`, `focus.svelte.test.ts`, `scripts/ui-smoke.mjs` |
 
@@ -714,11 +755,16 @@ also what X-26's pinned add group and the note pane's `sticky` edge were always 
 column they live in rather than to a window the page slides under.
 
 **The corner says where the link goes — X-28.** It said `Checklist`, which was the application naming itself in the one
-place a person looks to find their way back to the top of the tree, and the page it opens has been headed `All lists`
-since the root page existed. Two words for one destination is one word too many, and the one worth keeping is the one
-that describes the destination: the application's name is on the icon that launched it and on the screen that installed
-it. It is the same link, the same drawer close and the same type size — X-27 took the name off the phone's bar for the
-reason this takes it off the corner.
+place a person looks to find their way back to the top of the tree. Two words for one destination is one word too many,
+and the one worth keeping is the one that describes the destination: the application's name is on the icon that launched
+it and on the screen that installed it. It is the same link, the same drawer close and the same type size — X-27 took
+the name off the phone's bar for the reason this takes it off the corner.
+
+The word is now `All` rather than `All lists`, and it changed in six places at once rather than in the corner alone: the
+page's own heading, the breadcrumb that starts every path, the two views that print a row's path (Done and Search) and
+the log line that names a parent. A root with two names would be two places, and the corner is the one entry with
+something under it — `Today` and `Tomorrow` sit below it now, and a corner that is longer than what it holds reads as a
+heading rather than as a link.
 
 Packaging decides which of these are reachable, and it answers them per target rather than once — see
 [architecture.md §7 Packaging](architecture.md#7-packaging). X-3 in particular is a PWA install on Chromium and an APK
@@ -1045,6 +1091,8 @@ every possible destination is a second navigation to build and to test, and the 
 
 | M7 | Formatting in a note body | **Closed.** B-1 to B-6 — [§4.3 Bold and headings in a note body](#43-bold-and-headings-in-a-note-body) — bold and two heading levels, as Markdown marks inside the body string. The one milestone so far that adds a feature and changes nothing about the payload: `body` was a string before it and is a string after, so the merge, the conflict rows and compaction never learned that a body can be formatted |
 | M8 | A note beside the list | **Closed.** X-21 to X-24 — [§10.3 A note beside the list](#103-a-note-beside-the-list) — a note opens beside the nearest list above it at `lg` and as a 60%-tall sheet over it below, a page's column is left-aligned so nothing moves when it does, and the divider between the two columns is dragged. Like M7 it adds a feature and changes nothing about the payload: no route, no op, no field. The one thing it stores is X-24's width, and that is device-local like every other width here. It is one composition change in `src/ui/App.svelte`, one new view, and one grip that the sidebar now shares |
+
+| M9 | Today and Tomorrow | **Closed.** G-1 to G-7 — [§4.4 Today and Tomorrow](#44-today-and-tomorrow) — two lists that are not the tree, and the first milestone since M6 to touch the payload: one parent that is not a node and one field, `day`. What it did *not* add is a write nobody made — the rollover is a date comparison at read time, so nothing happens at midnight on any device. It also carried T-17's second level in the sidebar and X-28's shorter corner, both of which are what made room for two more nav entries |
 
 M2 is closed against a folder, not against a provider. The three adapters it added are the three methods every other
 adapter already offers, so what remains untested is the client underneath them, and observing that needs a Windows and

@@ -74,7 +74,7 @@
       <NoteBody {session} {id} />
     {/if}
   {:else}
-    <h1 class="text-2xl font-semibold" data-testid="page-title">All lists</h1>
+    <h1 class="text-2xl font-semibold" data-testid="page-title">All</h1>
   {/if}
 
   <!-- A-4. The bar is the tree's, and it sits with the tree — §4.2. -->

@@ -33,7 +33,7 @@ describe('logEntries — D-4', () => {
     expect(rows).toHaveLength(shop.length);
     expect(rows[0]!.id).toBe('n_bread');
     expect(rows[0]!.detail).toBe('title “Bread”');
-    expect(rows.at(-1)!.detail).toBe('new folder in All lists');
+    expect(rows.at(-1)!.detail).toBe('new folder in All');
   });
 
   it('carries the counter and the clock of the op itself', () => {
@@ -56,7 +56,7 @@ describe('logEntries — D-4', () => {
       { op: 'move', id: 'n_milk', parent: 'n_shop', order: 'a3', c: ++counter, at: 1_200, dev: 'aaaa0001' },
       { op: 'move', id: 'n_milk', parent: ROOT, order: 'a4', c: ++counter, at: 1_300, dev: 'aaaa0001' },
     ]);
-    expect(rows[0]!.detail).toBe('moved into All lists');
+    expect(rows[0]!.detail).toBe('moved into All');
     expect(rows[1]!.detail).toBe('reordered in “Shopping”');
   });
 
@@ -66,7 +66,7 @@ describe('logEntries — D-4', () => {
       [{ op: 'move', id: 'n_milk', parent: ROOT, order: 'b1', c: 1, at: 1_400, dev: 'bbbb0002' }],
       peerCreated,
     );
-    expect(rows[0]!.detail).toBe('moved into All lists');
+    expect(rows[0]!.detail).toBe('moved into All');
   });
 
   it('lists every field one set carried', () => {

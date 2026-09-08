@@ -23,6 +23,7 @@ import {
   peerLog,
   playwright,
   seedInto,
+  seedLog,
   startPreview,
 } from './lib/harness.mjs';
 
@@ -160,7 +161,7 @@ async function main() {
     const corner = page.locator('[data-testid="all-lists-link"]');
     check(
       'the sidebar’s corner is named for the page it opens, not for the app — X-28',
-      (await corner.innerText()).trim() === 'All lists' &&
+      (await corner.innerText()).trim() === 'All' &&
         (await corner.getAttribute('href')) === '#/' &&
         !/checklist/i.test(await page.locator('[data-testid="sidebar"]').innerText()),
       (await corner.innerText()).trim(),
@@ -502,6 +503,95 @@ async function main() {
       (await titlesUnder(page, 'Shopping')).join('|') === 'Milk|Coffee beans|Oat milk',
       (await titlesUnder(page, 'Shopping')).join('|'),
     );
+
+    // --- G-1 to G-7: Today and Tomorrow --------------------------------------
+    // The two lists are not the tree, so every check here is also a check that
+    // nothing leaked into `All` — requirements.md §4.4.
+    // The label is the second line of the link: the first is the glyph beside it.
+    const agendaLinks = (await page.locator('[data-testid="agenda-link"]').allInnerTexts()).map(
+      (text) => text.split('\n').pop().trim(),
+    );
+    check(
+      'Today and Tomorrow sit under All in the nav — G-7',
+      agendaLinks.join(',') === 'Today,Tomorrow',
+      agendaLinks.join(','),
+    );
+
+    await page.locator('[data-testid="agenda-link"][data-agenda="today"]').click();
+    await page.waitForSelector('[data-testid="agenda-page"][data-agenda="today"]');
+    check(
+      'a day with nothing filed for it says so rather than reading as a lost list — G-4',
+      (await page.locator('[data-testid="agenda-empty"]').count()) === 1,
+      await page.locator('[data-testid="page-title"]').innerText(),
+    );
+
+    await page.locator('[data-testid="agenda-link"][data-agenda="tomorrow"]').click();
+    await page.waitForSelector('[data-testid="agenda-page"][data-agenda="tomorrow"]');
+    const agendaAdd = page.locator('[data-testid="quick-add"]:visible');
+    await agendaAdd.fill('Collect the parcel');
+    await page.keyboard.press('Enter');
+    check(
+      'the same line files an item on the page’s own day — G-5',
+      (await titlesOf(page)).includes('Collect the parcel'),
+      (await titlesOf(page)).join('|'),
+    );
+
+    await page.locator('[data-testid="all-lists-link"]').click();
+    // The agenda page draws a tree of its own, so waiting for one would wait
+    // for the page being left: what says the navigation landed is that page
+    // going away.
+    await page.waitForSelector('[data-testid="agenda-page"]', { state: 'detached' });
+    check(
+      'and nothing in All holds it — G-1',
+      !(await titlesOf(page)).includes('Collect the parcel'),
+      (await titlesOf(page)).join('|'),
+    );
+
+    await page.locator('[data-testid="agenda-link"][data-agenda="tomorrow"]').click();
+    await page.waitForSelector('[data-testid="agenda-page"][data-agenda="tomorrow"]');
+    const parcel = await rowByTitle(page, 'Collect the parcel');
+    await parcel.locator('[data-testid="row-menu-button"]').click();
+    const dayEntry = page.locator('[data-testid="row-menu"] [data-action="move-to-today"]');
+    check(
+      'an item in Tomorrow offers exactly one day move, and it is the other list — G-6',
+      (await dayEntry.count()) === 1 &&
+        (await page.locator('[data-testid="row-menu"] [data-action="move-to-tomorrow"]').count()) === 0,
+      await page.locator('[data-testid="row-menu"]').innerText(),
+    );
+    await dayEntry.click();
+    check(
+      'taking it moves it into Today, and Tomorrow is empty again — G-6',
+      (await page.locator('[data-testid="agenda-empty"]').count()) === 1,
+      (await titlesOf(page)).join('|'),
+    );
+
+    await page.locator('[data-testid="agenda-link"][data-agenda="today"]').click();
+    await page.waitForSelector('[data-testid="agenda-page"][data-agenda="today"]');
+    check(
+      'and Today is where it now is — G-6',
+      (await titlesOf(page)).includes('Collect the parcel'),
+      (await titlesOf(page)).join('|'),
+    );
+
+    const rowMenuTree = await rowByTitle(page, 'Collect the parcel');
+    await rowMenuTree.locator('[data-testid="row-menu-button"]').click();
+    check(
+      'and the entry is now the other way round — G-6',
+      (await page.locator('[data-testid="row-menu"] [data-action="move-to-tomorrow"]').count()) === 1,
+    );
+    await page.keyboard.press('Escape');
+    await page.locator('[data-testid="row-menu"]').waitFor({ state: 'detached' });
+
+    await page.locator('[data-testid="all-lists-link"]').click();
+    await page.waitForSelector('[data-testid="agenda-page"]', { state: 'detached' });
+    const treeRow = await rowByTitle(page, 'Milk');
+    await treeRow.locator('[data-testid="row-menu-button"]').click();
+    check(
+      'a row in the tree is offered neither: it has no day and no list to move to — G-2',
+      (await page.locator('[data-testid="row-menu"] [data-action^="move-to-to"]').count()) === 0,
+    );
+    await page.keyboard.press('Escape');
+    await page.locator('[data-testid="row-menu"]').waitFor({ state: 'detached' });
 
     // --- ↑ / ↓ move the caret --------------------------------------------
     // The caret goes back where the keyboard checks left it: the tag block above
@@ -1604,6 +1694,53 @@ async function main() {
       check('a finger that travels is a scroll and picks nothing up — T-16', !scrolled);
     } finally {
       await phone.close();
+    }
+
+    // --- G-3: the day turns, and the rollover costs no write ----------------
+    // Its own context because it owns the clock: the whole claim is that an
+    // item filed for tomorrow is in Today tomorrow *without anything being
+    // written*, and the only way to see that is to move the clock and read the
+    // folder on both sides of midnight.
+    const midnight = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    try {
+      await midnight.clock.install({ time: new Date('2026-09-08T10:00:00') });
+      const { device } = seedLog();
+      await seedInto(midnight);
+      const day = await midnight.newPage();
+      await day.goto(`${BASE_URL}#/tomorrow`);
+      await day.waitForSelector('[data-testid="agenda-page"][data-agenda="tomorrow"]');
+      await day.locator('[data-testid="quick-add"]:visible').fill('Collect the parcel');
+      await day.keyboard.press('Enter');
+      // The write debounce is a timer, and the clock is this test's now.
+      await day.clock.runFor(500);
+      check(
+        'an item filed for tomorrow is in Tomorrow and not in Today — G-3',
+        (await titlesOf(day)).includes('Collect the parcel'),
+        (await titlesOf(day)).join('|'),
+      );
+
+      const fileKey = `checklist:folder:checklist.${device}.ops.jsonl`;
+      const before = await day.evaluate((key) => localStorage.getItem(key), fileKey);
+
+      await day.clock.setFixedTime(new Date('2026-09-09T10:00:00'));
+      await day.locator('[data-testid="agenda-link"][data-agenda="today"]').click();
+      await day.waitForSelector('[data-testid="agenda-page"][data-agenda="today"]');
+      check(
+        'the next day it is in Today, with nothing having happened — G-3',
+        (await titlesOf(day)).includes('Collect the parcel'),
+        (await titlesOf(day)).join('|'),
+      );
+
+      await day.locator('[data-testid="agenda-link"][data-agenda="tomorrow"]').click();
+      await day.waitForSelector('[data-testid="agenda-page"][data-agenda="tomorrow"]');
+      const after = await day.evaluate((key) => localStorage.getItem(key), fileKey);
+      check(
+        'and Tomorrow is empty again, with the device file byte-identical — G-3',
+        (await day.locator('[data-testid="agenda-empty"]').count()) === 1 && after === before,
+        after === before ? 'unchanged' : 'the folder changed',
+      );
+    } finally {
+      await midnight.close();
     }
 
     // --- first run, in a browser with nothing in it — architecture.md §4 -----

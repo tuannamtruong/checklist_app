@@ -22,6 +22,7 @@ import {
   removeTag,
   restore,
   setBody,
+  setDay,
   setPriority,
   setTags,
   setTitle,
@@ -31,7 +32,7 @@ import {
 } from './edit';
 import { FakeContext, Session, titlesOf } from './test-support';
 import { childrenOf, parentOf } from './tree';
-import { ROOT, type NodeId } from './types';
+import { AGENDA, ROOT, type NodeId } from './types';
 
 let ctx: FakeContext;
 let session: Session;
@@ -504,5 +505,47 @@ describe('deleting — T-7 and §3.1', () => {
     expect(setBody(session.tree, ctx, a, 'text')).toEqual([]);
     expect(turnInto(session.tree, ctx, a, 'note')).toEqual([]);
     expect(session.tree.nodes[a]!.title).toBe('a');
+  });
+});
+
+describe('the agenda — G-1, G-5, G-6', () => {
+  it('files a new item on the page’s day, in the create’s own set', () => {
+    const ops = createLastChild(session.tree, ctx, AGENDA, { title: 'Ring back', day: '2026-09-09' });
+    expect(ops).toHaveLength(2);
+    expect(ops[0]).toMatchObject({ op: 'create', parent: AGENDA, kind: 'task' });
+    expect(ops[1]).toMatchObject({ op: 'set', title: 'Ring back', day: '2026-09-09' });
+  });
+
+  it('writes no day at all for a row in the tree', () => {
+    const ops = createLastChild(session.tree, ctx, ROOT, { title: 'Shopping' });
+    expect(ops[1]).not.toHaveProperty('day');
+  });
+
+  it('refuses to outdent a top-level agenda item into the tree', () => {
+    const ops = createLastChild(session.tree, ctx, AGENDA, { title: 'Ring back', day: '2026-09-08' });
+    session.apply(ops);
+    const id = ops[0]!.id;
+    expect(canOutdent(session.tree, id)).toBe(false);
+    expect(outdent(session.tree, ctx.tick(), id)).toEqual([]);
+    expect(parentOf(session.tree, id)).toBe(AGENDA);
+  });
+
+  it('outdents a child of an agenda item as far as the item and no further', () => {
+    const top = createLastChild(session.tree, ctx, AGENDA, { title: 'Parcel', day: '2026-09-08' });
+    session.apply(top);
+    const child = createLastChild(session.tree, ctx.tick(), top[0]!.id, { title: 'Card' });
+    session.apply(child);
+    session.apply(outdent(session.tree, ctx.tick(), child[0]!.id));
+    expect(parentOf(session.tree, child[0]!.id)).toBe(AGENDA);
+    expect(canOutdent(session.tree, child[0]!.id)).toBe(false);
+  });
+
+  it('moves an item between the lists without moving it anywhere — G-6', () => {
+    const ops = createLastChild(session.tree, ctx, AGENDA, { title: 'Ring back', day: '2026-09-08' });
+    session.apply(ops);
+    const id = ops[0]!.id;
+    session.apply(setDay(session.tree, ctx.tick(), id, '2026-09-09'));
+    expect(session.tree.nodes[id]!.day).toBe('2026-09-09');
+    expect(parentOf(session.tree, id)).toBe(AGENDA);
   });
 });

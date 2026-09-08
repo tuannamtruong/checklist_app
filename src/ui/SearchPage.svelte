@@ -8,6 +8,8 @@
   // survives a reload. The route is written as the user types and read only on
   // the way in — see `text` below for why it cannot also be the input's value.
   import { untrack } from 'svelte';
+  import type { SearchHit } from '../core/search';
+  import { pathLabelOf } from './paths';
   import { searchTree } from '../core/search';
   import type { Session } from '../app/Session.svelte';
   import { nodeHref } from '../app/router.svelte';
@@ -42,9 +44,8 @@
     onquery(next);
   }
 
-  function pathLabel(path: readonly string[]): string {
-    if (path.length === 0) return 'All lists';
-    return path.map((id) => session.tree.nodes[id]?.title || 'Untitled').join(' / ');
+  function pathLabel(hit: SearchHit): string {
+    return pathLabelOf(session.tree, hit.id, hit.path, Date.now());
   }
 </script>
 
@@ -108,7 +109,7 @@
               </span>
             {/if}
             <span class="truncate pl-6 text-xs text-ink-faint" data-testid="hit-path">
-              {pathLabel(hit.path)}
+              {pathLabel(hit)}
             </span>
           </a>
         </li>
