@@ -230,9 +230,14 @@ gesture, not a setting.
 where `Breadcrumbs` used to be. No path — the column on the left *is* the note's path, in rows. No list of the note's
 own children — that same column draws them, nested under the note's own row, and drawing them here put the same rows on
 screen twice. K-4 is untouched: the add line still files under the note, and the row it makes appears on the left. The
-body takes the height that is left, which is `fill` in `src/ui/NoteBody.svelte` — the `min-h` floor is what a *page*
-needs and what the peeked sheet still gets, since flex distributes free space and an auto-height sheet has none, so
-X-22's sizing rule is untouched too.
+body takes the height that is left and scrolls inside itself, which is `fill` in `src/ui/NoteBody.svelte` — the `min-h`
+floor is what a *page* needs and what the peeked sheet still gets, since flex distributes free space and an auto-height
+sheet has none, so X-22's sizing rule is untouched too. Two traps live in that one prop. The field's height is one
+expression in the class string and never a `class:h-full` beside it, because a `class:` directive takes its class away
+when the condition is false whatever the string said — that is what made the field two rows tall the moment the caret
+arrived. And `syncScroll` puts the rendered half under the field's own `scrollTop` on every scroll, because B-3's two
+boxes each have a scrollbar now and the transparent one is on top: the wheel reaches the field, and the view that stays
+put is the one the reader is looking at.
 
 **The caret is a second way in, and it moves nothing — X-30.** Putting the caret in a **note** row's title raises that
 note in the pane; the route, the history and the left column stay exactly where the reader left them. `src/ui/panes.ts`

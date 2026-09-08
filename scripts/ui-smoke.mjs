@@ -744,6 +744,59 @@ async function main() {
       'and the add line is above it rather than under the list it no longer draws — X-31, K-8',
       (await pane.locator('[data-testid="quick-add"]').boundingBox()).y < bodyBox.y,
     );
+    // The caret arriving swaps B-3's overlay for the field itself, so the height
+    // has to be the field's and not the rendered block's — the first cut put it
+    // on the overlay alone and the note was edited through two rows.
+    const body = page.locator('[data-testid="note-body"]');
+    const written = await body.inputValue();
+    await body.click();
+    const editingBox = await body.boundingBox();
+    check(
+      'and it is still that tall once the caret is in it — X-31',
+      Math.abs(editingBox.height - bodyBox.height) <= 2,
+      `${Math.round(bodyBox.height)} reading, ${Math.round(editingBox.height)} editing`,
+    );
+    await body.fill(Array.from({ length: 40 }, (_, i) => `Line ${i + 1}.`).join('\n'));
+    const longBox = await body.boundingBox();
+    const scrolls = await body.evaluate((el) => el.scrollHeight > el.clientHeight + 1);
+    check(
+      'a body longer than the pane scrolls in the field rather than growing it — X-31',
+      scrolls && Math.abs(longBox.height - bodyBox.height) <= 2,
+      `${Math.round(longBox.height)} tall, ${scrolls ? 'scrolls' : 'grew'}`,
+    );
+    // B-3's two boxes over X-31's one scrollbar: the field on top is what the
+    // wheel reaches, so the rendered view has to follow it or a long note would
+    // sit frozen while the text scrolled invisibly behind it.
+    await pane.locator('[data-testid="page-title"]').click();
+    await page.waitForSelector('[data-testid="note-rendered"]');
+    await body.evaluate((el) => {
+      el.scrollTop = 120;
+    });
+    await page.waitForTimeout(100);
+    const bothBoxes = await pane.evaluate((el) => ({
+      field: el.querySelector('[data-testid="note-body"]').scrollTop,
+      view: el.querySelector('[data-testid="note-rendered"]').scrollTop,
+    }));
+    check(
+      'and the rendered view scrolls with the field over it — X-31, B-3',
+      bothBoxes.field > 0 && Math.abs(bothBoxes.view - bothBoxes.field) <= 1,
+      `field ${Math.round(bothBoxes.field)}, view ${Math.round(bothBoxes.view)}`,
+    );
+    // Put the note back, and *blur* it: a body becomes an op on blur or after
+    // K-7's second of quiet, so a restore typed a moment before the pane closes
+    // is a restore that never happened — which is how this check first left the
+    // 40 lines behind for F-1 and X-22 to trip over.
+    await body.fill(written);
+    await pane.locator('[data-testid="page-title"]').click();
+    await page.waitForFunction(
+      (text) => document.querySelector('[data-testid="note-rendered"]')?.innerText.startsWith(text),
+      written.slice(0, 12),
+    );
+    check(
+      'and the note is back to what it said, for the checks downstream that read it',
+      (await body.inputValue()) === written,
+      (await body.inputValue()).split('\n')[0],
+    );
     const openLeft = await listLeft();
     await page.locator('[data-testid="note-close"]').click();
     await page.waitForTimeout(150);

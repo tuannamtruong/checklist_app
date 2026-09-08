@@ -744,7 +744,7 @@ to empty, and a dismissal is only for a row the user is content to leave as it l
 | X-28 | The link in the sidebar's top corner is named for the page it opens — `All` — rather than for the application, and the root is called that everywhere it is written to a person | ✅ | `src/ui/Shell.svelte` for the corner and `src/ui/NodePage.svelte` for the head of the page; `src/ui/Breadcrumbs.svelte`, `src/ui/DonePage.svelte`, `src/ui/SearchPage.svelte` and `src/core/log-view.ts` are the four places a path names the root, and they say the same word. It was `All lists` until the nav grew entries beside it — one word keeps the corner a corner. `log-view.test.ts`, `scripts/ui-smoke.mjs` |
 | X-29 | The sidebar scrolls in its own column: a page long enough to scroll moves the list and leaves the sidebar whole, and the sidebar scrolls itself when its own entries outgrow the window | ✅ | `src/ui/Shell.svelte` — the shell is one `h-dvh` row holding two scrollers rather than one document that scrolls entire. The nav has been `overflow-y-auto` since X-2 and never got the chance to use it; what it lacked was a column the height of the window rather than of the page — `scripts/ui-smoke.mjs` |
 | X-30 | Putting the caret in a **note** row's title raises that note in the pane, and the list beside it does not move: a caret is not a navigation, so the route, the history and the left column are exactly where the reader left them. A caret in a folder's or a task's title leaves the pane as it is; the ✕ and a navigation are what end it | ✅ | `src/ui/panes.ts` derives both panes from the route and `RowFocus.noteId`, which only a note's title ever writes, and `src/ui/App.svelte` composes them as it already did. Above `lg` only — below it the pane is X-22's sheet, and a sheet raised by typing would cover the row being typed. How the pane was opened changes exactly one thing, the ✕: a link out of the route, or a button that clears the caret's note — [§10.3 A note beside the list](#103-a-note-beside-the-list). `panes.test.ts`, `focus.svelte.test.ts`, `scripts/ui-smoke.mjs` |
-| X-31 | The note pane is an editor and nothing else: the add line and its two kind buttons are its top row, the body takes whatever height is left under the title, and neither a path above the note nor the note's own children are drawn in it | ✅ | `src/ui/NotePane.svelte` — `src/ui/QuickAdd.svelte` in the header row `src/ui/Breadcrumbs.svelte` used to hold, and `src/ui/NoteBody.svelte` given `fill`, which is the height the pane has instead of the `min-h` floor a page's body needs. Nothing is lost with the children: the list beside the pane draws the whole subtree, so they are on screen one level in under the note's own row, and a row added here appears there — K-4. `scripts/ui-smoke.mjs` |
+| X-31 | The note pane is an editor and nothing else: the add line and its two kind buttons are its top row, the body takes whatever height is left under the title and scrolls inside itself when the note outgrows it, and neither a path above the note nor the note's own children are drawn in it | ✅ | `src/ui/NotePane.svelte` — `src/ui/QuickAdd.svelte` in the header row `src/ui/Breadcrumbs.svelte` used to hold, and `src/ui/NoteBody.svelte` given `fill`, which is the height the pane has instead of the `min-h` floor a page's body needs. Nothing is lost with the children: the list beside the pane draws the whole subtree, so they are on screen one level in under the note's own row, and a row added here appears there — K-4. `scripts/ui-smoke.mjs` |
 
 **A phone's top bar holds the add group rather than the application's name — X-27.** The bar existed to carry a `☰` and
 said `Checklist` beside it, which is a thing to read once on an application with one tree in it: every screen it
@@ -999,11 +999,17 @@ they were on screen twice, in two lists that scrolled apart and disagreed about 
 body was the loser of both — a `min-h` floor five lines tall with half a window of nothing under it, in the pane the
 reader opened to write in.
 
-So the pane draws the title, the tags and the body, and **the body takes the height that is left**. That is `fill` in
-`NoteBody`, which is the pane's own height rather than a floor: above `lg` the pane is `h-dvh` and the field ends where
-the pane does, and on the sheet there is no free space to distribute, so X-22's "as tall as the note" is untouched and
-the floor is what the peek still gets. K-4 is untouched as well — a note owns children exactly as it did, the ops are
-the same ops, and this settles only where they are drawn.
+So the pane draws the title, the tags and the body, and **the body takes the height that is left, and scrolls in place**
+— a note longer than the pane moves inside the field rather than growing it and pushing the title off the top. That is
+`fill` in `NoteBody`, which is the pane's own height rather than a floor: above `lg` the pane is `h-dvh` and the field
+ends where the pane does, and on the sheet there is no free space to distribute, so X-22's "as tall as the note" is
+untouched and the floor is what the peek still gets. Two things follow from the field having a scrollbar of its own. Its
+height is one expression rather than a `class:` toggle beside it, because a `class:` directive removes the class its
+condition denies whatever the string said — the first cut left the height on B-3's overlay alone, and the field the
+caret arrived in was two rows tall. And the rendered half is scrolled to match the field on every scroll, because B-3
+draws one value in two boxes and the transparent one is on top: the wheel reaches the field, and a view that stayed put
+would show a note frozen at its first screenful. K-4 is untouched as well — a note owns children exactly as it did, the
+ops are the same ops, and this settles only where they are drawn.
 
 **The add line takes the row the path left.** K-8 put it immediately above the children it adds to, which was the right
 answer while the children were in the pane; with them on the left it would be an input above nothing, and "under the

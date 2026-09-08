@@ -53,6 +53,8 @@
   /** Whether the caret is in the field, which is what B-3 swaps the view on. */
   let editing = $state(false);
   let field = $state<HTMLTextAreaElement | null>(null);
+  /** B-3's rendered half, which `syncScroll` keeps under the field's own scroll. */
+  let rendered = $state<HTMLDivElement | null>(null);
   let debounce: ReturnType<typeof setTimeout> | null = null;
   let longEdit: ReturnType<typeof setTimeout> | null = null;
 
@@ -117,6 +119,28 @@
       return;
     }
     at = { top: rect.top - GAP, left: rect.left };
+  }
+
+  /**
+   * B-3 draws one value in two boxes, and X-31's `fill` gives each of them a
+   * scrollbar rather than one page that scrolls both. The transparent field is
+   * the one on top, so it is the one the wheel reaches: the rendered view under
+   * it is moved to match, or a note longer than the pane would sit frozen while
+   * the field scrolled invisibly behind it.
+   */
+  function syncScroll(): void {
+    if (rendered && field) rendered.scrollTop = field.scrollTop;
+  }
+
+  // And once more when the rendered half comes back, since the caret leaving
+  // mounts a fresh element at the top of a body the reader had scrolled.
+  $effect(() => {
+    if (rendered) syncScroll();
+  });
+
+  function onScroll(): void {
+    syncScroll();
+    place();
   }
 
   function stopTimers(): void {
@@ -233,7 +257,13 @@
 </div>
 
 <!-- X-31's `fill` grows this box to the pane's height, and the floor is what
-     stops it collapsing on a sheet that has no height to give. -->
+     stops it collapsing on a sheet that has no height to give.
+
+     The field's own height is one expression in the class string and never a
+     `class:h-full` beside it: a `class:` directive toggles that class *off*
+     when its condition is false, whatever the string said, so a directive
+     written for the overlay would take the height away from the field the
+     moment the caret arrived and the note would be edited through two rows. -->
 <div class="relative {fill ? `flex-1 ${floor}` : ''}">
   <!-- The rendered view is what the same value looks like, so it is hidden from
        assistive technology: the textarea below carries the text itself, and one
@@ -247,6 +277,7 @@
          reach would ever have been enough. Marks are what B-2 keeps in the
          string; a line too long to fit is not one of them. -->
     <div
+      bind:this={rendered}
       class="w-full rounded-lg border border-line bg-surface-raised p-3 text-sm leading-relaxed break-words {fill
         ? 'h-full overflow-y-auto'
         : floor}"
@@ -282,16 +313,14 @@
   <textarea
     bind:this={field}
     bind:value={draft}
-    class="w-full rounded-lg border border-line bg-surface-raised p-3 text-sm leading-relaxed outline-none focus:border-accent {fill
+    class="w-full rounded-lg border border-line bg-surface-raised p-3 text-sm leading-relaxed outline-none focus:border-accent {!editing ||
+    fill
       ? 'h-full'
-      : editing
-        ? floor
-        : ''}"
+      : floor}"
     class:resize-y={editing && !fill}
     class:absolute={!editing}
     class:inset-0={!editing}
-    class:h-full={!editing}
-    class:resize-none={!editing}
+    class:resize-none={!editing || fill}
     class:opacity-0={!editing}
     placeholder="Write anything here."
     aria-label="Note body"
@@ -299,7 +328,7 @@
     oninput={onInput}
     onkeydown={onKeyDown}
     onselect={readSelection}
-    onscroll={place}
+    onscroll={onScroll}
     onfocus={() => {
       editing = true;
       readSelection();
