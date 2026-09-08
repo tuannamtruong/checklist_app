@@ -88,42 +88,39 @@
     data-testid="sidebar"
     data-open={view.drawerOpen}
   >
-    <div class="flex items-center justify-between border-b border-line px-3 py-3">
-      <!-- X-28. Named for the page it opens rather than for the application:
-           this is the way back to the top of the tree, and that page has been
-           headed with the same word since it existed — requirements.md §10. -->
-      <a
-        href="#/"
-        class="sidebar-text font-semibold"
-        data-testid="all-lists-link"
-        onclick={() => view.setDrawer(false)}
-      >
-        All
-      </a>
-      <button
-        type="button"
-        class="sidebar-text row-control rounded px-2 text-ink-muted hover:text-ink md:hidden"
-        aria-label="Close navigation"
-        onclick={() => view.setDrawer(false)}
-      >
-        ✕
-      </button>
-    </div>
+    <div class="border-b border-line px-3 py-3">
+      <div class="flex items-center justify-between">
+        <!-- X-28. Named for the page it opens rather than for the application:
+             this is the way back to the top of the tree, and that page has been
+             headed with the same word since it existed — requirements.md §10. -->
+        <a
+          href="#/"
+          class="sidebar-text font-semibold"
+          data-testid="all-lists-link"
+          onclick={() => view.setDrawer(false)}
+        >
+          All
+        </a>
+        <button
+          type="button"
+          class="sidebar-text row-control rounded px-2 text-ink-muted hover:text-ink md:hidden"
+          aria-label="Close navigation"
+          onclick={() => view.setDrawer(false)}
+        >
+          ✕
+        </button>
+      </div>
 
-    <nav class="min-h-0 flex-1 overflow-y-auto p-2" aria-label="Lists">
-      <!-- G-7. The two day lists sit directly under the corner that opens
-           `All`, above the tree's own rows: they belong to that group rather
-           than starting a second one, and they are the two places a day starts
-           — requirements.md §4.4. They carry the corner's own weight and no
-           glyph: a symbol beside the two shortest labels in the column says
-           nothing the words do not. The disclosure column is empty here, so
-           their titles line up with the rows below them. -->
-      {#each [{ href: TODAY_HREF, label: 'Today', open: todayOpen }, { href: TOMORROW_HREF, label: 'Tomorrow', open: tomorrowOpen }] as entry (entry.href)}
-        <div class="flex items-center">
-          <span class="sidebar-disclosure shrink-0" aria-hidden="true"></span>
+      <!-- G-7. The two day lists belong with the corner rather than with the
+           tree: they are not in it, so they sit above the rule that separates
+           `All` from the lists under it — requirements.md §4.4. Same weight as
+           the corner and no glyph, and the negative margin puts their labels on
+           the corner's own left edge while the padding keeps a hover target. -->
+      <div class="-mx-1 mt-1 flex flex-col">
+        {#each [{ href: TODAY_HREF, label: 'Today', open: todayOpen }, { href: TOMORROW_HREF, label: 'Tomorrow', open: tomorrowOpen }] as entry (entry.href)}
           <a
             href={entry.href}
-            class="sidebar-text flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 font-semibold hover:bg-surface-sunken"
+            class="sidebar-text truncate rounded-md px-1 py-1 font-semibold hover:bg-surface-sunken"
             class:bg-accent-soft={entry.open}
             class:text-accent={entry.open}
             class:text-ink-muted={!entry.open}
@@ -131,11 +128,13 @@
             data-agenda={entry.label.toLowerCase()}
             onclick={() => view.setDrawer(false)}
           >
-            <span class="truncate">{entry.label}</span>
+            {entry.label}
           </a>
-        </div>
-      {/each}
+        {/each}
+      </div>
+    </div>
 
+    <nav class="min-h-0 flex-1 overflow-y-auto p-2" aria-label="Lists">
       <SidebarLinks {session} {view} {currentId} onNavigate={() => view.setDrawer(false)} />
 
       <!-- T-12 and F-5. Both are here even when empty: a view that appeared
