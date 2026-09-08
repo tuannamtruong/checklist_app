@@ -111,16 +111,22 @@
     </div>
 
     <nav class="min-h-0 flex-1 overflow-y-auto p-2" aria-label="Lists">
-      <!-- G-7. The two day lists sit directly under the corner that opens `All`,
-           above the tree's own rows: they are not in the tree and they are the
-           two places a day starts — requirements.md §4.4. The disclosure column
-           is empty here, so their titles line up with the rows below them. -->
-      {#each [{ href: TODAY_HREF, label: 'Today', icon: '☀', open: todayOpen }, { href: TOMORROW_HREF, label: 'Tomorrow', icon: '☾', open: tomorrowOpen }] as entry (entry.href)}
+      <SidebarLinks {session} {view} {currentId} onNavigate={() => view.setDrawer(false)} />
+
+      <!-- G-7. The two day lists are the last thing in the `All` group rather
+           than the first: they belong to it — they are two places a day starts,
+           not a second nav section — and they sit against the separator, where
+           the eye lands on its way down to Search and Done. They carry the
+           corner's own weight instead of a glyph: a symbol beside two words
+           that are already the shortest labels in the column says nothing the
+           words do not — requirements.md §4.4. The disclosure column is empty
+           here, so their titles line up with the rows above them. -->
+      {#each [{ href: TODAY_HREF, label: 'Today', open: todayOpen }, { href: TOMORROW_HREF, label: 'Tomorrow', open: tomorrowOpen }] as entry (entry.href)}
         <div class="flex items-center">
           <span class="sidebar-disclosure shrink-0" aria-hidden="true"></span>
           <a
             href={entry.href}
-            class="sidebar-text flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 hover:bg-surface-sunken"
+            class="sidebar-text flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 font-semibold hover:bg-surface-sunken"
             class:bg-accent-soft={entry.open}
             class:text-accent={entry.open}
             class:text-ink-muted={!entry.open}
@@ -128,13 +134,10 @@
             data-agenda={entry.label.toLowerCase()}
             onclick={() => view.setDrawer(false)}
           >
-            <span class="sidebar-icon text-center" aria-hidden="true">{entry.icon}</span>
             <span class="truncate">{entry.label}</span>
           </a>
         </div>
       {/each}
-
-      <SidebarLinks {session} {view} {currentId} onNavigate={() => view.setDrawer(false)} />
 
       <!-- T-12 and F-5. Both are here even when empty: a view that appeared
            only once it had something in it is a view the user never learns

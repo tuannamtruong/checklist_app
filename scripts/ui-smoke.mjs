@@ -507,9 +507,8 @@ async function main() {
     // --- G-1 to G-7: Today and Tomorrow --------------------------------------
     // The two lists are not the tree, so every check here is also a check that
     // nothing leaked into `All` — requirements.md §4.4.
-    // The label is the second line of the link: the first is the glyph beside it.
     const agendaLinks = (await page.locator('[data-testid="agenda-link"]').allInnerTexts()).map(
-      (text) => text.split('\n').pop().trim(),
+      (text) => text.trim(),
     );
     check(
       'Today and Tomorrow sit under All in the nav — G-7',

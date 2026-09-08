@@ -450,7 +450,7 @@ second root beside `root`, holding rows of the ordinary kind — `src/core/agend
 | G-4 | An item whose day has passed and which is not ticked stays in Today | ✅ | The cut is `day <= today` rather than `day === today`, so a day nobody got to does not empty itself — `src/core/agenda.ts`. A ticked item leaves by T-11 and lands in the Done view like any other row. `agenda.test.ts` |
 | G-5 | Items are added by the same line every list has, and land on the day of the page they were typed on | ✅ | `src/ui/AgendaPage.svelte` hands K-8's `src/ui/QuickAdd.svelte` the page's day, and `createLastChild` carries it into the `create`'s companion `set`. `edit.test.ts`, `scripts/ui-smoke.mjs` |
 | G-6 | An item is moved between the two lists from the row menu | ✅ | `setDay` in `src/core/edit.ts`, offered by `src/ui/actions.ts` as `move-to-tomorrow` and `move-to-today` — one `set day`, and the item is in the other list because that is what the other list means. `actions.test.ts`, `scripts/ui-smoke.mjs` |
-| G-7 | Both lists are nav entries under `All`, and both have a route of their own | ✅ | `#/today` and `#/tomorrow` — [§5 Navigation and routing](#5-navigation-and-routing) — rendered by `src/ui/AgendaPage.svelte` and linked from `src/ui/Shell.svelte` above the tree's top-level rows. `router.svelte.test.ts`, `scripts/ui-smoke.mjs` |
+| G-7 | Both lists are nav entries in the `All` group — the last two, against the separator that starts Search and Done — and both have a route of their own | ✅ | `#/today` and `#/tomorrow` — [§5 Navigation and routing](#5-navigation-and-routing) — rendered by `src/ui/AgendaPage.svelte` and linked from `src/ui/Shell.svelte` under the tree's top-level rows, in the corner's own weight and with no glyph. `router.svelte.test.ts`, `scripts/ui-smoke.mjs` |
 
 **The rollover is a read, not a write, and that is the whole design.** "Tomorrow's items move into Today after a day"
 could have been two folders and a job that writes `move` ops at midnight. Every device would have had to run it, a
@@ -458,6 +458,12 @@ device that was shut for three days would run it late, two devices awake at midn
 sibling order those moves minted would raise C-3 rows for a move nobody made. Instead the item records the day it is
 filed for and the two lists are questions asked of that day: Today is `day <= today`, Tomorrow is `day > today`. Nothing
 is written, nothing can race, and every device turns the day at its own midnight without agreeing with anyone.
+
+**They are the bottom of the `All` group, not a nav section of their own.** Search, Done and Merged sit under a rule
+because they are views of the whole tree; Today and Tomorrow are two places a day starts, so they belong with the lists
+and end the group rather than starting a new one. They carry the corner's weight and no icon: the two shortest labels in
+the column do not need a glyph to be told apart, and one beside them would have been the only picture in a list of
+words.
 
 **The items are ordinary rows, which is why so little of this is new.** They are created, titled, ticked, tagged,
 flagged, dragged, deleted and restored by the same ops and the same code as everything else; they are in the Done view
