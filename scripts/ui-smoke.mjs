@@ -99,11 +99,62 @@ async function main() {
       titles.includes('Shopping') && titles.includes('Milk') && titles.includes('Descale the kettle'),
       `${titles.length} rows`,
     );
-    const sidebar = (await page.locator('[data-testid="sidebar-link"]').allInnerTexts()).map((t) => t.trim());
+    const sidebarTitles = async () =>
+      (await page.locator('[data-testid="sidebar-link"]').allInnerTexts()).map((t) => t.trim()).join(',');
     check(
-      'the sidebar shows top-level folders and notes, and nothing deeper — T-10',
-      sidebar.join(',') === 'Shopping,House,Trip notes',
-      sidebar.join(','),
+      'the sidebar starts at the top-level folders and notes, second level closed — T-10, T-17',
+      (await sidebarTitles()) === 'Shopping,House,Trip notes',
+      await sidebarTitles(),
+    );
+
+    // --- T-17: the second level, disclosed and device-local -----------------
+    const sidebarRowId = async (title) =>
+      page
+        .locator('[data-testid="sidebar-link"]')
+        .filter({ hasText: title })
+        .first()
+        .getAttribute('data-row-id');
+    const disclosure = async (title) =>
+      page.locator(`[data-testid="sidebar-disclosure"][data-row-id="${await sidebarRowId(title)}"]`);
+
+    const shoppingTriangle = await disclosure('Shopping');
+    const houseTriangle = await disclosure('House');
+    check(
+      'a row with no folders or notes under it offers no disclosure — T-17',
+      (await shoppingTriangle.getAttribute('aria-expanded')) === null &&
+        (await houseTriangle.getAttribute('aria-expanded')) === 'false',
+      `Shopping ${await shoppingTriangle.getAttribute('aria-expanded')}, House ${await houseTriangle.getAttribute('aria-expanded')}`,
+    );
+
+    await houseTriangle.click();
+    check(
+      'opening a top-level row shows its immediate folders and notes — T-10',
+      (await sidebarTitles()) === 'Shopping,House,Kitchen,Trip notes',
+      await sidebarTitles(),
+    );
+
+    await (await disclosure('Trip notes')).click();
+    check(
+      'and never a task at the second level, however navigable the note is — T-10',
+      (await sidebarTitles()) === 'Shopping,House,Kitchen,Trip notes,Packing list',
+      await sidebarTitles(),
+    );
+
+    await page.reload();
+    await page.waitForSelector('[data-testid="tree"]');
+    check(
+      'which rows are open is device-local state, so it survives a reload — T-17, §2.3',
+      (await sidebarTitles()) === 'Shopping,House,Kitchen,Trip notes,Packing list',
+      await sidebarTitles(),
+    );
+
+    // Shut again, so every check below reads the column it was written against.
+    await (await disclosure('House')).click();
+    await (await disclosure('Trip notes')).click();
+    check(
+      'and the disclosure closes what it opened',
+      (await sidebarTitles()) === 'Shopping,House,Trip notes',
+      await sidebarTitles(),
     );
 
     const corner = page.locator('[data-testid="all-lists-link"]');

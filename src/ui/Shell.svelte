@@ -99,7 +99,7 @@
     </div>
 
     <nav class="min-h-0 flex-1 overflow-y-auto p-2" aria-label="Lists">
-      <SidebarLinks {session} {currentId} onNavigate={() => view.setDrawer(false)} />
+      <SidebarLinks {session} {view} {currentId} onNavigate={() => view.setDrawer(false)} />
 
       <!-- T-12 and F-5. Both are here even when empty: a view that appeared
            only once it had something in it is a view the user never learns

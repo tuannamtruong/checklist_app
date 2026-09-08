@@ -93,7 +93,7 @@ the rule is [sync-flow.md §4.8 The compaction cut](sync-flow.md#48-the-compacti
 ### 2.3 What is never in the Sync Folder
 
 Device-local state, held in `localStorage` and never written to a shared file: the device id, collapse/expand state
-(T-8), the sync cadence (S-19), which folder this device reaches the tree through
+(T-8), which sidebar rows are open (T-17), the sync cadence (S-19), which folder this device reaches the tree through
 ([architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter)), dismissed conflict notices (C-6), the
 chosen theme (X-14), how large the sidebar's type is (X-25), which tags the tree is filtered by (A-5), how wide the
 sidebar and the note pane have been dragged (X-20, X-24), and any filter the Done view grows (T-12). Anything the user
@@ -125,13 +125,14 @@ timestamps the fold already carries — derived, so it needs no sync and no writ
 | T-7 | Deleting a node tombstones its whole subtree, not just the node | ✅ | The ancestor walk must climb the T-6-resolved parent, or a tombstoned subtree containing a cycle hangs — [sync-flow.md §6.2 The repair](sync-flow.md#62-the-repair) — `src/core/tree.ts`; `tree.test.ts` covers the tombstoned subtree that contains a cycle |
 | T-8 | Collapse/expand state is per-device and never synced | ✅ | `src/app/view-state.svelte.ts` — `localStorage`, never a file |
 | T-9 | Breadcrumbs show the path back up from any node | ✅ | `src/ui/Breadcrumbs.svelte`, over `ancestorsOf` |
-| T-10 | Sidebar shows the **top-level** `folder` and `note` rows, and nothing deeper | ✅ | `SIDEBAR_KINDS` in `src/core/types.ts`, read by `src/ui/SidebarLinks.svelte`, which renders one level and does not recurse. A task would drown the two kinds that are navigation |
+| T-10 | Sidebar shows the **top-level** `folder` and `note` rows, and under each of them its immediate `folder` and `note` children — two levels, and nothing deeper | ✅ | `sidebarChildren` in `src/core/tree.ts` over `SIDEBAR_KINDS` in `src/core/types.ts`, read by `src/ui/SidebarLinks.svelte`, which draws the two levels and does not recurse. A task would drown the two kinds that are navigation, at either level. `tree.test.ts`, `scripts/ui-smoke.mjs` |
 | T-11 | A ticked row is not in the normal view at all — not in its list, not in the sidebar, not in the caret order, and neither is anything it holds | ✅ | The filter is `resolveTree`'s, beside T-7's: `src/core/tree.ts` drops an own-`done` node from `children`, and one filtered set answers all three. The subtree goes with it because nothing walks *into* a row that is not there — but the flag itself is **not** inherited, so a finished row's own page still shows what is inside it, which is what makes T-12's rows worth opening. `tree.test.ts`, `scripts/ui-smoke.mjs` |
 | T-12 | One Done view lists every row the tree no longer shows — ticked or deleted, one list, newest first, each with the path it sat on | ✅ | `archivedRows` in `src/core/done.ts`; `src/ui/DonePage.svelte` at `#/done`. **No distinction between the two:** a tick and a delete are the same answer to "where did that go?", and two lists made the reader settle which kind of gone a row had been before they could start looking. The order is `deletedAt` or `doneAt`, newest first, because the row being looked for is nearly always the last one to go — tree order is the wrong order for a list nobody browses. One entry per run, never the descendants, and one control on it: `unarchive` in `src/core/edit.ts` clears the tombstone, the tick, or both. `done.test.ts`, `edit.test.ts`, `scripts/ui-smoke.mjs` |
 | T-13 | A deleted row can be restored from the Done view | ✅ | The `restore` op of [§2.2 The op](#22-the-op), added in M3: `src/core/edit.ts` `restore`, offered by `src/ui/DonePage.svelte`. It clears the row's **own** tombstone and nothing else, so a row still under a deleted ancestor stays gone — which is why the Done view lists only the top of a deleted run, and restoring that one brings the whole subtree back with it. It is one of the two ops `unarchive` writes, and the archive's single Restore control is where T-12 offers it. `done.test.ts`, `edit.test.ts`, `scripts/ui-smoke.mjs` |
 | T-14 | A row is dragged to another place in the tree: above a row, below it, or into it | ✅ | `dropOnto` in `src/core/edit.ts`, one `move` op like every other; `src/ui/drag.svelte.ts` drives it over **pointer** events rather than HTML5 drag-and-drop, so a thumb and a mouse take one code path. `edit.test.ts`, `scripts/ui-smoke.mjs` |
 | T-15 | The grip sits in one column at the left edge of every row, whatever the row's depth | ✅ | `src/ui/Row.svelte` puts the depth indent on the row's contents rather than on the row itself, so every grip is at the same x and the indent still draws the nesting. `scripts/ui-smoke.mjs` |
 | T-16 | On a touch screen there is no grip at all: a finger held on the row picks it up | ✅ | `src/ui/drag.svelte.ts` arms the hold on `pointerdown` and fires it after 400 ms of stillness, `src/ui/Row.svelte` captures the pointer there, and the coarse-pointer rule in `src/app.css` takes the grip off the row. `drag.svelte.test.ts`, `scripts/ui-smoke.mjs` |
+| T-17 | A top-level sidebar row with children of those kinds carries a disclosure, and the second level starts **closed**; which rows are open is this device's own and never syncs | ✅ | `sidebarOpen` in `src/app/view-state.svelte.ts` — `localStorage`, never a file, and it holds the *open* ids so a fresh device and an empty set are the same state. Separate from T-8's collapse set on purpose: the nav and the page are two drawings, and opening a folder to navigate to it says nothing about how the page under it is read. `view-state.svelte.test.ts`, `scripts/ui-smoke.mjs` |
 
 [sync-flow.md §3 Why a snapshot does not scale to a tree](sync-flow.md#3-why-a-snapshot-does-not-scale-to-a-tree) is why
 T-2, T-5, T-6 and T-7 constrain the sync payload, not just the UI.
@@ -170,13 +171,20 @@ A drag is one `move` op, exactly like `Tab` and `Alt-↓` before it. It mints an
 way every other insertion does (T-2), so two devices dragging into one gap resolve by
 [§5.3 The tiebreak](sync-flow.md#53-the-tiebreak) rather than by anything the drag knows about.
 
-**The sidebar is one level deep, and that is the whole of T-10.** It used to mirror the tree: every container at every
-depth, indented. Two things were wrong with it. A tree that is unlimited in depth (T-1) makes the column unlimited too,
-so the nav entries under it — Search, Done, Merged — go off the bottom of the screen long before the tree itself does;
-and a second drawing of the same nesting is a second place to read it, one of which is always the narrower. What the
-sidebar is for is the way back to the few places worth starting from, and those are top level. Everything below is drawn
-by the tree view, which is the one that can collapse (T-8), filter (A-4) and drag (T-14), and breadcrumbs (T-9) are the
-way back up out of it.
+**The sidebar is two levels deep and the second one starts closed — T-10 with T-17.** It mirrored the tree once: every
+container at every depth, indented, and M6 cut it back to the top level alone. Both ends of that were wrong. A tree
+unlimited in depth (T-1) makes the column unlimited too, so the nav entries under it — Search, Done, Merged — go off the
+bottom of the screen long before the tree itself does; but one level stops one step short of where the second place
+worth starting usually is, and reaching it meant opening the top-level page to click a row that was already in view. A
+*fixed* second level keeps the column bounded and closes that step: a top-level row is worth one disclosure, and
+everything under that is the tree view's, which is the one that can collapse (T-8), filter (A-4) and drag (T-14), with
+breadcrumbs (T-9) as the way back up out of it.
+
+**Closed by default, and that is the whole difference between this and the column M6 removed.** A sidebar that opened
+every row would draw the mirror again on the first paint; one that could not open at all would be M6's sidebar for
+anyone who never found the triangle. So the disclosure is drawn only on a row that actually has `folder` or `note`
+children, and what is stored is the set of *open* ids — nothing is written until somebody opens one, and a device that
+never does is the device M6 shipped.
 
 **A note is one of those places and a task is not.** A note is somewhere a person returns to — it holds a body (K-3) and
 may own a checklist (K-4) — so it belongs beside the folders. Tasks are the bulk of a checklist and would bury both
@@ -1033,7 +1041,7 @@ every possible destination is a second navigation to build and to test, and the 
 | M4 | Settings and appearance | **Closed.** One screen for everything about this device rather than about the tree (X-12), and the six themes X-13 puts behind it — [§10.1 Themes](#101-themes). It moved the D-1 name editor and the D-4 log link onto that screen and took a nav entry away rather than adding one. It changed no component's colours, because no component ever named one |
 | M5 | Attributes, the drag and the folder screen | **Closed.** Four features that each turned out to be a caller of something already there: the drag (T-14) over the `move` op M1 wrote, tags and priority ([§4.1 Tags and priority](#41-tags-and-priority)) over the `set` op and the conflict list M2 built, the quick-add line (K-8) over `createLastChild`, and the sync folder section ([§10.2 The sync folder, on the settings screen](#102-the-sync-folder-on-the-settings-screen)) over the shell that already held the folder. It closed row 2 of [§15 Deviations and defects found during verification](#15-deviations-and-defects-found-during-verification) — T-5's refusal has a gesture that can provoke it at last |
 
-| M6 | Fewer things | **Closed.** A milestone that mostly removed: the fourth kind (K-1, `list` folded into `folder` at the decoder), the second control for a kind change ([K-6, withdrawn](#4-item-kinds-and-attributes)), and the sidebar's copy of the whole tree (T-10, one level now). The one thing it added is K-9, a pasted paragraph becoming one row per line, which is the quick-add line answering a question it already had the machinery for. Nothing here changed the payload, the merge or the folder |
+| M6 | Fewer things | **Closed.** A milestone that mostly removed: the fourth kind (K-1, `list` folded into `folder` at the decoder), the second control for a kind change ([K-6, withdrawn](#4-item-kinds-and-attributes)), and the sidebar's copy of the whole tree (T-10, one level then; T-17 later gave it a second level that starts closed). The one thing it added is K-9, a pasted paragraph becoming one row per line, which is the quick-add line answering a question it already had the machinery for. Nothing here changed the payload, the merge or the folder |
 
 | M7 | Formatting in a note body | **Closed.** B-1 to B-6 — [§4.3 Bold and headings in a note body](#43-bold-and-headings-in-a-note-body) — bold and two heading levels, as Markdown marks inside the body string. The one milestone so far that adds a feature and changes nothing about the payload: `body` was a string before it and is a string after, so the merge, the conflict rows and compaction never learned that a body can be formatted |
 | M8 | A note beside the list | **Closed.** X-21 to X-24 — [§10.3 A note beside the list](#103-a-note-beside-the-list) — a note opens beside the nearest list above it at `lg` and as a 60%-tall sheet over it below, a page's column is left-aligned so nothing moves when it does, and the divider between the two columns is dragged. Like M7 it adds a feature and changes nothing about the payload: no route, no op, no field. The one thing it stores is X-24's width, and that is device-local like every other width here. It is one composition change in `src/ui/App.svelte`, one new view, and one grip that the sidebar now shares |

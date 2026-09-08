@@ -243,7 +243,7 @@ body {
    view's — is untouched, because those are not the column this setting is
    about. */
 .sidebar-text {
-  font-size: calc(1.05rem * var(--sidebar-type));
+  font-size: calc(1.35rem * var(--sidebar-type));
   line-height: calc(1.5rem * var(--sidebar-type));
 }
 
@@ -256,6 +256,27 @@ body {
   width: calc(1.2rem * var(--sidebar-type));
   height: calc(1.2rem * var(--sidebar-type));
   flex-shrink: 0;
+}
+
+/* T-17: the triangle is drawn larger than the kind icon beside it rather than
+   the same size. It is the one control in this column — everything else here is
+   a link — and at `.sidebar-icon`'s 1.2rem the glyph inside it was a mark rather
+   than something to aim at. The box and the glyph both scale with X-25's type,
+   for the reason `.sidebar-icon` does. */
+.sidebar-disclosure {
+  width: calc(1.7rem * var(--sidebar-type));
+  height: calc(1.7rem * var(--sidebar-type));
+  font-size: calc(1.7rem * var(--sidebar-type));
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+/* T-17: the second level is inset by two things — the disclosure column it does
+   not have, which is `.sidebar-disclosure`'s width, and one step of nesting,
+   which is the 1.25rem a row of the tree indents by. Both scale with X-25's
+   type, so the step stays a step at `maximal` rather than closing up. */
+.sidebar-indent {
+  padding-left: calc(1.7rem * var(--sidebar-type) + 1.25rem * var(--sidebar-type));
 }
 
 /* X-20: a pointer that starts on the sidebar's grip is a resize, never a

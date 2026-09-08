@@ -437,8 +437,8 @@ as well, by the very note whose list the click came from.
 | C | The parent, with its body suppressed on the left | Keeps the movement and adds a rule: a node page that draws itself differently depending on who is beside it. `NodePage` is one drawing on its own route and on the left of a note's, and that is what makes the second pane free |
 
 What A gives up is small because the tree does not stop at one level: the nested note is drawn, and highlighted, inside
-the tree the left pane already shows — T-10's "one level deep" is the sidebar's rule, not the tree's. What it buys is
-that the left column moves when the *user* navigates it and at no other time.
+the tree the left pane already shows — T-10's two levels are the sidebar's rule, not the tree's. What it buys is that
+the left column moves when the *user* navigates it and at no other time.
 
 ### 14.3 The divider — reopened and taken
 
@@ -608,3 +608,37 @@ last changed would name the same failure without starting anything.
 A shell that offers a *documented, provider-independent* "sync now" — an Android intent every client honours, say —
 reopens it as a different feature. That is a capability of the shell rather than a catalog of apps, and it would arrive
 with no list to keep in step.
+
+## 17. The sidebar's second level
+
+M6 cut the sidebar back to the top level — [§11 Retiring the `list` kind](#11-retiring-the-list-kind) was the same
+milestone's other removal — and using it found what the cut had taken. The place a person goes back to is often one step
+down: the project inside the folder, the packing list inside the trip. The nav could name only the container above it,
+so every one of those trips was two clicks and a page nobody wanted to read on the way past. T-17 gives each top-level
+row a disclosure and one level under it, closed until it is opened.
+
+### 17.1 The options
+
+| # | Option | What it costs |
+| --- | --- | --- |
+| A | **One fixed level under each top-level row, disclosed, closed by default** — chosen | A second drawing of one level of the tree, a triangle on the rows that have children of the right kinds, and one more piece of device-local state |
+| B | The whole tree again, collapsed by default | M6's column with a lid on it. Depth is unlimited (T-1), so one opened branch runs the nav entries off the bottom exactly as before, and the state that keeps it shut is a second copy of T-8's, growing with the tree |
+| C | The second level, but open by default | The first paint is the mirror M6 removed, on every device that never touches a triangle — and the column is longest exactly when the reader has learned least about it |
+| D | Reuse T-8's collapse state, so a folder open on the page is open in the nav | One set rather than two, and two drawings that move each other: collapsing a folder while reading it would close it in the nav, and the nav's triangle would reach into the page. They answer different questions — what am I reading, and where do I go |
+| E | Tasks at the second level as well | The second level becomes the bulk of the checklist, which is the argument that kept tasks out of the first (T-10) |
+
+**A was taken, and the fixed depth is what makes it safe.** B's objection was never nesting as such — it was that the
+column's length is a function of the tree's depth, so no amount of collapsing bounds it. Two levels is a bound: the
+column is at most the top-level rows plus the children of the ones the reader opened, and both halves are things a
+person chose to have.
+
+D is the one worth stating twice, because it looks like a saving. The sidebar's disclosure means *show me what is in
+there before I go*, and the tree's means *I am done with this part of the page*. Fusing them makes each gesture perform
+the other one somewhere the reader is not looking. Two sets, two keys, and neither one ever reads the other.
+
+### 17.2 What reopens it
+
+A third level, if the two-click trip turns out to have moved down a step rather than gone away — the shape of the
+complaint would be identical and the fix would be the same code with a depth of three. What would *not* reopen it is B:
+a depth that is a function of the tree is the thing this design is built to avoid, and a bound that is unlimited is not
+a bound.

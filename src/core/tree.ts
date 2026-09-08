@@ -11,7 +11,7 @@
 // device drops the same edge without agreeing with anyone — sync-flow.md §6.2.
 
 import { compareSiblings } from './order';
-import { ROOT, type Node, type NodeId, type NodeMap, type ParentId } from './types';
+import { ROOT, SIDEBAR_KINDS, type Node, type NodeId, type NodeMap, type ParentId } from './types';
 
 export type RepairReason = 'cycle' | 'missing-parent';
 
@@ -206,6 +206,21 @@ export function listAbove(tree: ResolvedTree, id: NodeId): ParentId {
     cursor = parentOf(tree, cursor);
   }
   return cursor;
+}
+
+/**
+ * T-10. The children of `parent` the sidebar draws: the `folder` and `note`
+ * ones, in tree order, and never a task — tasks are the bulk of a checklist and
+ * would bury the two kinds that are navigation.
+ *
+ * `childrenOf` has already dropped the tombstoned (T-7) and the ticked (T-11),
+ * so a row leaves the nav at the same moment it leaves the page.
+ */
+export function sidebarChildren(tree: ResolvedTree, parent: ParentId): readonly NodeId[] {
+  return childrenOf(tree, parent).filter((id) => {
+    const kind = tree.nodes[id]?.kind;
+    return kind !== undefined && SIDEBAR_KINDS.includes(kind);
+  });
 }
 
 /** Present and not tombstoned — what a route may open, per X-11. */

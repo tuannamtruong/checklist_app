@@ -8,6 +8,7 @@ import type { NodeId } from '../core/types';
 const COLLAPSED_KEY = 'checklist.collapsed';
 const DRAWER_KEY = 'checklist.drawer';
 const TAG_FILTER_KEY = 'checklist.tagfilter';
+const SIDEBAR_OPEN_KEY = 'checklist.sidebaropen';
 const SIDEBAR_WIDTH_KEY = 'checklist.sidebarwidth';
 const NOTE_WIDTH_KEY = 'checklist.notewidth';
 
@@ -73,7 +74,7 @@ function loadIds(storage: Storage, key: string): Set<NodeId> {
   }
 }
 
-/** T-8 and A-5. Collapse, the drawer and the tag filter, on this device only. */
+/** T-8, T-17 and A-5. Collapse, the nav's disclosures, the drawer and the tag filter, on this device only. */
 export class ViewState {
   private storage: Storage;
   private collapsedIds = $state<Set<NodeId>>(new Set());
@@ -84,6 +85,18 @@ export class ViewState {
    * mistaken for an empty one.
    */
   private tags = $state<Set<string>>(new Set());
+  /**
+   * T-17. Which top-level sidebar rows have their second level open. It holds
+   * the *open* ids rather than the closed ones, which is what makes "closed" the
+   * default with nothing stored: a device that never touches a triangle reads an
+   * empty set and draws the one-level column M6 shipped.
+   *
+   * It is deliberately not `collapsedIds`. The nav's disclosure means "show me
+   * what is in there before I go" and the tree's means "I am done with this part
+   * of the page"; one set would make each gesture perform the other somewhere the
+   * reader is not looking — past_decision.md §17.
+   */
+  private sidebarOpenIds = $state<Set<NodeId>>(new Set());
   /** Below `md` the sidebar is a drawer, and the drawer starts shut — X-2. */
   drawerOpen = $state(false);
   /**
@@ -105,6 +118,7 @@ export class ViewState {
   constructor(storage: Storage = window.localStorage) {
     this.storage = storage;
     this.collapsedIds = loadIds(storage, COLLAPSED_KEY);
+    this.sidebarOpenIds = loadIds(storage, SIDEBAR_OPEN_KEY);
     this.tags = loadIds(storage, TAG_FILTER_KEY);
     this.drawerOpen = storage.getItem(DRAWER_KEY) === 'open';
     this.sidebarWidth = loadWidth(storage, SIDEBAR_WIDTH_KEY, SIDEBAR_WIDTH);
@@ -180,6 +194,18 @@ export class ViewState {
   expand(id: NodeId): void {
     if (!this.collapsedIds.has(id)) return;
     this.toggleCollapsed(id);
+  }
+
+  /** T-17, and closed is what an id nobody stored means. */
+  isSidebarOpen(id: NodeId): boolean {
+    return this.sidebarOpenIds.has(id);
+  }
+
+  toggleSidebarOpen(id: NodeId): void {
+    const next = new Set(this.sidebarOpenIds);
+    if (!next.delete(id)) next.add(id);
+    this.sidebarOpenIds = next;
+    this.storage.setItem(SIDEBAR_OPEN_KEY, JSON.stringify([...next]));
   }
 
   /** X-20. Clamped here rather than at the grip, so every caller gets the bounds. */

@@ -7,6 +7,7 @@ import {
   listAbove,
   parentOf,
   resolveTree,
+  sidebarChildren,
   siblingAt,
 } from './tree';
 import { ROOT, type Kind, type Op, type ParentId } from './types';
@@ -252,5 +253,43 @@ describe('listAbove — X-21', () => {
     // tree on the left does not contain.
     const tree = treeOf([createOf('n_x', 'n_missing', 'a1', 'note')]);
     expect(listAbove(tree, 'n_x')).toBe(ROOT);
+  });
+});
+
+describe('sidebarChildren — T-10', () => {
+  // One of each kind under the root and under a folder, which is the whole
+  // question the sidebar asks twice: once at the top level, once one step down.
+  const ops = [
+    createOf('n_f', ROOT, 'a1', 'folder'),
+    createOf('n_note', ROOT, 'a2', 'note'),
+    createOf('n_task', ROOT, 'a3', 'task'),
+    createOf('n_f_sub', 'n_f', 'a1', 'folder'),
+    createOf('n_f_note', 'n_f', 'a2', 'note'),
+    createOf('n_f_task', 'n_f', 'a3', 'task'),
+  ];
+
+  it('is the folders and the notes, in sibling order, and never a task', () => {
+    expect(sidebarChildren(treeOf(ops), ROOT)).toEqual(['n_f', 'n_note']);
+  });
+
+  it('asks the same question one level down, which is where the second level comes from', () => {
+    expect(sidebarChildren(treeOf(ops), 'n_f')).toEqual(['n_f_sub', 'n_f_note']);
+  });
+
+  it('is empty for a row whose children are all tasks, so no disclosure is drawn', () => {
+    const tree = treeOf([createOf('n_a', ROOT, 'a1', 'folder'), createOf('n_a1', 'n_a', 'a1', 'task')]);
+    expect(sidebarChildren(tree, 'n_a')).toEqual([]);
+  });
+
+  it('loses a ticked or deleted row when the page does — T-11, T-7', () => {
+    const tree = treeOf([
+      createOf('n_a', ROOT, 'a1', 'folder'),
+      createOf('n_done', 'n_a', 'a1', 'folder'),
+      createOf('n_gone', 'n_a', 'a2', 'note'),
+      createOf('n_kept', 'n_a', 'a3', 'note'),
+      tick('n_done'),
+      remove('n_gone'),
+    ]);
+    expect(sidebarChildren(tree, 'n_a')).toEqual(['n_kept']);
   });
 });

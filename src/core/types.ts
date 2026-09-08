@@ -26,11 +26,13 @@ export type Kind = 'folder' | 'note' | 'task';
 export const KINDS: readonly Kind[] = ['folder', 'note', 'task'];
 
 /**
- * T-10. The sidebar shows these kinds, at the top level only. It is the way
- * back to the few places worth starting from rather than a second copy of the
- * tree: nesting is what the tree view draws, and breadcrumbs (T-9) are the way
- * back up out of it. A task is left out because tasks are the bulk of a
- * checklist and would bury the two kinds that are navigation.
+ * T-10. The kinds the sidebar shows, at the top level and one step under it —
+ * `sidebarChildren` in `core/tree.ts` is the only reader. Two levels and no
+ * more: it is the way back to the few places worth starting from rather than a
+ * second copy of the tree, and the deeper nesting is what the tree view draws,
+ * with breadcrumbs (T-9) as the way back up out of it. A task is left out at
+ * both levels because tasks are the bulk of a checklist and would bury the two
+ * kinds that are navigation.
  */
 export const SIDEBAR_KINDS: readonly Kind[] = ['folder', 'note'];
 

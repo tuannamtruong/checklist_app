@@ -111,3 +111,37 @@ describe('note pane width — X-24', () => {
     expect(view.notePaneWidth).toBe(1500);
   });
 });
+
+describe("the sidebar's second level — T-17", () => {
+  it('starts closed, and stores nothing to say so', () => {
+    const storage = fakeStorage();
+    const view = new ViewState(storage);
+    expect(view.isSidebarOpen('n_a')).toBe(false);
+    expect(storage.getItem('checklist.sidebaropen')).toBe(null);
+  });
+
+  it('opens a row, closes it again, and remembers the open ones on the next visit', () => {
+    const storage = fakeStorage();
+    const first = new ViewState(storage);
+    first.toggleSidebarOpen('n_a');
+    expect(first.isSidebarOpen('n_a')).toBe(true);
+    expect(new ViewState(storage).isSidebarOpen('n_a')).toBe(true);
+    first.toggleSidebarOpen('n_a');
+    expect(new ViewState(storage).isSidebarOpen('n_a')).toBe(false);
+  });
+
+  it("is not T-8's collapse state: neither disclosure moves the other", () => {
+    const storage = fakeStorage();
+    const view = new ViewState(storage);
+    view.toggleSidebarOpen('n_a');
+    expect(view.isCollapsed('n_a')).toBe(false);
+    view.toggleCollapsed('n_a');
+    expect(view.isSidebarOpen('n_a')).toBe(true);
+    expect(storage.getItem('checklist.collapsed')).toBe('["n_a"]');
+    expect(storage.getItem('checklist.sidebaropen')).toBe('["n_a"]');
+  });
+
+  it('ignores a stored value that is not a list of ids', () => {
+    expect(new ViewState(fakeStorage({ 'checklist.sidebaropen': '{' })).isSidebarOpen('n_a')).toBe(false);
+  });
+});

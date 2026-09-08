@@ -137,10 +137,10 @@ it. Never a peer's file: one writer per file, and that is also why the cut needs
 lower this device's top counter, or every peer reads the file as a partial download and skips it forever. sync-flow.md
 §4.8.
 
-Never in a file, always `localStorage`: the device id, collapse state, the drawer's state, the sidebar's and the note
-pane's widths, which folder this device chose, which cloud app it belongs to, the chosen theme, how large the sidebar's
-type is, the tag filter, and dismissed conflict rows. The File System Access handle is the exception, and only because
-it is an object: IndexedDB.
+Never in a file, always `localStorage`: the device id, collapse state, which sidebar rows are open, the drawer's state,
+the sidebar's and the note pane's widths, which folder this device chose, which cloud app it belongs to, the chosen
+theme, how large the sidebar's type is, the tag filter, and dismissed conflict rows. The File System Access handle is
+the exception, and only because it is an object: IndexedDB.
 
 ### Component catalog
 
@@ -251,8 +251,11 @@ older file as a `folder`, which is the only migration there is and is the same r
 Nothing rewrites a file to do it, and a peer on an older build reads `folder` without noticing anything happened —
 past_decision.md §11.
 
-`src/ui/SidebarLinks.svelte` renders the **top-level** folders and notes and does not recurse (T-10): the sidebar is the
-way back to the few places worth starting from, and the tree view is what draws the nesting.
+`src/ui/SidebarLinks.svelte` renders the **top-level** folders and notes and, under each, its immediate folder and note
+children — two levels, and it does not recurse (T-10). The second level is behind a disclosure and **starts closed**
+(T-17): `sidebarOpen` in `src/app/view-state.svelte.ts` holds the *open* ids, so a device that never opens one sees the
+column M6 shipped. It is deliberately not T-8's collapse set — the nav and the page are two drawings and neither moves
+the other. Deeper than that is the tree view's, which is what draws the nesting.
 
 ### Attributes
 
