@@ -118,12 +118,13 @@
            the corner's own left edge while the padding keeps a hover target. -->
       <div class="-mx-1 mt-1 flex flex-col">
         {#each [{ href: TODAY_HREF, label: 'Today', open: todayOpen }, { href: TOMORROW_HREF, label: 'Tomorrow', open: tomorrowOpen }] as entry (entry.href)}
+          <!-- The corner's colour as well as its weight: these two read as part
+               of `All` rather than as entries under it, so the open one is
+               marked by its background alone. -->
           <a
             href={entry.href}
             class="sidebar-text truncate rounded-md px-1 py-1 font-semibold hover:bg-surface-sunken"
             class:bg-accent-soft={entry.open}
-            class:text-accent={entry.open}
-            class:text-ink-muted={!entry.open}
             data-testid="agenda-link"
             data-agenda={entry.label.toLowerCase()}
             onclick={() => view.setDrawer(false)}

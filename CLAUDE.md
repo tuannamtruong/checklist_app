@@ -269,7 +269,8 @@ so, on every device at its own midnight. past_decision.md §18 says what a `move
 passes in — the logic layer still reads no clock. `src/ui/AgendaPage.svelte` is one page asked about two days, reusing
 K-8's line (which files under the page's day) and `TreeView`'s `only` set, which is A-4's filter mechanism with a second
 caller. The nav entries sit in the corner's own block, under `All` and **above** the rule that starts the tree's rows,
-in the corner's weight and with no glyph — so they are pinned where `All` is rather than scrolling with the lists.
+in the corner's weight and colour and with no glyph — so they are pinned where `All` is rather than scrolling with the
+lists, and the open one is marked by its background alone.
 
 **A second root means every walk that stopped at one now stops at two.** `isRoot` in `types.ts` is what they call:
 `resolveTree`'s cycle and missing-parent walks — reading `agenda` as a parent that failed to arrive would repair every
