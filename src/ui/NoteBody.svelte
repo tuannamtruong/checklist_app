@@ -24,12 +24,20 @@
    * 16rem minimum exists so a full page's body is a target worth clicking; in a
    * pane the pane's own height already does that job, and on the phone's sheet
    * the floor would eat X-22's 60% before the note had said anything.
+   *
+   * `fill` is X-31: the field takes the height it is given rather than the
+   * height of what is in it. It only means anything inside a flex column with a
+   * height of its own — the pane above `lg`, and the sheet once it is expanded —
+   * because `flex-1` distributes free space and an auto-height box has none. So
+   * the peeked sheet keeps `compact`'s floor and X-22's rule with it, and the
+   * caller passes both.
    */
   let {
     session,
     id,
     compact = false,
-  }: { session: Session; id: NodeId; compact?: boolean } = $props();
+    fill = false,
+  }: { session: Session; id: NodeId; compact?: boolean; fill?: boolean } = $props();
 
   const floor = $derived(compact ? 'min-h-32' : 'min-h-64');
 
@@ -224,7 +232,9 @@
   </button>
 </div>
 
-<div class="relative">
+<!-- X-31's `fill` grows this box to the pane's height, and the floor is what
+     stops it collapsing on a sheet that has no height to give. -->
+<div class="relative {fill ? `flex-1 ${floor}` : ''}">
   <!-- The rendered view is what the same value looks like, so it is hidden from
        assistive technology: the textarea below carries the text itself, and one
        value announced twice is one value too many. -->
@@ -237,7 +247,9 @@
          reach would ever have been enough. Marks are what B-2 keeps in the
          string; a line too long to fit is not one of them. -->
     <div
-      class="w-full rounded-lg border border-line bg-surface-raised p-3 text-sm leading-relaxed break-words {floor}"
+      class="w-full rounded-lg border border-line bg-surface-raised p-3 text-sm leading-relaxed break-words {fill
+        ? 'h-full overflow-y-auto'
+        : floor}"
       aria-hidden="true"
       data-testid="note-rendered"
     >
@@ -270,8 +282,12 @@
   <textarea
     bind:this={field}
     bind:value={draft}
-    class="w-full rounded-lg border border-line bg-surface-raised p-3 text-sm leading-relaxed outline-none focus:border-accent {editing ? floor : ''}"
-    class:resize-y={editing}
+    class="w-full rounded-lg border border-line bg-surface-raised p-3 text-sm leading-relaxed outline-none focus:border-accent {fill
+      ? 'h-full'
+      : editing
+        ? floor
+        : ''}"
+    class:resize-y={editing && !fill}
     class:absolute={!editing}
     class:inset-0={!editing}
     class:h-full={!editing}

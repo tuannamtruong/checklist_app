@@ -206,8 +206,8 @@ page it always did: a list beside a list is the same drawing twice.
 
 **"The nearest list above it" is a walk, not the parent.** `listAbove` in `src/core/tree.ts` climbs T-6's resolved
 parents past every `note`, so opening a note *inside* a note swaps the pane and leaves the left column exactly where the
-reader put it — its children are in the pane (K-4), so that click is a click inside the pane and the pane is what
-answers it. Drawing the parent note on the left instead was the first cut: it put a second body and a second K-7
+reader put it — the nested note is a row in that column's own tree, which draws the whole subtree, so the click is a
+click on the left and only the pane answers it. Drawing the parent note on the left instead was the first cut: it put a second body and a second K-7
 debounce on screen, and moved the list on every step down. `closeHref` walks the same way, or ✕ on a nested note would
 open its parent rather than close anything.
 
@@ -223,9 +223,16 @@ The breakpoint is **`lg`, not X-2's `md`**: the sidebar asks whether there is ro
 whether there is room for two columns of content. Below it `src/ui/NotePane.svelte` is a bottom sheet instead —
 `max-h-[60dvh]` over an auto height, so a short note shows whole and a long one stops at 60% with no measurement
 anywhere (X-22). A peeked sheet is covered by one transparent button that swallows the tap and opens it; without it the
-tap would land in B-3's always-mounted textarea. The peek hides the note's own children in CSS (`note-children`), or
-every note would sit at the cap and "as tall as its content" would mean nothing. Expansion is one boolean in the pane,
-reset when the note changes — a gesture, not a setting.
+tap would land in B-3's always-mounted textarea. Expansion is one boolean in the pane, reset when the note changes — a
+gesture, not a setting.
+
+**The pane is an editor and nothing else — X-31.** The title, the tags, the body, and K-8's add line as the top row
+where `Breadcrumbs` used to be. No path — the column on the left *is* the note's path, in rows. No list of the note's
+own children — that same column draws them, nested under the note's own row, and drawing them here put the same rows on
+screen twice. K-4 is untouched: the add line still files under the note, and the row it makes appears on the left. The
+body takes the height that is left, which is `fill` in `src/ui/NoteBody.svelte` — the `min-h` floor is what a *page*
+needs and what the peeked sheet still gets, since flex distributes free space and an auto-height sheet has none, so
+X-22's sizing rule is untouched too.
 
 **The caret is a second way in, and it moves nothing — X-30.** Putting the caret in a **note** row's title raises that
 note in the pane; the route, the history and the left column stay exactly where the reader left them. `src/ui/panes.ts`

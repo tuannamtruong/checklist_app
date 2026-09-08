@@ -22,12 +22,10 @@
   import type { Session } from '../app/Session.svelte';
   import { NOTE_WIDTH, type ViewState } from '../app/view-state.svelte';
   import type { RowFocus } from './focus.svelte';
-  import Breadcrumbs from './Breadcrumbs.svelte';
   import NoteBody from './NoteBody.svelte';
   import PageTitle from './PageTitle.svelte';
   import QuickAdd from './QuickAdd.svelte';
   import TagEditor from './TagEditor.svelte';
-  import TreeView from './TreeView.svelte';
   import WidthGrip from './WidthGrip.svelte';
   import { nodeHref } from '../app/router.svelte';
 
@@ -107,8 +105,15 @@
        desktop, where the pane is already as open as it gets. -->
   <div class="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-line lg:hidden" aria-hidden="true"></div>
 
+  <!-- X-31. The top row is K-8's add line, in the place the breadcrumbs held
+       until the pane stopped being the note's page: the left column is the
+       note's path drawn as the rows around it, so a breadcrumb here said that
+       again in words and offered the reader a way out of the note they just
+       opened. The line adds to the note, and the row it makes is drawn under
+       the note's own row on the left — K-10's group in the place X-27 already
+       puts it on a phone. -->
   <div class="flex shrink-0 items-center gap-2 px-4 py-2">
-    <div class="min-w-0 flex-1"><Breadcrumbs {session} {id} /></div>
+    <QuickAdd {session} {view} {focus} parent={id} />
     <!-- Above the peek's tap layer: everything on a peeked sheet means "open
          this" except the one control that means the opposite — §10.3. -->
     {#if fromCaret}
@@ -143,32 +148,18 @@
 
     <TagEditor {session} {id} />
 
+    <!-- X-31. `fill` rather than the page's floor: the pane opened to be
+         written in, and a five-line field under half a window of nothing is the
+         one thing it must not be. On the sheet it changes nothing — there is no
+         free space to distribute under an auto height, so X-22's "as tall as
+         the note" and the peek's floor both stand. -->
     {#if node?.kind === 'note'}
-      <NoteBody {session} {id} compact />
+      <NoteBody {session} {id} compact fill />
     {/if}
-
-    <!-- K-4's children, and K-8's line directly above them rather than at the
-         head of the pane: a pane that opened with an input would be a note you
-         cannot read — requirements.md §4. A-4's bar is not repeated here; the
-         page behind this one already says what is filtered, and the filter
-         reaches this tree through `TreeView` regardless.
-
-         Hidden on a peeked sheet, and hidden in CSS rather than by not being
-         rendered: a peek is the note's *text*, so measuring the note's list into
-         its height would put every note at X-22's 60% cap and make "as tall as
-         its content" mean nothing. Above `lg` there is no peek and the list is
-         always here — §10.3. -->
-    <div class="flex-col gap-4 {expanded ? 'flex' : 'hidden'} lg:flex" data-testid="note-children">
-      <div class="flex max-w-xl">
-        <QuickAdd {session} {view} {focus} parent={id} />
-      </div>
-
-      <TreeView {session} {view} {focus} parent={id} />
-    </div>
   </div>
 
   <!-- X-22. One transparent layer over the whole peeked sheet, so a tap on the
-       body, the title or the breadcrumbs all mean "open it". Without it the tap
+       body, the title or the add line all mean "open it". Without it the tap
        would land in B-3's always-mounted textarea and the phone would put a
        caret and a keyboard into text the reader can see 60% of — §10.3. -->
   {#if !expanded}

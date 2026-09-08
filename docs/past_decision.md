@@ -19,6 +19,7 @@ History of project's decision. The situation, its options and resolution.
 | [One archive rather than two lists](#13-one-archive-rather-than-two-lists) | One list of everything the tree no longer shows, ordered by when it left | -  keeping the finished and deleted lists apart<br>-  one list with a badge saying which kind of gone<br>-  a separate `archived_at` field on the op |
 | [A note beside the list](#14-a-note-beside-the-list-rather-than-instead-of-it) | One route drawing two panes, the list derived from the note | -  a second route carrying both ids<br>-  the pane as device-local state beside the route<br>-  splitting every kind, not just notes<br>-  a preview popover over the row |
 | [The caret opens the note pane](#144-the-caret-opens-the-pane-too) | The caret raises the pane and the route does not move | -  the caret navigating like the icon<br>-  a route carrying both ids<br>-  remembering the list beside the route<br>-  the icon as the only way in |
+| [What the note pane draws](#146-what-the-pane-draws--x-31) | The title, the tags and the body, with the body filling the pane | -  the note's page redrawn in a column<br>-  keeping the children under the body<br>-  dropping the tree's nesting under a note instead |
 | [Retiring the cloud-app launcher](#16-retiring-the-cloud-app-launcher) | Remove X-17 outright — no catalog, no stored provider, no launch capability | -  keeping the button and dropping only the picker<br>-  a free-text command instead of a catalog<br>-  detecting the provider from the folder's path |
 
 ---
@@ -506,6 +507,34 @@ A device that is wide *and* touch-only, where the peek's tap-to-expand and the s
 what a tap on a note means — the breakpoint answers that today by assuming width implies a pointer. The other opening is
 a second kind worth splitting: D stays refused for folders, but a `task` that grew a body would be K-3's question again
 rather than this one.
+
+### 14.6 What the pane draws — X-31
+
+The pane started as the note's page moved into a column, which meant it drew everything that page drew: breadcrumbs, the
+title and flag, the tags, the body, the add line, and the note's own children under it. Two columns of content, and one
+of them was drawn twice — the tree on the left already draws the whole subtree, so the note's children were on screen in
+two lists at once. The body paid for it: a floor five lines tall, then the pane's remaining height left empty under a
+list that mostly had nothing in it.
+
+| | Option | Cost |
+| --- | --- | --- |
+| A | **The pane is the title, the tags and the body; the body fills it** — chosen | The add line adds to a list the pane does not draw, so the row it makes appears on the left rather than under the input. A note's children are reachable only through the tree, which means through the collapse state (T-8) |
+| B | Leave it as the page's column | The complaint that opened X-31: a field five lines tall in a pane the reader opened to write in, under a duplicate of the list already beside it |
+| C | Keep the children, give the body the space above them | The two lists still disagree — the same rows in two places, and a drag that means one thing in each. It also makes the body's height depend on how many children the note has, which is a measurement X-22 exists to avoid |
+| D | Keep the children and drop the tree's nesting under a note instead | T-10 is the sidebar's rule and the tree has never had one; hiding a subtree in the list because a *different* view might draw it is a view deciding what the tree contains |
+
+**The path went with them, and for the same reason.** The left column is where the note sits, drawn as the rows around
+it. A breadcrumb over the pane is that in words, in the one place where following it can only take the reader away from
+the note they opened — and T-9 is answered by the page on the left, which still carries its own.
+
+**The add line stays.** Filing something under the note while reading it is the pattern K-4 exists for, and the line is
+what makes it cost nothing. What moved is where it sits: the top row, which is the header the breadcrumbs vacated, and
+is where the same group already sits on a phone (X-27) and at the head of a list page (K-10). Under the body is no
+longer a place — the body ends where the pane does.
+
+**What reopens it.** A note whose children are its point rather than its footnote — a heading with a checklist under it,
+read as one thing — would be C's question again, and the answer would be a pane that can be told to show them rather
+than a pane that always does.
 
 ## 15. A size for the sidebar's type
 

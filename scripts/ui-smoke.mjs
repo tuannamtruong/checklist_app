@@ -686,6 +686,16 @@ async function main() {
       (await titlesUnder(page, 'Shopping')).join('|'),
     );
 
+    // --- T-9: the path back up, on the page that draws it ------------------
+    // A nested folder, because the root has no path — and the page is the only
+    // thing that draws one at all since X-31 took the pane's copy away.
+    await page.goto(`${BASE_URL}#/n/n_seed0006`);
+    await page.waitForSelector('[data-testid="breadcrumbs"]');
+    const crumbs = (await page.locator('[data-testid="breadcrumbs"]').innerText()).replace(/\s+/g, ' ');
+    check('breadcrumbs name the path back up — T-9', crumbs.includes('All') && crumbs.includes('House'), crumbs);
+    await page.goto(BASE_URL);
+    await page.waitForSelector('[data-testid="tree"]');
+
     // --- the note pane, beside the list — X-21, X-23 ----------------------
     // The left edge is measured rather than looked at: X-23's whole claim is
     // that the list does not move when the pane opens, and a centred column
@@ -702,18 +712,37 @@ async function main() {
       'a note opens its own page with its body — K-3',
       (await page.locator('[data-testid="note-body"]').inputValue()).startsWith('Ferry leaves'),
     );
+    // X-31. The pane is the editor and the tree is the list: no path over the
+    // note, and no second copy of rows the column beside it already draws.
     check(
-      'a note still owns its checklist children — K-4',
-      (await pane.locator('[data-testid="tree"] [data-testid="title"]').evaluateAll((i) => i.map((x) => x.value)))
-        .includes('Book the ferry'),
+      'the pane draws neither a path nor the note’s own children — X-31',
+      (await pane.locator('[data-testid="tree"]').count()) === 0 &&
+        (await pane.locator('[data-testid="breadcrumbs"]').count()) === 0,
+    );
+    check(
+      'and K-4’s children are still on screen, nested under the note’s own row',
+      (await titlesUnder(page, 'Trip notes')).includes('Book the ferry'),
+      (await titlesUnder(page, 'Trip notes')).join('|'),
     );
     const paneBox = await pane.boundingBox();
     const listBox = await page.locator('[data-testid="page-header"]').boundingBox();
     check(
       'and the list it was opened from is still on screen, beside it — X-21',
-      (await page.locator('[data-testid="tree"] [data-testid="row"]').count()) > rowsListOnly &&
+      (await page.locator('[data-testid="tree"] [data-testid="row"]').count()) === rowsListOnly &&
         paneBox.x > listBox.x + listBox.width - 1,
       `list ${Math.round(listBox.x)}+${Math.round(listBox.width)}, pane at ${Math.round(paneBox.x)}`,
+    );
+    // The complaint X-31 answers, measured: a five-line field with the rest of
+    // the pane empty under it.
+    const bodyBox = await page.locator('[data-testid="note-body"]').boundingBox();
+    check(
+      'the body takes the height left under the title — X-31',
+      bodyBox.height > paneBox.height * 0.6,
+      `${Math.round(bodyBox.height)} of ${Math.round(paneBox.height)}`,
+    );
+    check(
+      'and the add line is above it rather than under the list it no longer draws — X-31, K-8',
+      (await pane.locator('[data-testid="quick-add"]').boundingBox()).y < bodyBox.y,
     );
     const openLeft = await listLeft();
     await page.locator('[data-testid="note-close"]').click();
@@ -733,11 +762,17 @@ async function main() {
     const listTitle = async () =>
       (await page.locator('[data-testid="page-title"]').first().innerText()).trim();
     const beforeSub = await listTitle();
-    await (await rowByTitle(pane, 'Packing list')).locator('[data-testid="open"]').click();
+    // Since X-31 the nested note is opened from the tree on the left, which
+    // draws the whole subtree — the pane has no list to click in.
+    await (await rowByTitle(page, 'Packing list')).locator('[data-testid="open"]').click();
     await page.waitForFunction(() => location.hash.endsWith('n_seed0012'));
     // The hash changing is the route; the pane redrawing is a frame later, and
-    // its own path is what says the redraw happened rather than a timer.
-    await pane.locator('[data-testid="breadcrumbs"]').getByText('Trip notes').waitFor();
+    // its own title is what says the redraw happened rather than a timer.
+    await page.waitForFunction(
+      () =>
+        document.querySelector('[data-testid="note-pane"] [data-testid="page-title"]')?.value ===
+        'Packing list',
+    );
     const paneTitle = await pane.locator('[data-testid="page-title"]').inputValue();
     check('a note inside a note opens in the pane — X-21', paneTitle === 'Packing list', paneTitle);
     const bodies = await page.locator('[data-testid="note-body"]').count();
@@ -895,10 +930,6 @@ async function main() {
 
     await (await rowByTitle(page, 'Trip notes')).locator('[data-testid="open"]').click();
     await page.waitForSelector('[data-testid="note-body"]');
-    check(
-      'breadcrumbs name the path back up — T-9',
-      await pane.locator('[data-testid="breadcrumbs"]').isVisible(),
-    );
     check(
       'and the only way to change what a row is, is the row menu — K-5, K-6 withdrawn',
       (await page.locator('[data-testid="promote-to-list"]').count()) === 0,
@@ -1464,8 +1495,9 @@ async function main() {
       `${Math.round(opened.height)}px, focus ${focused}`,
     );
     check(
-      'and the note owns its list again once it is open — K-4, X-22',
-      await sheet.locator('[data-testid="note-children"]').isVisible(),
+      'and an open sheet is still the editor alone, list and path on the page under it — X-31',
+      (await sheet.locator('[data-testid="tree"]').count()) === 0 &&
+        (await sheet.locator('[data-testid="note-body"]').isVisible()),
     );
     await page.screenshot({ path: join(shots, 'phone-note-open.png') });
 
