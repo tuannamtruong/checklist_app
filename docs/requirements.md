@@ -600,6 +600,7 @@ out of the tree.
 | F-3 | Finished and deleted rows are found, and are labelled as such | ✅ | The tree hides them (T-11, T-7); search is where they are reachable by name rather than by scrolling the Done view |
 | F-4 | Search is read-time and device-local: no index is built, stored or synced | ✅ | A scan of the materialised tree per query. Nothing to invalidate, so a peer's merged edit is searchable the moment it lands |
 | F-5 | `/` opens search from anywhere; the query is in the route | ✅ | `src/ui/SearchPage.svelte`, `src/app/router.svelte.ts`; the fragment makes a result list linkable and reloadable |
+| F-6 | The page says nothing until something is typed: the box, and then the results | ✅ | `src/ui/SearchPage.svelte`. The idle paragraph explaining the matching rules is gone — it was read once and skipped past on every visit after it, and the rules it described are the ones below, which the results demonstrate |
 
 **Every term must match, and a term may match a different field from its neighbour.** "milk shop" finds a row titled
 "Milk" inside a note whose body mentions the shop, because the row is what the user is looking for and the fields are

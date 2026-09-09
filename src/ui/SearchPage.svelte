@@ -63,12 +63,10 @@
     oninput={(event) => typed(event.currentTarget.value)}
   />
 
-  {#if text.trim() === ''}
-    <p class="px-1 text-sm text-ink-muted" data-testid="search-idle">
-      Every term has to match, and a term may match a title or a note's body. Finished and deleted
-      rows are here too — this is the only place that still finds them by name.
-    </p>
-  {:else}
+  <!-- F-6. Nothing at all until something is typed: the box says what it is for
+       and the results say the rest, so a paragraph explaining the matching rules
+       is a thing read once and then skipped past on every visit after it. -->
+  {#if text.trim() !== ''}
     <p class="px-1 text-xs text-ink-faint" data-testid="search-count">
       {hits.length} {hits.length === 1 ? 'result' : 'results'}
     </p>
