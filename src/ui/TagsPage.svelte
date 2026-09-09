@@ -76,10 +76,14 @@
             data-tag={row.tag}
             onclick={() => choose(row.tag)}
           >
-            <span class="min-w-0 flex-1 truncate text-sm">{row.tag}</span>
+            <!-- The count sits against the tag rather than against the far
+                 edge of the column: the two are one fact, and the whole row is
+                 still the target. -->
+            <span class="min-w-0 max-w-xs truncate text-sm">{row.tag}</span>
             <span class="shrink-0 text-xs text-ink-faint" data-testid="tag-count">
               {row.count} row{row.count === 1 ? '' : 's'}
             </span>
+            <span class="flex-1"></span>
           </a>
         </li>
       {/each}

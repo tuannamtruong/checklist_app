@@ -266,7 +266,9 @@ Nothing rewrites a file to do it, and a peer on an older build reads `folder` wi
 past_decision.md §11.
 
 `src/ui/SidebarLinks.svelte` renders the **top-level** folders and notes and, under each, its immediate folder and note
-children — two levels, and it does not recurse (T-10). The second level is behind a disclosure and **starts closed**
+children — two levels, and it does not recurse (T-10). Every entry carries the tree's own `⋮` menu on its right (T-18),
+the same component over the same `actions.ts` list, so nothing can drift into a sidebar-only set of actions; the two
+editors a nav entry has nowhere to draw come up disabled, which is the rule `RowActionContext` already had. The second level is behind a disclosure and **starts closed**
 (T-17): `sidebarOpen` in `src/app/view-state.svelte.ts` holds the *open* ids, so a device that never opens one sees the
 column M6 shipped. It is deliberately not T-8's collapse set — the nav and the page are two drawings and neither moves
 the other. Deeper than that is the tree view's, which is what draws the nesting.

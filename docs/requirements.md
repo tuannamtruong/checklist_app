@@ -135,6 +135,7 @@ timestamps the fold already carries — derived, so it needs no sync and no writ
 | T-15 | The grip sits in one column at the left edge of every row, whatever the row's depth | ✅ | `src/ui/Row.svelte` puts the depth indent on the row's contents rather than on the row itself, so every grip is at the same x and the indent still draws the nesting. `scripts/ui-smoke.mjs` |
 | T-16 | On a touch screen there is no grip at all: a finger held on the row picks it up | ✅ | `src/ui/drag.svelte.ts` arms the hold on `pointerdown` and fires it after 400 ms of stillness, `src/ui/Row.svelte` captures the pointer there, and the coarse-pointer rule in `src/app.css` takes the grip off the row. `drag.svelte.test.ts`, `scripts/ui-smoke.mjs` |
 | T-17 | A top-level sidebar row with children of those kinds carries a disclosure, and the second level starts **closed**; which rows are open is this device's own and never syncs | ✅ | `sidebarOpen` in `src/app/view-state.svelte.ts` — `localStorage`, never a file, and it holds the *open* ids so a fresh device and an empty set are the same state. Separate from T-8's collapse set on purpose: the nav and the page are two drawings, and opening a folder to navigate to it says nothing about how the page under it is read. `view-state.svelte.test.ts`, `scripts/ui-smoke.mjs` |
+| T-18 | Every sidebar entry carries the same `⋮` menu the tree's rows do, on its right | ✅ | `src/ui/RowMenu.svelte` in `src/ui/SidebarLinks.svelte`, over the same `src/ui/actions.ts` list — so what it offers here is whatever it offers anywhere and nothing new can drift into it. The two editors a nav entry has nowhere to draw (tags, R-7's period) show disabled, which is the rule `RowActionContext` already had for a caller without them. `scripts/ui-smoke.mjs` |
 
 [sync-flow.md §3 Why a snapshot does not scale to a tree](sync-flow.md#3-why-a-snapshot-does-not-scale-to-a-tree) is why
 T-2, T-5, T-6 and T-7 constrain the sync payload, not just the UI.
@@ -191,6 +192,13 @@ never does is the device M6 shipped.
 **A note is one of those places and a task is not.** A note is somewhere a person returns to — it holds a body (K-3) and
 may own a checklist (K-4) — so it belongs beside the folders. Tasks are the bulk of a checklist and would bury both
 kinds that are navigation, which is the same argument that kept them out when this row read "containers only".
+
+**A sidebar entry is a row, so it carries a row's menu — T-18.** It was the one row on screen with nothing but a link on
+it: renaming a top-level folder, or adding something to it, meant navigating to a page to reach a row that was already
+in front of the reader. The menu is the same component over the same list, which is what keeps this from being a second,
+smaller set of things a sidebar row can do — `src/ui/RowMenu.svelte` reads `menuActions` here exactly as
+`src/ui/Row.svelte` does. Two entries come up disabled and correctly so: tags and R-7's period open a field *on the
+row*, and a nav entry has nowhere to put one.
 
 T-11 filters `children` rather than the rendering, so every edit sees the same rows the user does: `Alt-↓` cannot move a
 row past a hidden one, and `Backspace` on an empty row is not refused by children nobody can see. The cost is that a new

@@ -5,6 +5,7 @@
   import type { Snippet } from 'svelte';
   import type { Session } from '../app/Session.svelte';
   import type { Dismissals } from '../app/dismissals.svelte';
+  import type { RowFocus } from './focus.svelte';
   import { SIDEBAR_WIDTH, type ViewState } from '../app/view-state.svelte';
   import SidebarLinks from './SidebarLinks.svelte';
   import WidthGrip from './WidthGrip.svelte';
@@ -22,6 +23,8 @@
   let {
     session,
     view,
+    focus,
+    now,
     dismissals,
     topbar,
     currentId,
@@ -40,6 +43,10 @@
   }: {
     session: Session;
     view: ViewState;
+    /** T-18. The sidebar's rows carry the row menu, which edits like any other. */
+    focus: RowFocus;
+    /** T-18. The day those edits are made on — G-6, R-4. */
+    now: number;
     dismissals: Dismissals;
     /** X-27. The phone's top bar, when the route has one to give it. */
     topbar?: Snippet;
@@ -170,7 +177,14 @@
     </div>
 
     <nav class="min-h-0 flex-1 overflow-y-auto p-2" aria-label="Lists">
-      <SidebarLinks {session} {view} {currentId} onNavigate={() => view.setDrawer(false)} />
+      <SidebarLinks
+        {session}
+        {view}
+        {focus}
+        {now}
+        {currentId}
+        onNavigate={() => view.setDrawer(false)}
+      />
 
       <!-- T-12 and F-5. Both are here even when empty: a view that appeared
            only once it had something in it is a view the user never learns

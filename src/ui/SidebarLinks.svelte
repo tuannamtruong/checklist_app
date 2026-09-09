@@ -13,6 +13,13 @@
   // draws exactly the column it drew before. Which rows are open is this
   // device's own and is not T-8's collapse state — past_decision.md §17.
   //
+  // T-18: every entry carries the same `⋮` menu the tree's rows do. A sidebar
+  // row is one of the few rows a person sees all day and it was the only one
+  // with nothing but a link on it — renaming a top-level folder meant navigating
+  // to a page to reach a row that was already on screen. It is the *same*
+  // component over the same `actions.ts` list, so what the menu offers here is
+  // whatever it offers anywhere, and nothing new can drift into it.
+  //
   // Finished and deleted branches are already gone: sidebarChildren reads the
   // filtered set, so T-11 and T-7 take them out of here without this file
   // knowing.
@@ -21,21 +28,41 @@
   import type { Session } from '../app/Session.svelte';
   import type { ViewState } from '../app/view-state.svelte';
   import { nodeHref } from '../app/router.svelte';
+  import type { RowFocus } from './focus.svelte';
   import KindIcon from './KindIcon.svelte';
+  import RowMenu from './RowMenu.svelte';
 
   let {
     session,
     view,
+    focus,
+    now,
     currentId,
     onNavigate,
   }: {
     session: Session;
     view: ViewState;
+    /** T-18. The menu's edits put the caret on what they made, as they do anywhere. */
+    focus: RowFocus;
+    /** T-18. G-6's and R-4's clock, handed down as every other caller hands it. */
+    now: number;
     currentId: string | null;
     onNavigate?: (() => void) | undefined;
   } = $props();
 
   const links = $derived(sidebarChildren(session.tree, ROOT));
+
+  /**
+   * T-18. The context the menu runs against. `rows` is empty and stays empty:
+   * it exists so that deleting a row can put the caret on the one above it, and
+   * this column has no caret in it — the tree's rows are where a title is typed.
+   * `editTags` and `editRepeat` are absent for the reason `actions.ts` already
+   * gives: they open a field *on the row*, and a nav entry has nowhere to put
+   * one, so the menu shows them disabled rather than lying about where they are.
+   */
+  function ctxFor(id: NodeId) {
+    return { session, view, focus, rows: [], id, now };
+  }
 </script>
 
 {#snippet entry(id: NodeId, nested: boolean)}
@@ -75,12 +102,14 @@
       <span class="inline-block transition-transform" class:-rotate-90={!open} aria-hidden="true">▾</span>
     </button>
     {@render entry(id, false)}
+    <RowMenu ctx={ctxFor(id)} />
   </div>
 
   {#if open}
     {#each children as childId (childId)}
       <div class="sidebar-indent flex items-center">
         {@render entry(childId, true)}
+        <RowMenu ctx={ctxFor(childId)} />
       </div>
     {/each}
   {/if}

@@ -145,6 +145,24 @@ async function main() {
     // Shut again, so every check below reads the column it was written against.
     await (await disclosure('House')).click();
     await (await disclosure('Trip notes')).click();
+    // --- T-18: a sidebar entry is a row, so it carries a row's menu ---------
+    await page.locator('[data-testid="sidebar"] [data-testid="row-menu-button"]').first().click();
+    const sidebarMenu = await page
+      .locator('[data-testid="row-menu"] [data-action]')
+      .evaluateAll((buttons) => buttons.map((button) => button.dataset.action));
+    check(
+      'a sidebar entry carries the same menu the tree’s rows do — T-18',
+      MENU_ACTIONS.every((action) => sidebarMenu.includes(action)) &&
+        KEYBOARD_ONLY_ACTIONS.every((action) => !sidebarMenu.includes(action)),
+      sidebarMenu.join(','),
+    );
+    check(
+      'with the two editors it has nowhere to draw shown disabled rather than absent',
+      await page.locator('[data-testid="row-menu"] [data-action="tags"]').isDisabled(),
+    );
+    await page.keyboard.press('Escape');
+    await page.locator('[data-testid="row-menu"]').waitFor({ state: 'detached' });
+
     check(
       'and the disclosure closes what it opened',
       (await sidebarTitles()) === 'Shopping,House,Trip notes',
@@ -503,6 +521,35 @@ async function main() {
       (await titlesUnder(page, 'Shopping')).join('|') === 'Milk|Coffee beans|Oat milk',
       (await titlesUnder(page, 'Shopping')).join('|'),
     );
+
+    // --- A-7: the tags of the tree, on a page of their own -------------------
+    await page.locator('[data-testid="tags-link"]').click();
+    await page.waitForSelector('[data-testid="tags-page"]');
+    const tagEntries = await page
+      .locator('[data-testid="tag-entry"]')
+      .evaluateAll((links) => links.map((link) => link.dataset.tag));
+    check(
+      'the Tags page lists every tag in the tree — A-7',
+      tagEntries.join(',') === 'town',
+      tagEntries.join(','),
+    );
+    check(
+      'and says how many rows carry each one',
+      (await page.locator('[data-testid="tag-count"]').first().innerText()).trim() === '2 rows',
+      await page.locator('[data-testid="tag-count"]').first().innerText(),
+    );
+
+    await page.locator('[data-testid="tag-entry"][data-tag="town"]').click();
+    await page.waitForSelector('[data-testid="tree"]');
+    const fromTagsPage = await page
+      .locator('[data-testid="row"] [data-testid="title"]')
+      .evaluateAll((inputs) => inputs.map((input) => input.value));
+    check(
+      'choosing one filters the tree to it and lands there — A-7, A-4',
+      fromTagsPage.join('|') === 'Shopping|Milk|Errand run',
+      fromTagsPage.join('|'),
+    );
+    await page.locator('[data-testid="filter-clear"]').click();
 
     // --- G-1 to G-7: Today and Tomorrow --------------------------------------
     // The two lists are not the tree, so every check here is also a check that

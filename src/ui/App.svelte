@@ -230,6 +230,8 @@
   <Shell
     {session}
     {view}
+    {focus}
+    {now}
     {dismissals}
     {topbar}
     {currentId}
