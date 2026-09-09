@@ -5,7 +5,7 @@ import { childrenOf } from '../core/tree';
 import { AGENDA, ROOT, TIMELY } from '../core/types';
 import { Session } from '../app/Session.svelte';
 import { ViewState } from '../app/view-state.svelte';
-import { actionNamed, rowActions, type RowActionContext } from './actions';
+import { actionNamed, menuActions, rowActions, type RowActionContext } from './actions';
 import { RowFocus } from './focus.svelte';
 import { KEY_BOUND_ACTIONS } from './keyboard';
 import { visibleRows } from './rows';
@@ -66,25 +66,30 @@ beforeEach(async () => {
 });
 
 describe('the row menu and the keyboard', () => {
-  it('offer exactly the same actions — requirements.md §3.1', () => {
+  it('run the same code: every key resolves to an action — requirements.md §3.1', () => {
     const id = add(ROOT);
     const names = rowActions(context(id)).map((action) => action.name);
     for (const bound of KEY_BOUND_ACTIONS) {
-      expect(names, `${bound} is bound to a key but missing from the menu`).toContain(bound);
+      expect(names, `${bound} is bound to a key and defined nowhere`).toContain(bound);
     }
   });
 
-  it('name their keys, so the menu is where the keyboard is taught', async () => {
+  it('part company over the four reorderings — X-34', async () => {
     const id = add(ROOT);
-    const actions = rowActions(context(id));
+    const shown = menuActions(context(id)).map((action) => action.name);
+    for (const structural of ['indent', 'outdent', 'move-up', 'move-down']) {
+      expect(shown, `${structural} is a drag, not a menu entry`).not.toContain(structural);
+    }
+    // Everything else a key binds is still reachable by thumb.
     for (const bound of KEY_BOUND_ACTIONS) {
-      expect(actionNamed(actions, bound)?.keys, `${bound} has no key shown`).toBeTruthy();
+      if (['indent', 'outdent', 'move-up', 'move-down'].includes(bound)) continue;
+      expect(shown, `${bound} is bound to a key and unreachable by thumb`).toContain(bound);
     }
   });
 
   it('offers a conversion to every kind but the row’s own — K-5', async () => {
     const id = add(ROOT);
-    const names = rowActions(context(id)).map((action) => action.name);
+    const names = menuActions(context(id)).map((action) => action.name);
     expect(names).toContain('turn-into-note');
     expect(names).toContain('turn-into-folder');
     expect(names).not.toContain('turn-into-task');
@@ -168,7 +173,7 @@ describe('a timely row — R-1, R-7', () => {
 
   it('offers the repeat editor, and says what it repeats at — R-7', () => {
     const id = chore('5d');
-    const entry = actionNamed(rowActions(context(id, TIMELY)), 'repeat')!;
+    const entry = actionNamed(menuActions(context(id, TIMELY)), 'repeat')!;
     expect(entry.label).toBe('Repeats every 5 days');
     // Disabled without an editor to open, exactly as the tag entry is.
     expect(entry.enabled).toBe(false);
@@ -179,14 +184,16 @@ describe('a timely row — R-1, R-7', () => {
     expect(opened).toBe(true);
   });
 
-  it('offers no kind change and no indent — R-1', () => {
+  it('offers no kind change, and refuses to indent — R-1', () => {
     const first = chore('1d');
     const second = chore('7d');
     const actions = rowActions(context(second, TIMELY));
     expect(actions.filter((action) => action.name.startsWith('turn-into-'))).toEqual([]);
     expect(actionNamed(actions, 'indent')!.enabled).toBe(false);
-    // The order of the list is still dragged and nudged.
+    // The order of the list is still dragged and nudged — by key or by grip,
+    // never by a menu entry, which is X-34 and not R-1.
     expect(actionNamed(actions, 'move-up')!.enabled).toBe(true);
+    expect(menuActions(context(second, TIMELY)).map((a) => a.name)).not.toContain('move-up');
     expect(first).not.toBe(second);
   });
 

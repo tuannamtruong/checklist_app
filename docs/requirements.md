@@ -217,10 +217,16 @@ drift from what the keys do. `src/ui/keyboard.test.ts` fails if a key is bound a
 nowhere. It used to be printed on every row's `⋮` menu instead, which put a reference a person reads once under a
 control they open ten times a day — [§10 Application shell, PWA, offline](#10-application-shell-pwa-offline).
 
-One key is deliberately outside that rule. `/` opens search (F-5), and search is not a row action — it acts on the
-application rather than on the row under the caret, so the row menu is the wrong place for it and the sidebar entry is
-where a phone reaches it. `KEY_BOUND_ACTIONS` stays the list of *row* actions, which is what makes the parity test mean
-something.
+**The row `⋮` menu carries the edits, and four of these keys are not among them — X-34.** Indent, outdent and the two
+nudges only reorder the tree, and a finger already reorders it by dragging (T-14, T-16) — a menu entry beside that
+gesture is a second, worse way to do the same thing, and it is four of the eight entries on the menu. Every other key
+still has one, because a phone has no keyboard and that is what the menu is for: `menu` on each `RowAction` in
+`src/ui/actions.ts` is where the line is drawn, `menuActions` is what `RowMenu` renders, and `actions.test.ts` fails if
+the four ever come back or if anything else leaves.
+
+One key is outside all of it. `/` opens search (F-5), and search is not a row action — it acts on the application rather
+than on the row under the caret, so the row menu is the wrong place for it and the sidebar entry is where a phone
+reaches it. `KEY_BOUND_ACTIONS` stays the list of *row* actions, which is what makes the tests above mean something.
 
 ## 4. Item kinds and attributes
 
@@ -812,6 +818,7 @@ to empty, and a dismissal is only for a row the user is content to leave as it l
 | X-31 | The note pane is an editor and nothing else: the add line and its two kind buttons are its top row, the body takes whatever height is left under the title and scrolls inside itself when the note outgrows it, and neither a path above the note nor the note's own children are drawn in it | ✅ | `src/ui/NotePane.svelte` — `src/ui/QuickAdd.svelte` in the header row `src/ui/Breadcrumbs.svelte` used to hold, and `src/ui/NoteBody.svelte` given `fill`, which is the height the pane has instead of the `min-h` floor a page's body needs. Nothing is lost with the children: the list beside the pane draws the whole subtree, so they are on screen one level in under the note's own row, and a row added here appears there — K-4. `scripts/ui-smoke.mjs` |
 | X-32 | The `All` link in the sidebar's corner is a full-width target, exactly like the entries under it | ✅ | `src/ui/Shell.svelte` — the corner and G-7's two day lists and R-8's third are one column of full-width links with one padding, rather than a corner sized to its four letters with a row of links under it. The `✕` that closes the drawer sits beside it and is drawn below `md` only, which is the one width where the corner is not the whole row |
 | X-33 | The keyboard reference lives on the settings screen, and nowhere else | ✅ | `KEY_HELP` in `src/ui/keyboard.ts`, rendered by `src/ui/SettingsPage.svelte` beside the bindings it describes; `keyboard.test.ts` fails if the two drift. It is the same kind of thing as everything else X-12 gathered — a fact about how *this* device is driven — and a reference read once does not belong under a control opened ten times a day — [§3.1 Keyboard (desktop)](#31-keyboard-desktop) |
+| X-34 | The row `⋮` menu carries a row's edits and nothing else: no keys printed beside them, no caret hints under them, and none of the four reorderings a drag already does | ✅ | `menu` on each `RowAction` in `src/ui/actions.ts`, filtered by `menuActions` and rendered by `src/ui/RowMenu.svelte`. Indent, outdent and the two nudges stay defined there because `src/ui/keyboard.ts` resolves a key through the same list — they left the menu, not the app. `actions.test.ts`, `scripts/ui-smoke.mjs` |
 
 **A phone's top bar holds the add group rather than the application's name — X-27.** The bar existed to carry a `☰` and
 said `Checklist` beside it, which is a thing to read once on an application with one tree in it: every screen it

@@ -410,4 +410,6 @@ are the only thing that persists, per device, in `localStorage`.
 - `npm run ui-smoke` — the built app in Chromium. Every check reports, then the run fails; screenshots land in
   `ui-smoke/`.
 - The logic layer is never mocked. Time, ids and counters are injected, so a test asserts exact values.
-- A new keyboard binding must appear in `KEY_BOUND_ACTIONS` and in the row menu, or `src/ui/actions.test.ts` fails.
+- A new keyboard binding must appear in `KEY_BOUND_ACTIONS` and in `KEY_HELP`, or `src/ui/keyboard.test.ts` fails. It
+  must also be defined in `actions.ts`; whether the row menu *draws* it is `menu` on the action — X-34 keeps the four
+  reorderings off it, and `src/ui/actions.test.ts` fails if that changes either way.

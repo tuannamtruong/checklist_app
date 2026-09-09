@@ -1,8 +1,13 @@
 <script lang="ts">
-  // Where a phone reaches everything the keyboard offers — requirements.md §3.1.
-  // The menu also shows each action's key, so it is where the keyboard model is
-  // taught rather than a second, quieter implementation of it.
-  import { CARET_KEYS, rowActions, type RowActionContext } from './actions';
+  // Where a phone reaches a row's edits — requirements.md §3.1.
+  //
+  // X-34: edits and nothing else. It carried each action's key and a block of
+  // caret hints besides, which made a control opened ten times a day the place
+  // a reference read once was kept; that reference is on the settings screen
+  // now (X-33). It also carried indent, outdent and the two nudges, which a
+  // finger already does by dragging (T-14, T-16) — the four are the keyboard's,
+  // and `menuActions` is where that line is drawn.
+  import { menuActions, type RowActionContext } from './actions';
 
   let { ctx }: { ctx: RowActionContext } = $props();
 
@@ -10,7 +15,7 @@
   let menu = $state<HTMLDivElement | null>(null);
   let button = $state<HTMLButtonElement | null>(null);
 
-  const actions = $derived(rowActions(ctx));
+  const actions = $derived(menuActions(ctx));
 
   function close(returnFocus = true): void {
     open = false;
@@ -55,7 +60,7 @@
   {#if open}
     <div
       bind:this={menu}
-      class="row-menu absolute right-0 z-20 mt-1 w-64 rounded-lg border border-line bg-surface-raised py-1 shadow-lg"
+      class="row-menu absolute right-0 z-20 mt-1 w-56 rounded-lg border border-line bg-surface-raised py-1 shadow-lg"
       role="menu"
       tabindex="-1"
       data-testid="row-menu"
@@ -64,7 +69,7 @@
         <button
           type="button"
           role="menuitem"
-          class="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-surface-sunken disabled:cursor-not-allowed disabled:text-ink-faint disabled:hover:bg-transparent"
+          class="flex w-full items-center px-3 py-2 text-left text-sm hover:bg-surface-sunken disabled:cursor-not-allowed disabled:text-ink-faint disabled:hover:bg-transparent"
           class:text-danger={action.danger}
           disabled={!action.enabled}
           data-action={action.name}
@@ -74,20 +79,8 @@
           }}
         >
           <span>{action.label}</span>
-          {#if action.keys}
-            <kbd class="shrink-0 text-xs text-ink-faint">{action.keys}</kbd>
-          {/if}
         </button>
       {/each}
-
-      <div class="mt-1 border-t border-line px-3 pt-2 pb-1">
-        <p class="text-xs font-medium text-ink-muted">Keyboard</p>
-        {#each CARET_KEYS as hint (hint.keys)}
-          <p class="flex justify-between gap-3 py-0.5 text-xs text-ink-faint">
-            <span>{hint.label}</span><kbd>{hint.keys}</kbd>
-          </p>
-        {/each}
-      </div>
     </div>
   {/if}
 </div>

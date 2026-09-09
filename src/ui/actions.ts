@@ -1,10 +1,15 @@
 // Every action a row offers, defined once.
 //
-// requirements.md §3.1 asks that every keyboard action also exist in the row
-// menu, because a phone has no Tab key. Defining the two from one list is what
-// makes that structural rather than a promise: `keyboard.ts` and `RowMenu`
-// both read this file, and `actions.test.ts` fails if a key ever binds
-// something the menu does not show.
+// `keyboard.ts` and `RowMenu` both read it, so a key and a menu entry run the
+// same code by construction rather than by promise, and `actions.test.ts`
+// fails if a key ever binds something this file does not define.
+//
+// X-34: the two lists are no longer the *same* list. Every keyboard action is
+// still defined here, but `menu` says which of them the `⋮` menu draws, and the
+// four that only reorder the tree — indent, outdent, and the two nudges — say
+// no. A phone reorders by dragging (T-14, T-16), which is the gesture those
+// keys stand in for on a desktop, so the menu was offering a second, worse way
+// to do a thing the finger already does — requirements.md §3.1.
 
 import * as edit from '../core/edit';
 import { dayKey, nextDayKey } from '../core/agenda';
@@ -49,8 +54,12 @@ export interface RowAction {
   /** Stable name, used by the keyboard map and by the tests. */
   name: string;
   label: string;
-  /** What §3.1 calls this action, shown in the menu so the menu teaches it. */
-  keys: string | null;
+  /**
+   * X-34. Whether the `⋮` menu draws it. False for the four that only reorder
+   * the tree: a finger reorders by dragging, and the menu is what a finger
+   * reaches — an entry there that duplicates a drag is a worse drag.
+   */
+  menu: boolean;
   enabled: boolean;
   danger?: boolean;
   run(): void;
@@ -91,7 +100,7 @@ export function rowActions(ctx: RowActionContext): RowAction[] {
         {
           name: filedForToday ? 'move-to-tomorrow' : 'move-to-today',
           label: filedForToday ? 'Move to Tomorrow' : 'Move to Today',
-          keys: null,
+          menu: true,
           enabled: true,
           run: () => {
             const at = Date.now();
@@ -113,7 +122,7 @@ export function rowActions(ctx: RowActionContext): RowAction[] {
         {
           name: 'repeat',
           label: `Repeats ${periodLabel(periodOf(node))}`,
-          keys: null,
+          menu: true,
           enabled: ctx.editRepeat !== undefined,
           run: () => ctx.editRepeat?.(),
         },
@@ -123,14 +132,14 @@ export function rowActions(ctx: RowActionContext): RowAction[] {
     {
       name: 'new-below',
       label: 'New row below',
-      keys: 'Enter',
+      menu: true,
       enabled: true,
       run: () => focusNew(session.run((t, c) => edit.createSiblingBelow(t, c, id))),
     },
     {
       name: 'new-inside',
       label: 'New row inside',
-      keys: 'Enter on an open parent',
+      menu: true,
       enabled: true,
       run: () => {
         view.expand(id);
@@ -138,9 +147,12 @@ export function rowActions(ctx: RowActionContext): RowAction[] {
       },
     },
     {
+      // The four below are the keyboard's alone — X-34. They stay defined here
+      // because `keyboard.ts` resolves a key through this list, and they are
+      // the reason `menu` exists at all.
       name: 'indent',
       label: 'Indent',
-      keys: 'Tab',
+      menu: false,
       enabled: edit.canIndent(tree, id),
       run: () => {
         session.run((t, c) => edit.indent(t, c, id));
@@ -151,7 +163,7 @@ export function rowActions(ctx: RowActionContext): RowAction[] {
     {
       name: 'outdent',
       label: 'Outdent',
-      keys: 'Shift-Tab',
+      menu: false,
       enabled: edit.canOutdent(tree, id),
       run: () => {
         session.run((t, c) => edit.outdent(t, c, id));
@@ -161,7 +173,7 @@ export function rowActions(ctx: RowActionContext): RowAction[] {
     {
       name: 'move-up',
       label: 'Move up',
-      keys: 'Alt-↑',
+      menu: false,
       enabled: edit.canMoveUp(tree, id),
       run: () => {
         session.run((t, c) => edit.moveUp(t, c, id));
@@ -171,7 +183,7 @@ export function rowActions(ctx: RowActionContext): RowAction[] {
     {
       name: 'move-down',
       label: 'Move down',
-      keys: 'Alt-↓',
+      menu: false,
       enabled: edit.canMoveDown(tree, id),
       run: () => {
         session.run((t, c) => edit.moveDown(t, c, id));
@@ -183,7 +195,7 @@ export function rowActions(ctx: RowActionContext): RowAction[] {
     {
       name: 'tags',
       label: node.tags.length === 0 ? 'Add tags' : `Tags (${node.tags.length})`,
-      keys: null,
+      menu: true,
       enabled: ctx.editTags !== undefined,
       run: () => ctx.editTags?.(),
     },
@@ -193,7 +205,7 @@ export function rowActions(ctx: RowActionContext): RowAction[] {
     ...(inTimely ? [] : KINDS.filter((kind) => kind !== node.kind)).map((kind) => ({
       name: `turn-into-${kind}`,
       label: `Turn into ${KIND_LABELS[kind].toLowerCase()}`,
-      keys: null,
+      menu: true,
       enabled: true,
       run: () => {
         session.run((t, c) => edit.turnInto(t, c, id, kind));
@@ -204,7 +216,7 @@ export function rowActions(ctx: RowActionContext): RowAction[] {
       label: childrenOf(tree, id).length > 0 ? 'Delete, with everything inside' : 'Delete',
       // The keyboard's version refuses a row with children; the menu's does not,
       // because a subtree delete from a menu is deliberate — T-7.
-      keys: 'Backspace on an empty row',
+      menu: true,
       enabled: true,
       danger: true,
       run: () => {
@@ -220,8 +232,7 @@ export function actionNamed(actions: readonly RowAction[], name: string): RowAct
   return actions.find((action) => action.name === name);
 }
 
-/** The keys §3.1 gives to navigation rather than to an edit. */
-export const CARET_KEYS: readonly { keys: string; label: string }[] = [
-  { keys: '↑ / ↓', label: 'Move the caret between rows' },
-  { keys: 'Escape', label: 'Discard this title edit' },
-];
+/** X-34. What the `⋮` menu draws: the edits, and never the four reorderings. */
+export function menuActions(ctx: RowActionContext): RowAction[] {
+  return rowActions(ctx).filter((action) => action.menu);
+}

@@ -30,16 +30,9 @@ import {
 const headed = process.argv.includes('--headed');
 const shots = join(ROOT_DIR, 'ui-smoke');
 
-/** The actions keyboard.ts binds; the row menu owes every one of them. */
-const KEY_BOUND_ACTIONS = [
-  'new-below',
-  'new-inside',
-  'indent',
-  'outdent',
-  'move-up',
-  'move-down',
-  'delete',
-];
+/** X-34. What the row menu draws: the edits, never the four reorderings. */
+const MENU_ACTIONS = ['new-below', 'new-inside', 'tags', 'delete'];
+const KEYBOARD_ONLY_ACTIONS = ['indent', 'outdent', 'move-up', 'move-down'];
 
 const results = [];
 function check(name, ok, detail = '') {
@@ -236,17 +229,24 @@ async function main() {
       String(await sidebarWidth()),
     );
 
-    // --- the row menu carries every keyboard action — §3.1 ----------------
+    // --- the row menu is edits and nothing else — X-34 --------------------
     const milkRow = await rowByTitle(page, 'Milk');
     await milkRow.locator('[data-testid="row-menu-button"]').click();
     const menuActions = await page
       .locator('[data-testid="row-menu"] [data-action]')
       .evaluateAll((buttons) => buttons.map((button) => button.dataset.action));
-    const missing = KEY_BOUND_ACTIONS.filter((action) => !menuActions.includes(action));
-    check('every keyboard action is in the row menu', missing.length === 0, missing.join(', '));
+    const missing = MENU_ACTIONS.filter((action) => !menuActions.includes(action));
+    check('every edit a thumb needs is in the row menu', missing.length === 0, missing.join(', '));
+    const structural = KEYBOARD_ONLY_ACTIONS.filter((action) => menuActions.includes(action));
     check(
-      'the menu teaches the keys',
-      (await page.locator('[data-testid="row-menu"] kbd').allInnerTexts()).join(' ').includes('Alt-↑'),
+      'and the four reorderings are not — a finger drags instead',
+      structural.length === 0,
+      structural.join(', '),
+    );
+    check(
+      'the menu teaches no keys: the reference is on the settings screen — X-33',
+      (await page.locator('[data-testid="row-menu"] kbd').count()) === 0,
+      await page.locator('[data-testid="row-menu"]').innerText(),
     );
     await page.keyboard.press('Escape');
     await page.locator('[data-testid="row-menu"]').waitFor({ state: 'detached' });
@@ -735,11 +735,8 @@ async function main() {
       await page.locator('[data-testid="row-menu"]').innerText(),
     );
     check(
-      'and offers no kind change and no indent: check items, one level — R-1',
-      (await page.locator('[data-testid="row-menu"] [data-action^="turn-into-"]').count()) === 0 &&
-        (await page
-          .locator('[data-testid="row-menu"] [data-action="indent"]')
-          .isDisabled()),
+      'and offers no kind change: check items, one level — R-1',
+      (await page.locator('[data-testid="row-menu"] [data-action^="turn-into-"]').count()) === 0,
       await page.locator('[data-testid="row-menu"]').innerText(),
     );
     await page.keyboard.press('Escape');
