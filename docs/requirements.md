@@ -211,9 +211,11 @@ menu renders.
 | `Backspace` on an empty row | Delete it — **refused if it has children** | ✅ `canBackspaceDelete`, against the typed title |
 | `Escape` | Discard the in-progress title edit | ✅ the row's draft, never a written op |
 
-Every one of these also has to exist in the row `⋮` menu, which is where a phone reaches them, and that menu is where
-the keyboard list is shown to the user. `src/ui/actions.test.ts` fails if a key ever binds something the menu does not
-show, and `scripts/ui-smoke.mjs` checks the same thing against the rendered menu.
+**The keys are written down in one place, and it is the settings screen — X-33.** `KEY_HELP` in `src/ui/keyboard.ts` is
+that list: every binding above in the words a person reads, beside the bindings themselves, so the reference cannot
+drift from what the keys do. `src/ui/keyboard.test.ts` fails if a key is bound and taught nowhere, or taught and bound
+nowhere. It used to be printed on every row's `⋮` menu instead, which put a reference a person reads once under a
+control they open ten times a day — [§10 Application shell, PWA, offline](#10-application-shell-pwa-offline).
 
 One key is deliberately outside that rule. `/` opens search (F-5), and search is not a row action — it acts on the
 application rather than on the row under the caret, so the row menu is the wrong place for it and the sidebar entry is
@@ -809,6 +811,7 @@ to empty, and a dismissal is only for a row the user is content to leave as it l
 | X-30 | Putting the caret in a **note** row's title raises that note in the pane, and the list beside it does not move: a caret is not a navigation, so the route, the history and the left column are exactly where the reader left them. A caret in a folder's or a task's title leaves the pane as it is; the ✕ and a navigation are what end it | ✅ | `src/ui/panes.ts` derives both panes from the route and `RowFocus.noteId`, which only a note's title ever writes, and `src/ui/App.svelte` composes them as it already did. Above `lg` only — below it the pane is X-22's sheet, and a sheet raised by typing would cover the row being typed. How the pane was opened changes exactly one thing, the ✕: a link out of the route, or a button that clears the caret's note — [§10.3 A note beside the list](#103-a-note-beside-the-list). `panes.test.ts`, `focus.svelte.test.ts`, `scripts/ui-smoke.mjs` |
 | X-31 | The note pane is an editor and nothing else: the add line and its two kind buttons are its top row, the body takes whatever height is left under the title and scrolls inside itself when the note outgrows it, and neither a path above the note nor the note's own children are drawn in it | ✅ | `src/ui/NotePane.svelte` — `src/ui/QuickAdd.svelte` in the header row `src/ui/Breadcrumbs.svelte` used to hold, and `src/ui/NoteBody.svelte` given `fill`, which is the height the pane has instead of the `min-h` floor a page's body needs. Nothing is lost with the children: the list beside the pane draws the whole subtree, so they are on screen one level in under the note's own row, and a row added here appears there — K-4. `scripts/ui-smoke.mjs` |
 | X-32 | The `All` link in the sidebar's corner is a full-width target, exactly like the entries under it | ✅ | `src/ui/Shell.svelte` — the corner and G-7's two day lists and R-8's third are one column of full-width links with one padding, rather than a corner sized to its four letters with a row of links under it. The `✕` that closes the drawer sits beside it and is drawn below `md` only, which is the one width where the corner is not the whole row |
+| X-33 | The keyboard reference lives on the settings screen, and nowhere else | ✅ | `KEY_HELP` in `src/ui/keyboard.ts`, rendered by `src/ui/SettingsPage.svelte` beside the bindings it describes; `keyboard.test.ts` fails if the two drift. It is the same kind of thing as everything else X-12 gathered — a fact about how *this* device is driven — and a reference read once does not belong under a control opened ten times a day — [§3.1 Keyboard (desktop)](#31-keyboard-desktop) |
 
 **A phone's top bar holds the add group rather than the application's name — X-27.** The bar existed to carry a `☰` and
 said `Checklist` beside it, which is a thing to read once on an application with one tree in it: every screen it

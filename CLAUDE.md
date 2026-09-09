@@ -384,6 +384,10 @@ is the third and last nav entry, beside Search and Done. Five things sit on it, 
   stylesheet drift. **No component ever names a colour** — that is what makes a seventh theme a CSS block and nothing
   else. The id is applied by a boot line in `index.html` so a dark theme never flashes light, and it never syncs (X-14).
 
+- **The keyboard** (X-33). Every key `src/ui/keyboard.ts` binds, written down once as `KEY_HELP` in that same file and
+  rendered here — `keyboard.test.ts` fails if a key is bound and taught nowhere, or taught and bound nowhere. It was
+  printed on every row's `⋮` menu until M11, which put a reference read once under a control opened ten times a day.
+
 - **The sidebar's type size** (X-25). X-19's fifth, made a per-device choice in four steps — small, normal, large,
   maximal, at 0.8/1/1.2/1.4. `src/core/sidebar-size.ts` is the catalog, `src/app.css` holds one `--sidebar-type`
   multiplier per id, and `src/app/sidebar-size.svelte.ts` applies it as `data-sidebar-size` on the root. **The type

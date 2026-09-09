@@ -9,7 +9,14 @@
   // theme is fourteen colours and never a size (§10.1). Only the name writes an
   // op; the rest is device-local, which is why none of this needed a nav entry
   // of its own before there was a screen to gather them onto.
+  //
+  // X-33 adds a fifth that changes nothing at all: the keyboard reference. It
+  // is here because it is the same *kind* of thing — a fact about how this
+  // device is driven — and because a reference belongs somewhere a person goes
+  // once, not on every row's menu where it was read once and then scrolled past
+  // ten times a day.
   import { THEMES } from '../core/themes';
+  import { KEY_HELP } from './keyboard';
   import { SIDEBAR_SIZES } from '../core/sidebar-size';
   import type { OpenFolder } from '../app/folder-choice';
   import { shellActions } from '../app/shell';
@@ -204,6 +211,31 @@
         {/each}
       </div>
     </div>
+  </section>
+
+  <!-- X-33. The whole keyboard, in one place, from the one list `keyboard.ts`
+       binds — a second copy of it here would be a second thing to keep true,
+       which is exactly what the row menu's copy became. `keyboard.test.ts`
+       fails if a key is bound and not taught here. -->
+  <section class="flex flex-col gap-3" data-testid="settings-keyboard">
+    <div class="flex flex-col gap-0.5">
+      <h2 class="text-sm font-semibold">Keyboard</h2>
+      <p class="text-xs text-ink-faint">
+        On a row's title, in every list the app draws. A phone has none of these and needs none: the
+        row's ⋮ menu is where it reaches the edits themselves.
+      </p>
+    </div>
+
+    <dl class="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1.5 text-sm" data-testid="key-help">
+      {#each KEY_HELP as entry (entry.keys)}
+        <dt class="min-w-0 text-ink-muted">{entry.label}</dt>
+        <dd class="shrink-0 text-right">
+          <kbd class="rounded border border-line bg-surface-sunken px-1.5 py-0.5 text-xs">
+            {entry.keys}
+          </kbd>
+        </dd>
+      {/each}
+    </dl>
   </section>
 
   <!-- D-1. The one editor for the name: `#/devices` lists what every device has
