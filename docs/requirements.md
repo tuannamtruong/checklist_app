@@ -334,6 +334,7 @@ a date, and a date wants a calendar rather than a field.
 | A-4 | The tree can be filtered to the rows carrying a tag, and several tags are AND-ed | ✅ | `src/core/filter.ts`, `src/ui/TagFilter.svelte`. Every selected tag must be on the row |
 | A-5 | The filter is device-local and never reaches a file | ✅ | `src/app/view-state.svelte.ts`, beside the collapse state — [§2.3 What is never in the Sync Folder](#23-what-is-never-in-the-sync-folder) |
 | A-6 | A row created while a filter is on carries that filter's tags | ✅ | `CreateOptions.tags` in `src/core/edit.ts`, passed by `src/ui/TreeView.svelte`. Without it the new row would vanish as it was typed |
+| A-7 | Every tag in the tree is listed on a page of its own, and choosing one filters the tree to it | ✅ | `src/ui/TagsPage.svelte` at `#/tags`, a nav entry between Search and Done. It derives everything and stores nothing: `tagsInTree` is the scan A-4's bar already runs, and choosing a tag writes A-5's device-local selection — [§4.2 Filtering by tag](#42-filtering-by-tag) |
 
 **A tag is normalised on the way in, and the normal form is what is stored.** Case-folded, its inner whitespace
 collapsed, a leading `#` dropped, trimmed to 32 characters, and the set held sorted and deduplicated —
@@ -365,6 +366,14 @@ words.
 the filter promised and did not deliver, so the collapse state (T-8) is overridden for as long as the filter is on, and
 it is remembered rather than cleared when the filter comes off. The ancestors are context, not matches: they are drawn
 as ordinary rows because opening one is the whole point of showing it.
+
+**The tags themselves are a page, not only a bar — A-7.** The bar above the tree answers "narrow *this* list", and it is
+drawn against the rows it is narrowing; it is also absent entirely on a tree with no tags in it, which is what makes it
+costless for someone who never uses them. `#/tags` answers the other question — "what have I been tagging?" — which is
+asked away from any one list, so it is a nav entry beside Search rather than a second bar. Choosing a tag there sets the
+same one selection and lands on the tree, because the rows are read in the tree and a second list of them on this page
+would be A-4's answer drawn twice. It is one tag per click and never a selection built up first: several at once is the
+bar's, where the rows being narrowed are on screen to be watched.
 
 **Nothing else in the application is filtered.** Search (F-4) already scans every row by name and the Done view (T-12)
 is a list of what has left the tree — a filter over either would be a second answer to a question the user asked
@@ -544,6 +553,7 @@ helper and to the Android WebView unchanged. `src/app/router.svelte.ts` holds th
 | `#/today` | Today: every agenda item whose day has come, including the ones it did not come *on* — G-3, G-4 | `src/ui/AgendaPage.svelte` |
 | `#/tomorrow` | Tomorrow: every agenda item whose day has not come yet — G-3 | `src/ui/AgendaPage.svelte`, the same page on the other day |
 | `#/timely` | Timely: every repeating check item, the due ones live and the waiting ones greyed — R-3, R-4 | `src/ui/TimelyPage.svelte` |
+| `#/tags` | Every tag in the tree, most used first, and choosing one filters the tree to it — A-7 | `src/ui/TagsPage.svelte` |
 | `#/done` | The Done view of T-12: every ticked and deleted row in one list, newest first | `src/ui/DonePage.svelte` |
 | `#/conflicts` | What the merge decided without asking — [§9 Conflict presentation](#9-conflict-presentation) | `src/ui/ConflictsPage.svelte` |
 | `#/search` and `#/search/<query>` | The search results of [§6 Search](#6-search) | `src/ui/SearchPage.svelte` |
@@ -584,8 +594,8 @@ reachable by typing the fragment even then, and answers "nothing to report" rath
 but both are reached from `#/settings`, because what they say is about *this* device and settings is where this device
 is already the subject. A permanent nav entry for a diagnostic would cost every user of the tree a line of nav for a
 page opened when something looks wrong. The nav went from four entries to three when X-12 gathered them, and to two when
-Settings took the footer: **Search** and **Done**, plus **Merged** when there is something in it, with **Settings** in
-the corner below them.
+Settings took the footer, and back to three when A-7 put **Tags** between them: **Search**, **Tags** and **Done**, plus
+**Merged** when there is something in it, with **Settings** in the corner below them.
 
 ## 6. Search
 

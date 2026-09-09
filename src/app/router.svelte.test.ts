@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hrefOf, routeOf, TIMELY_HREF, TODAY_HREF, TOMORROW_HREF } from './router.svelte';
+import { hrefOf, routeOf, TAGS_HREF, TIMELY_HREF, TODAY_HREF, TOMORROW_HREF } from './router.svelte';
 
 describe('the two day routes — G-7', () => {
   it('are routes of their own rather than one carrying which list', () => {
@@ -10,7 +10,7 @@ describe('the two day routes — G-7', () => {
   });
 
   it('round-trip, so a nav entry and a deep link are the same thing — X-8', () => {
-    for (const hash of ['#/today', '#/tomorrow', '#/timely', '#/done', '#/', '#/n/n_1']) {
+    for (const hash of ['#/today', '#/tomorrow', '#/timely', '#/tags', '#/done', '#/', '#/n/n_1']) {
       expect(hrefOf(routeOf(hash))).toBe(hash);
     }
   });
@@ -25,5 +25,13 @@ describe('the Timely route — R-8', () => {
     expect(routeOf('#/timely')).toEqual({ name: 'timely' });
     expect(TIMELY_HREF).toBe('#/timely');
     expect(hrefOf({ name: 'timely' })).toBe('#/timely');
+  });
+});
+
+describe('the Tags route — A-7', () => {
+  it('is a place like every other nav entry, so it is linkable', () => {
+    expect(routeOf('#/tags')).toEqual({ name: 'tags' });
+    expect(TAGS_HREF).toBe('#/tags');
+    expect(hrefOf({ name: 'tags' })).toBe('#/tags');
   });
 });

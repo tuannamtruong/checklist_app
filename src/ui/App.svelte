@@ -35,6 +35,7 @@
   import SearchPage from './SearchPage.svelte';
   import SettingsPage from './SettingsPage.svelte';
   import Shell from './Shell.svelte';
+  import TagsPage from './TagsPage.svelte';
   import TimelyPage from './TimelyPage.svelte';
 
   const router = new Router();
@@ -86,6 +87,8 @@
   // R-8. A third list that is not the tree, so it is excluded from `listOpen`
   // exactly as the two days are: the phone's bar gets its own line instead.
   const timelyOpen = $derived(router.route.name === 'timely');
+  // A-7. The tags of the tree, gathered away from any one list.
+  const tagsOpen = $derived(router.route.name === 'tags');
   const doneOpen = $derived(router.route.name === 'done');
   const conflictsOpen = $derived(router.route.name === 'conflicts');
   const searchOpen = $derived(router.route.name === 'search');
@@ -131,6 +134,7 @@
   const listOpen = $derived(
     session !== null &&
       router.route.name !== 'unknown' &&
+      !tagsOpen &&
       !doneOpen &&
       !agendaOpen &&
       !timelyOpen &&
@@ -232,6 +236,7 @@
     {todayOpen}
     {tomorrowOpen}
     {timelyOpen}
+    {tagsOpen}
     {doneOpen}
     {conflictsOpen}
     {searchOpen}
@@ -256,6 +261,8 @@
       <DevicesPage {session} />
     {:else if logsOpen}
       <LogPage {session} />
+    {:else if tagsOpen}
+      <TagsPage {session} {view} />
     {:else if doneOpen}
       <DonePage {session} />
     {:else if currentId !== null && !isVisible(session.tree, currentId)}

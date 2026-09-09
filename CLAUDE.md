@@ -332,6 +332,11 @@ deep in a collapsed folder is reachable — the filter overrides T-8's collapse 
 `src/ui/TagFilter.svelte` says what is active. The selection is `localStorage`, never a file (A-5). A row created while
 a filter is on carries that filter's tags (A-6), or it would vanish as it was typed.
 
+`src/ui/TagsPage.svelte` at `#/tags` (A-7) is the same scan asked the other question — *what have I been tagging?* — so
+it is a nav entry between Search and Done rather than a second bar. Choosing a tag there sets A-5's one selection and
+lands on the tree: the rows are read in the tree, and a second list of them on the page would be A-4's answer drawn
+twice.
+
 **The three flag colours are theme tokens** — `flag-low`, `flag-medium`, `flag-high` — so a palette is fourteen
 properties rather than eleven and no component names a colour. `themes.test.ts` fails if a theme leaves one out.
 

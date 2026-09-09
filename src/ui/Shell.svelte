@@ -13,6 +13,7 @@
     DONE_HREF,
     SEARCH_HREF,
     SETTINGS_HREF,
+    TAGS_HREF,
     TIMELY_HREF,
     TODAY_HREF,
     TOMORROW_HREF,
@@ -27,6 +28,7 @@
     todayOpen,
     tomorrowOpen,
     timelyOpen,
+    tagsOpen,
     doneOpen,
     conflictsOpen,
     searchOpen,
@@ -47,6 +49,8 @@
     tomorrowOpen: boolean;
     /** R-8. The third list beside them, which is not a day at all. */
     timelyOpen: boolean;
+    /** A-7. The tags of the tree, between Search and Done. */
+    tagsOpen: boolean;
     doneOpen: boolean;
     conflictsOpen: boolean;
     searchOpen: boolean;
@@ -184,6 +188,20 @@
         <span class="sidebar-icon text-center" aria-hidden="true">⌕</span>
         <span class="truncate">Search</span>
         <span class="sidebar-note ml-auto shrink-0 text-ink-faint">/</span>
+      </a>
+
+      <!-- A-7. Between Search and Done, because it is the same kind of entry:
+           a way into the tree that is not a place in it. -->
+      <a
+        href={TAGS_HREF}
+        class="sidebar-text flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-surface-sunken"
+        class:text-accent={tagsOpen}
+        class:text-ink-muted={!tagsOpen}
+        data-testid="tags-link"
+        onclick={() => view.setDrawer(false)}
+      >
+        <span class="sidebar-icon text-center" aria-hidden="true">#</span>
+        <span class="truncate">Tags</span>
       </a>
 
       <a

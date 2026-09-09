@@ -14,6 +14,7 @@ export type Route =
   | { name: 'done' }
   | { name: 'conflicts' }
   | { name: 'search'; query: string }
+  | { name: 'tags' }
   | { name: 'settings' }
   | { name: 'devices' }
   | { name: 'logs' }
@@ -28,6 +29,10 @@ export function routeOf(hash: string): Route {
   if (path === '/tomorrow') return { name: 'tomorrow' };
   // R-8. A third list that is not the tree, and a third route beside the two.
   if (path === '/timely') return { name: 'timely' };
+  // A-7. The tags of the tree gathered away from any one list, and a route
+  // rather than a panel for the reason every other nav entry is one: it is a
+  // place, and a place is linkable.
+  if (path === '/tags') return { name: 'tags' };
   if (path === '/done') return { name: 'done' };
   if (path === '/conflicts') return { name: 'conflicts' };
   if (path === '/settings') return { name: 'settings' };
@@ -56,6 +61,8 @@ export function hrefOf(route: Route): string {
       return '#/tomorrow';
     case 'timely':
       return '#/timely';
+    case 'tags':
+      return '#/tags';
     case 'done':
       return '#/done';
     case 'conflicts':
@@ -79,6 +86,9 @@ export const TOMORROW_HREF = hrefOf({ name: 'tomorrow' });
 
 /** R-8's third, beside them and for the same reason — requirements.md §4.5. */
 export const TIMELY_HREF = hrefOf({ name: 'timely' });
+
+/** A-7's view, in the nav between Search and Done — requirements.md §4.2. */
+export const TAGS_HREF = hrefOf({ name: 'tags' });
 
 /** T-12's view, always in the nav — see requirements.md §5 Navigation and routing. */
 export const DONE_HREF = hrefOf({ name: 'done' });
