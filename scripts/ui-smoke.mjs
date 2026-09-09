@@ -556,9 +556,9 @@ async function main() {
       tagEntries.join(','),
     );
     check(
-      'and shows no rows until a tag is chosen: no tags is not a question',
-      (await page.locator('[data-testid="tags-idle"]').count()) === 1 &&
-        (await page.locator('[data-testid="tagged-row"]').count()) === 0,
+      'and shows nothing else at all until a tag is chosen — F-6',
+      (await page.locator('[data-testid="tagged-row"]').count()) === 0 &&
+        (await page.locator('[data-testid="tags-summary"]').count()) === 0,
     );
 
     await page.locator('[data-testid="tag-entry"][data-tag="town"]').click();

@@ -61,11 +61,11 @@
       {/each}
     </div>
 
-    {#if tags.length === 0}
-      <p class="px-1 text-sm text-ink-muted" data-testid="tags-idle">
-        Choose a tag to see what carries it. Two or more means every one of them, on the same row.
-      </p>
-    {:else}
+    <!-- F-6's rule, applied to this page: nothing at all until a tag is chosen.
+         The chips above are the control and the rows below are the answer, and
+         a line explaining that in between is read once and skipped past on
+         every visit after it. -->
+    {#if tags.length > 0}
       <div class="flex flex-wrap items-center gap-2 px-1">
         <!-- The bar above the tree used to say this. Every selected tag must be
              on the row, and the page says AND rather than letting the reader
