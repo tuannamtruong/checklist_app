@@ -71,7 +71,6 @@
       data-testid="setup-local"
       onclick={useThisBrowser}
     >
-      Use this browser only — no sync
     </button>
   </div>
 

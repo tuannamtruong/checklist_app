@@ -72,7 +72,7 @@ export function browserOnly(storage: Storage = window.localStorage): OpenFolder 
     kind: 'folder',
     source: 'local',
     folder: localFolder(storage),
-    label: 'This browser only — not synced',
+    label: 'Local storage',
     synced: false,
     uiTest: false,
   };
