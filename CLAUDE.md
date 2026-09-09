@@ -323,9 +323,7 @@ entry sits with `All` and the two days, above the rule (R-8), and X-32 gave all 
 
 ### Attributes
 
-Any row carries **tags** (A-1) and a **priority** (A-2), and both are edited on the row's own page rather than from
-its `⋮` menu — X-34 took the tag entry off it, and the editor it opened under the row went with it, since the page draws
-the same editor open. Both are ordinary fields: one `set` op, last-writer-wins, a
+Any row carries **tags** (A-1) and a **priority** (A-2), and both are ordinary fields: one `set` op, last-writer-wins, a
 conflict row when two devices raced, compaction dropping a superseded one. `src/core/tags.ts` is the only place a tag is
 given its shape — case-folded, `#` dropped, sorted, deduplicated, twelve to a row — and it runs at the *decoder* as well
 as at the input, so a tag from an older build arrives normalised. A tag set merges whole rather than per member;

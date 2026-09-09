@@ -56,11 +56,9 @@
    * T-18. The context the menu runs against. `rows` is empty and stays empty:
    * it exists so that deleting a row can put the caret on the one above it, and
    * this column has no caret in it — the tree's rows are where a title is typed.
-   * `editRepeat` is absent for the reason `actions.ts` already gives: it opens
-   * a field *on the row*, and a nav entry has nowhere to put one — the menu
-   * shows it disabled rather than lying about where the period lives. It never
-   * comes up here anyway: R-7's entry is a timely row's, and nothing in Timely
-   * is in this column.
+   * `editTags` and `editRepeat` are absent for the reason `actions.ts` already
+   * gives: they open a field *on the row*, and a nav entry has nowhere to put
+   * one, so the menu shows them disabled rather than lying about where they are.
    */
   function ctxFor(id: NodeId) {
     return { session, view, focus, rows: [], id, now };

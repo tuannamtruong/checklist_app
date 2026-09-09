@@ -31,7 +31,7 @@ const headed = process.argv.includes('--headed');
 const shots = join(ROOT_DIR, 'ui-smoke');
 
 /** X-34. What the row menu draws: the edits, never the four reorderings. */
-const MENU_ACTIONS = ['new-below', 'new-inside', 'delete'];
+const MENU_ACTIONS = ['new-below', 'new-inside', 'tags', 'delete'];
 const KEYBOARD_ONLY_ACTIONS = ['indent', 'outdent', 'move-up', 'move-down'];
 
 const results = [];
@@ -157,9 +157,8 @@ async function main() {
       sidebarMenu.join(','),
     );
     check(
-      'and no tag entry, here or anywhere: tagging is the row’s page — X-34, A-1',
-      (await page.locator('[data-testid="row-menu"] [data-action="tags"]').count()) === 0,
-      sidebarMenu.join(','),
+      'with the two editors it has nowhere to draw shown disabled rather than absent',
+      await page.locator('[data-testid="row-menu"] [data-action="tags"]').isDisabled(),
     );
     await page.keyboard.press('Escape');
     await page.locator('[data-testid="row-menu"]').waitFor({ state: 'detached' });
@@ -473,7 +472,7 @@ async function main() {
     );
 
     // --- A-1 to A-6: tags, the flag and the filter -------------------------
-    let milkRow2 = await rowByTitle(page, 'Milk');
+    const milkRow2 = await rowByTitle(page, 'Milk');
     const flag = milkRow2.locator('[data-testid="priority"]');
     await flag.click();
     check(
@@ -482,21 +481,10 @@ async function main() {
       String(await flag.getAttribute('data-priority')),
     );
 
-    // A-1 is tagged on the row's own page, which is where the editor is drawn
-    // open — the row menu has not carried it since X-34. Milk is a task, so the
-    // page is reached by its route rather than by a link on the row.
-    const milkId = await milkRow2.getAttribute('data-row-id');
-    await page.goto(`${BASE_URL}#/n/${milkId}`);
-    await page.waitForSelector('[data-testid="tag-editor"]');
-    check(
-      'a row’s own page draws its tag editor open, with no menu entry to find first — A-1',
-      (await page.locator('[data-testid="row-menu"] [data-action="tags"]').count()) === 0,
-    );
+    await milkRow2.locator('[data-testid="row-menu-button"]').click();
+    await page.locator('[data-testid="row-menu"] [data-action="tags"]').click();
     await page.locator('[data-testid="tag-input"]').fill('#Town');
     await page.keyboard.press('Enter');
-    await page.goto(BASE_URL);
-    await page.waitForSelector('[data-testid="tree"]');
-    milkRow2 = await rowByTitle(page, 'Milk');
     check(
       'a tag typed with a hash and a capital is stored as one tag — A-1',
       (await milkRow2.locator('[data-testid="tag-chip"]').innerText()).trim() === 'town',

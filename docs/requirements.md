@@ -232,10 +232,6 @@ still has one, because a phone has no keyboard and that is what the menu is for:
 `src/ui/actions.ts` is where the line is drawn, `menuActions` is what `RowMenu` renders, and `actions.test.ts` fails if
 the four ever come back or if anything else leaves.
 
-The tag entry left with them and did not become a `menu: false` action: it was never an edit, only a door to an editor
-drawn under the row, and that editor is drawn open on the row's own page with no door to find first —
-[§4.1 Tags and priority](#41-tags-and-priority).
-
 One key is outside all of it. `/` opens search (F-5), and search is not a row action — it acts on the application rather
 than on the row under the caret, so the row menu is the wrong place for it and the sidebar entry is where a phone
 reaches it. `KEY_BOUND_ACTIONS` stays the list of *row* actions, which is what makes the tests above mean something.
@@ -348,7 +344,7 @@ a date, and a date wants a calendar rather than a field.
 
 | ID | Requirement | State | Where |
 | --- | --- | --- | --- |
-| A-1 | Any row carries a set of tags, whatever its kind | ✅ | `tags` in `src/core/types.ts`; `src/core/tags.ts` is the one place a tag is cleaned. A row is tagged **on its own page**, where `src/ui/TagEditor.svelte` is drawn open; the row in the tree shows the chips (`src/ui/TagChips.svelte`) and carries no editor. The `⋮` menu offered one until X-34 |
+| A-1 | Any row carries a set of tags, whatever its kind | ✅ | `tags` in `src/core/types.ts`; `src/core/tags.ts` is the one place a tag is cleaned. A row is tagged from its `⋮` menu and from its own page |
 | A-2 | Any row carries a priority — none, low, medium or high — drawn as a flag in green, yellow or red | ✅ | `Priority` in `src/core/types.ts`; `src/ui/PriorityFlag.svelte` is the control, and the three colours are theme tokens like every other colour — [§10.1 Themes](#101-themes) |
 | A-3 | Both are ordinary fields: one `set` op, last-writer-wins, and a conflict row when two devices raced | ✅ | `setTags` and `setPriority` in `src/core/edit.ts`; `src/core/conflicts.ts` classifies them beside `title` and `done`, and `src/core/compact.ts` drops a superseded one like any other field |
 | A-4 | The tree can be filtered to the rows carrying a tag, and several tags are AND-ed | ✅ | `src/core/filter.ts`, `src/ui/TagFilter.svelte`. Every selected tag must be on the row |
@@ -374,13 +370,6 @@ against setting one, exactly like un-ticking a box.
 Priority has no row-menu entry, and that is not the [§3.1 Keyboard (desktop)](#31-keyboard-desktop) rule being broken:
 the flag *is* a control on the row, reachable by thumb and by mouse, and four menu entries would teach nothing the four
 states of one flag do not.
-
-**Tags have none either, since X-34.** The entry did not tag anything — it opened an editor under the row, which is a
-second place a row's fields could be edited and the only one that had to be found through a menu first. The row's own
-page draws that same editor open, with no entry to find, and the chips on the row already say what it carries. The cost
-is named rather than hidden: a **task** row has no link to its own page (its icon is the checkbox, K-2), so tagging one
-from the tree means opening it by search or by route —
-[§15 Deviations and defects found during verification](#15-deviations-and-defects-found-during-verification).
 
 ### 4.2 Filtering by tag
 
@@ -837,7 +826,7 @@ to empty, and a dismissal is only for a row the user is content to leave as it l
 | X-31 | The note pane is an editor and nothing else: the add line and its two kind buttons are its top row, the body takes whatever height is left under the title and scrolls inside itself when the note outgrows it, and neither a path above the note nor the note's own children are drawn in it | ✅ | `src/ui/NotePane.svelte` — `src/ui/QuickAdd.svelte` in the header row `src/ui/Breadcrumbs.svelte` used to hold, and `src/ui/NoteBody.svelte` given `fill`, which is the height the pane has instead of the `min-h` floor a page's body needs. Nothing is lost with the children: the list beside the pane draws the whole subtree, so they are on screen one level in under the note's own row, and a row added here appears there — K-4. `scripts/ui-smoke.mjs` |
 | X-32 | The `All` link in the sidebar's corner is a full-width target, exactly like the entries under it | ✅ | `src/ui/Shell.svelte` — the corner and G-7's two day lists and R-8's third are one column of full-width links with one padding, rather than a corner sized to its four letters with a row of links under it. The `✕` that closes the drawer sits beside it and is drawn below `md` only, which is the one width where the corner is not the whole row |
 | X-33 | The keyboard reference lives on the settings screen, and nowhere else | ✅ | `KEY_HELP` in `src/ui/keyboard.ts`, rendered by `src/ui/SettingsPage.svelte` beside the bindings it describes; `keyboard.test.ts` fails if the two drift. It is the same kind of thing as everything else X-12 gathered — a fact about how *this* device is driven — and a reference read once does not belong under a control opened ten times a day — [§3.1 Keyboard (desktop)](#31-keyboard-desktop) |
-| X-34 | The row `⋮` menu carries a row's edits and nothing else: no keys printed beside them, no caret hints under them, none of the four reorderings a drag already does, and no tag entry | ✅ | `menu` on each `RowAction` in `src/ui/actions.ts`, filtered by `menuActions` and rendered by `src/ui/RowMenu.svelte`. Indent, outdent and the two nudges stay defined there because `src/ui/keyboard.ts` resolves a key through the same list — they left the menu, not the app. Tagging is not defined there at all: it is A-1's, on the row's own page — [§4.1 Tags and priority](#41-tags-and-priority). `actions.test.ts`, `scripts/ui-smoke.mjs` |
+| X-34 | The row `⋮` menu carries a row's edits and nothing else: no keys printed beside them, no caret hints under them, and none of the four reorderings a drag already does | ✅ | `menu` on each `RowAction` in `src/ui/actions.ts`, filtered by `menuActions` and rendered by `src/ui/RowMenu.svelte`. Indent, outdent and the two nudges stay defined there because `src/ui/keyboard.ts` resolves a key through the same list — they left the menu, not the app. `actions.test.ts`, `scripts/ui-smoke.mjs` |
 
 **A phone's top bar holds the add group rather than the application's name — X-27.** The bar existed to carry a `☰` and
 said `Checklist` beside it, which is a thing to read once on an application with one tree in it: every screen it
@@ -1171,10 +1160,9 @@ _Not written yet._ Expected to cover: the no-server rule, the three-method adapt
 
 ## 15. Deviations and defects found during verification
 
-What M1, M2 and M3 leave standing, in the order it matters. Every row here but two is a deliberate gap rather than a
-discovered bug — `npm test` and `npm run ui-smoke` both pass. Row 11 is a defect found by running the Windows bundle in
-Firefox, fixed rather than accepted, and the reason X-18 exists. Row 12 is a reach X-34 gave up on purpose, recorded
-here so that giving it up stays a decision rather than an oversight.
+What M1, M2 and M3 leave standing, in the order it matters. Every row here but the last is a deliberate gap rather than
+a discovered bug — `npm test` and `npm run ui-smoke` both pass. Row 11 is the exception: a defect found by running the
+Windows bundle in Firefox, fixed rather than accepted, and the reason X-18 exists.
 
 | # | Deviation | Why it stands |
 | --- | --- | --- |
@@ -1189,7 +1177,6 @@ here so that giving it up stays a decision rather than an oversight.
 | 9 | A device with no name is still eight hex characters | **Closed by D-5.** A device now names itself on its first write — `Win-Chro-a3f1`, from the platform, the browser and the first four digits of its own id — so the list and the conflict rows start from something readable and the typed name is an improvement on a name rather than the only one there is. Eight hex characters survive in one place: a peer whose build predates D-5 and that nobody ever named |
 | 10 | The Windows and Android bundles are built but unobserved | `make windows` and `make apk` produce them — [architecture.md §7 Packaging](architecture.md#7-packaging) — which is what row 1 was waiting for. Running them against a real provider's client is still [test.md §3.6 Platform](test.md#36-platform)'s checklist and has not been done |
 | 11 | The Windows bundle in Firefox showed "This browser only — not synced" while the helper beside it held the folder | **Found in use, fixed by X-18.** Not a Firefox bug and nothing to do with the adapter: the device had a stored choice of `local` from a launch that had no folder yet, that choice outranked every shell at startup, and the only way out on offer was the File System Access picker — which is the one thing Firefox does not have, so the screen said "this browser cannot open a folder at all" and meant it. Edge was unaffected because it had answered the setup screen with a picked folder instead. The fix is one line of precedence rather than a new button: `local` is the absence of a folder, so a shell holding one now outranks it — [architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter) |
-| 12 | A **task** in the tree cannot be tagged without leaving the tree | X-34 took the tag entry off the row `⋮` menu, and A-1's editor is drawn open on the row's own page. A folder or a note reaches that page from the icon on its row; a task's icon is K-2's checkbox, so its page is reachable by search, by the Done view or by typing `#/n/<id>`. It is a real loss and a small one — a task is the row most often tagged and the row least often opened — and the fix, when it is wanted, is a way to open a task's page from its row rather than a second editor or a returned menu entry |
 
 ## 16. Explicitly out of scope
 
