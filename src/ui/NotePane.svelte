@@ -113,7 +113,7 @@
        the note's own row on the left — K-10's group in the place X-27 already
        puts it on a phone. -->
   <div class="flex shrink-0 items-center gap-2 px-4 py-2">
-    <QuickAdd {session} {view} {focus} parent={id} />
+    <QuickAdd {session} {focus} parent={id} />
     <!-- Above the peek's tap layer: everything on a peeked sheet means "open
          this" except the one control that means the opposite — §10.3. -->
     {#if fromCaret}

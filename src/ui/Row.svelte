@@ -261,7 +261,7 @@
     />
 
     <!-- A-1 and A-2, right of the title: what the row is for, after what it is. -->
-    <TagChips tags={node.tags} {view} />
+    <TagChips tags={node.tags} />
     {#if inTimely}
       <!-- R-7. Only where there is a period to show: every other list's rows do
            not repeat, and a chip saying so on all of them would be noise. -->

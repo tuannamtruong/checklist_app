@@ -1,12 +1,15 @@
-// A-4. The tag filter, as a pure question about the tree — requirements.md §4.2.
+// A-4. Finding rows by tag, as a pure question about the tree — requirements.md §4.2.
 //
 // Nothing is indexed and nothing is stored, for the same reason search is not
-// (F-4): one person's checklist is thousands of nodes, and a scan per change of
-// filter costs less than an index that has to be kept true.
+// (F-4): one person's checklist is thousands of nodes, and a scan per question
+// costs less than an index that has to be kept true.
 //
-// A row survives the filter when it carries *every* selected tag. Its ancestors
-// survive with it, because a hit three levels down that nothing renders a path
-// to is a hit the filter promised and did not deliver.
+// This used to answer a *filter over the tree* — which ids a page may draw,
+// with every match's ancestors added so a hit in a collapsed folder was
+// reachable. It answers a list instead now: the tree is the tree, and `#/tags`
+// is the one place a tag narrows anything (§4.2). A list needs matches and the
+// path to each, which is the shape §6's search hits already have, so the two
+// views read the same way.
 
 import { hasEveryTag } from './tags';
 import { ancestorsOf, childrenOf, type ResolvedTree } from './tree';
@@ -14,14 +17,20 @@ import { ROOT, type NodeId, type ParentId } from './types';
 
 export interface TagCount {
   tag: string;
-  /** How many rows in the tree carry it — what the chip shows. */
+  /** How many rows in the tree carry it — what the entry shows. */
   count: number;
+}
+
+export interface TaggedRow {
+  id: NodeId;
+  /** Root first, the row's own parent last — the path T-9 and T-12 render. */
+  path: readonly NodeId[];
 }
 
 /**
  * Every tag in the visible tree, with how many rows carry it, most used first
  * and alphabetical within a count. A tag that only a deleted or finished row
- * carries is not offered: the filter is the tree's, and those rows are not in it.
+ * carries is not offered: the list is the tree's, and those rows are not in it.
  */
 export function tagsInTree(tree: ResolvedTree): TagCount[] {
   const counts = new Map<string, number>();
@@ -43,33 +52,22 @@ function visibleIds(tree: ResolvedTree, parent: ParentId = ROOT, out: NodeId[] =
 }
 
 /**
- * The ids a filtered tree may render: every row carrying all of `tags`, plus
- * every ancestor of one. An empty selection filters nothing, and says so with
- * `null` rather than with a set holding the whole tree — the caller renders the
- * unfiltered tree in that case and never walks it twice.
+ * Every row carrying *all* of `tags`, in tree order, each with the path it sits
+ * on. AND rather than OR — A-4 — and the ancestors are the path rather than
+ * results of their own: a list says where a row is, where a filtered tree had
+ * to draw the ancestors as rows to have somewhere to hang the match.
+ *
+ * An empty selection matches nothing rather than everything: the caller is a
+ * page asking "which rows carry these tags", and no tags is not a question.
  */
-export function filteredIds(tree: ResolvedTree, tags: Iterable<string>): ReadonlySet<NodeId> | null {
+export function taggedRows(tree: ResolvedTree, tags: Iterable<string>): TaggedRow[] {
   const wanted = [...tags];
-  if (wanted.length === 0) return null;
+  if (wanted.length === 0) return [];
 
-  const shown = new Set<NodeId>();
+  const rows: TaggedRow[] = [];
   for (const id of visibleIds(tree)) {
     if (!hasEveryTag(tree.nodes[id]!.tags, wanted)) continue;
-    shown.add(id);
-    // The ancestors are context rather than matches: they are drawn as ordinary
-    // rows, because opening one is the whole point of showing it.
-    for (const ancestor of ancestorsOf(tree, id)) shown.add(ancestor);
+    rows.push({ id, path: ancestorsOf(tree, id) });
   }
-  return shown;
-}
-
-/** How many rows the current filter actually matched, for the bar to report. */
-export function matchCount(tree: ResolvedTree, tags: Iterable<string>): number {
-  const wanted = [...tags];
-  if (wanted.length === 0) return 0;
-  let matched = 0;
-  for (const id of visibleIds(tree)) {
-    if (hasEveryTag(tree.nodes[id]!.tags, wanted)) matched++;
-  }
-  return matched;
+  return rows;
 }

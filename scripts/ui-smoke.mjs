@@ -471,7 +471,7 @@ async function main() {
       await quickAdd.inputValue(),
     );
 
-    // --- A-1 to A-6: tags, the flag and the filter -------------------------
+    // --- A-1 to A-4, A-7: tags, the flag, and the one page that narrows -----
     const milkRow2 = await rowByTitle(page, 'Milk');
     const flag = milkRow2.locator('[data-testid="priority"]');
     await flag.click();
@@ -490,66 +490,108 @@ async function main() {
       (await milkRow2.locator('[data-testid="tag-chip"]').innerText()).trim() === 'town',
       (await milkRow2.locator('[data-testid="tag-chip"]').innerText()).trim(),
     );
-
-    await page.locator('[data-testid="filter-tag"][data-tag="town"]').click();
-    const filteredTitles = await page
-      .locator('[data-testid="row"] [data-testid="title"]')
-      .evaluateAll((inputs) => inputs.map((input) => input.value));
+    await page.keyboard.press('Escape');
     check(
-      'filtering shows the matching row and the path to it, and nothing else — A-4',
-      filteredTitles.join('|') === 'Shopping|Milk',
-      filteredTitles.join('|'),
-    );
-    check(
-      'and says how many rows carry the tags it is ANDing — §4.2',
-      (await page.locator('[data-testid="filter-summary"]').innerText()).includes('1 row with town'),
-      await page.locator('[data-testid="filter-summary"]').innerText(),
+      'the chip is a label, not a filter: nothing on a row narrows anything — §4.2',
+      (await milkRow2.locator('[data-testid="tag-chip"] button').count()) === 0 &&
+        (await page.locator('[data-testid="tag-filter"]').count()) === 0 &&
+        (await milkRow2.locator('button[data-testid="tag-chip"]').count()) === 0,
     );
 
-    // A-6: a row created under a filter carries it, or it would vanish as it
-    // was typed.
+    // Two more rows to tag, so the AND below has something to narrow.
     await quickAdd.fill('Errand run');
     await page.keyboard.press('Enter');
-    await page.locator('[data-testid="filter-clear"]').click();
     const errand = await rowByTitle(page, 'Errand run');
+    await errand.locator('[data-testid="row-menu-button"]').click();
+    await page.locator('[data-testid="row-menu"] [data-action="tags"]').click();
+    await page.locator('[data-testid="tag-input"]').fill('town');
+    await page.keyboard.press('Enter');
+    await page.locator('[data-testid="tag-input"]').fill('errand');
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('Escape');
     check(
-      'a row created while filtering carries the filter’s tags — A-6',
-      (await errand.locator('[data-testid="tag-chip"][data-tag="town"]').count()) === 1,
-    );
-    check(
-      'clearing the filter puts the whole tree back',
+      'the tree is never narrowed by a tag, however many rows carry one — §4.2',
       (await titlesUnder(page, 'Shopping')).join('|') === 'Milk|Coffee beans|Oat milk',
       (await titlesUnder(page, 'Shopping')).join('|'),
     );
 
-    // --- A-7: the tags of the tree, on a page of their own -------------------
+    // --- A-7: the tags of the tree, and the rows they name -------------------
     await page.locator('[data-testid="tags-link"]').click();
     await page.waitForSelector('[data-testid="tags-page"]');
     const tagEntries = await page
       .locator('[data-testid="tag-entry"]')
       .evaluateAll((links) => links.map((link) => link.dataset.tag));
     check(
-      'the Tags page lists every tag in the tree — A-7',
-      tagEntries.join(',') === 'town',
+      'the Tags page lists every tag in the tree, most used first — A-7',
+      tagEntries.join(',') === 'town,errand',
       tagEntries.join(','),
     );
     check(
-      'and says how many rows carry each one',
-      (await page.locator('[data-testid="tag-count"]').first().innerText()).trim() === '2 rows',
-      await page.locator('[data-testid="tag-count"]').first().innerText(),
+      'and shows no rows until a tag is chosen: no tags is not a question',
+      (await page.locator('[data-testid="tags-idle"]').count()) === 1 &&
+        (await page.locator('[data-testid="tagged-row"]').count()) === 0,
     );
 
     await page.locator('[data-testid="tag-entry"][data-tag="town"]').click();
-    await page.waitForSelector('[data-testid="tree"]');
-    const fromTagsPage = await page
-      .locator('[data-testid="row"] [data-testid="title"]')
-      .evaluateAll((inputs) => inputs.map((input) => input.value));
+    await page.waitForSelector('[data-testid="tagged-row"]');
+    const tagged = await page
+      .locator('[data-testid="tagged-row"]')
+      .evaluateAll((links) => links.map((link) => link.innerText.split('\n')[0].trim()));
     check(
-      'choosing one filters the tree to it and lands there — A-7, A-4',
-      fromTagsPage.join('|') === 'Shopping|Milk|Errand run',
-      fromTagsPage.join('|'),
+      'choosing one lists the rows carrying it, in tree order — A-7, A-4',
+      tagged.join('|') === 'Milk|Errand run',
+      tagged.join('|'),
     );
-    await page.locator('[data-testid="filter-clear"]').click();
+    check(
+      'each with the path it sits on, so the list says where the row is — F-2’s shape',
+      (await page.locator('[data-testid="tagged-path"]').first().innerText()).trim() ===
+        'Shopping',
+      await page.locator('[data-testid="tagged-path"]').first().innerText(),
+    );
+    check(
+      'and the chosen tags are in the route, so the list is linkable — A-7, F-5',
+      page.url().endsWith('#/tags/town'),
+      page.url(),
+    );
+
+    await page.locator('[data-testid="tag-entry"][data-tag="errand"]').click();
+    await page.waitForURL(/#\/tags\/town,errand$/);
+    await page
+      .locator('[data-testid="tags-summary"]')
+      .filter({ hasText: 'town and errand' })
+      .waitFor();
+    check(
+      'a second tag narrows the first: every one of them, on the same row — A-4',
+      (await page.locator('[data-testid="tagged-row"]').count()) === 1 &&
+        (await page.locator('[data-testid="tags-summary"]').innerText()).includes(
+          '1 row with town and errand',
+        ),
+      await page.locator('[data-testid="tags-summary"]').innerText(),
+    );
+
+    await page.reload();
+    await page.waitForSelector('[data-testid="tagged-row"]');
+    check(
+      'and the reload draws the same list, because nothing about it was stored — A-5',
+      (await page.locator('[data-testid="tagged-row"]').count()) === 1,
+    );
+
+    const chosenRow = await page.locator('[data-testid="tagged-row"]').first().getAttribute('href');
+    await page.locator('[data-testid="tagged-row"]').first().click();
+    // The page title is an editable input on a row's page, so its value is what
+    // says which row was opened — `src/ui/PageTitle.svelte`.
+    await page
+      .locator(`[data-testid="page-title"][value="Errand run"]`)
+      .waitFor({ timeout: 5_000 })
+      .catch(() => {});
+    check(
+      'a row opens from the list, which is the way back into the tree — A-7',
+      (await page.locator('[data-testid="page-title"]').inputValue()) === 'Errand run' &&
+        page.url().endsWith(chosenRow),
+      `${page.url()} for ${chosenRow}`,
+    );
+    await page.locator('[data-testid="all-lists-link"]').click();
+    await page.waitForSelector('[data-testid="tree"]');
 
     // --- G-1 to G-7: Today and Tomorrow --------------------------------------
     // The two lists are not the tree, so every check here is also a check that

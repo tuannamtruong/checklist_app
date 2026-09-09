@@ -30,8 +30,23 @@ describe('the Timely route — R-8', () => {
 
 describe('the Tags route — A-7', () => {
   it('is a place like every other nav entry, so it is linkable', () => {
-    expect(routeOf('#/tags')).toEqual({ name: 'tags' });
+    expect(routeOf('#/tags')).toEqual({ name: 'tags', tags: [] });
     expect(TAGS_HREF).toBe('#/tags');
-    expect(hrefOf({ name: 'tags' })).toBe('#/tags');
+    expect(hrefOf({ name: 'tags', tags: [] })).toBe('#/tags');
+  });
+
+  it('carries the chosen tags, so a list of rows is linkable too — F-5', () => {
+    expect(routeOf('#/tags/town')).toEqual({ name: 'tags', tags: ['town'] });
+    expect(routeOf('#/tags/errand,town')).toEqual({ name: 'tags', tags: ['errand', 'town'] });
+    expect(hrefOf({ name: 'tags', tags: ['errand', 'town'] })).toBe('#/tags/errand,town');
+  });
+
+  it('cleans what it is handed, so a hand-typed fragment means one tag — A-1', () => {
+    expect(routeOf('#/tags/%23Town')).toEqual({ name: 'tags', tags: ['town'] });
+    expect(routeOf('#/tags/,')).toEqual({ name: 'tags', tags: [] });
+  });
+
+  it('round-trips a tag holding a space', () => {
+    expect(hrefOf(routeOf('#/tags/day%20trip'))).toBe('#/tags/day%20trip');
   });
 });

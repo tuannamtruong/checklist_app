@@ -19,12 +19,10 @@
   import { splitPastedTitles } from '../core/paste';
   import type { Kind, ParentId } from '../core/types';
   import type { Session } from '../app/Session.svelte';
-  import type { ViewState } from '../app/view-state.svelte';
   import type { RowFocus } from './focus.svelte';
 
   let {
     session,
-    view,
     focus,
     parent,
     day = null,
@@ -32,7 +30,6 @@
     taskOnly = false,
   }: {
     session: Session;
-    view: ViewState;
     focus: RowFocus;
     parent: ParentId;
     /** G-5. The day this page files under, and null on every list in the tree. */
@@ -54,13 +51,15 @@
   let draft = $state('');
   let input = $state<HTMLInputElement | null>(null);
 
-  /** A-6: under a filter, the new row carries it or it is created invisible. */
+  // A-6 was here: a row created under a tag filter carried that filter's tags,
+  // or it vanished as it was typed. There is no filter over the tree any more —
+  // §4.2 — so there is nothing for a new row to inherit and nothing it can
+  // vanish from.
   function commit(): void {
     const title = draft.trim();
     if (title === '') return;
     draft = '';
-    const tags = [...view.tagFilter];
-    session.run((tree, ctx) => createLastChild(tree, ctx, parent, { title, tags, day, every }));
+    session.run((tree, ctx) => createLastChild(tree, ctx, parent, { title, day, every }));
   }
 
   /**
@@ -81,8 +80,7 @@
     const titles = splitPastedTitles(draft.slice(0, caret) + pasted + draft.slice(end));
     draft = '';
     if (titles.length === 0) return;
-    const tags = [...view.tagFilter];
-    session.run((tree, ctx) => createLastChildren(tree, ctx, parent, titles, { tags, day, every }));
+    session.run((tree, ctx) => createLastChildren(tree, ctx, parent, titles, { day, every }));
   }
 
   /**
@@ -96,14 +94,13 @@
    */
   function addKind(kind: Kind): void {
     const title = draft.trim();
-    const tags = [...view.tagFilter];
     draft = '';
     const ops = session.run((tree, ctx) =>
       createLastChild(
         tree,
         ctx,
         parent,
-        title === '' ? { kind, tags, day, every } : { kind, title, tags, day, every },
+        title === '' ? { kind, day, every } : { kind, title, day, every },
       ),
     );
     if (title === '' && ops[0]) focus.request(ops[0].id);

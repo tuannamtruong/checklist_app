@@ -97,9 +97,9 @@ the rule is [sync-flow.md §4.8 The compaction cut](sync-flow.md#48-the-compacti
 Device-local state, held in `localStorage` and never written to a shared file: the device id, collapse/expand state
 (T-8), which sidebar rows are open (T-17), the sync cadence (S-19), which folder this device reaches the tree through
 ([architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter)), dismissed conflict notices (C-6), the
-chosen theme (X-14), how large the sidebar's type is (X-25), which tags the tree is filtered by (A-5), how wide the
-sidebar and the note pane have been dragged (X-20, X-24), and any filter the Done view grows (T-12). Anything the user
-would not want to converge across devices belongs here rather than in the tree.
+chosen theme (X-14), how large the sidebar's type is (X-25), how wide the sidebar and the note pane have been dragged
+(X-20, X-24), and any filter the Done view grows (T-12). Anything the user would not want to converge across devices
+belongs here rather than in the tree.
 
 The **search index** is not state at all, in the same sense the Done view is not: F-4 scans the materialised tree on
 each keystroke, so there is nothing to store, nothing to invalidate and nothing to sync.
@@ -180,8 +180,8 @@ unlimited in depth (T-1) makes the column unlimited too, so the nav entries unde
 bottom of the screen long before the tree itself does; but one level stops one step short of where the second place
 worth starting usually is, and reaching it meant opening the top-level page to click a row that was already in view. A
 *fixed* second level keeps the column bounded and closes that step: a top-level row is worth one disclosure, and
-everything under that is the tree view's, which is the one that can collapse (T-8), filter (A-4) and drag (T-14), with
-breadcrumbs (T-9) as the way back up out of it.
+everything under that is the tree view's, which is the one that can collapse (T-8) and drag (T-14), with breadcrumbs
+(T-9) as the way back up out of it.
 
 **Closed by default, and that is the whole difference between this and the column M6 removed.** A sidebar that opened
 every row would draw the mirror again on the first paint; one that could not open at all would be M6's sidebar for
@@ -347,10 +347,10 @@ a date, and a date wants a calendar rather than a field.
 | A-1 | Any row carries a set of tags, whatever its kind | ✅ | `tags` in `src/core/types.ts`; `src/core/tags.ts` is the one place a tag is cleaned. A row is tagged from its `⋮` menu and from its own page |
 | A-2 | Any row carries a priority — none, low, medium or high — drawn as a flag in green, yellow or red | ✅ | `Priority` in `src/core/types.ts`; `src/ui/PriorityFlag.svelte` is the control, and the three colours are theme tokens like every other colour — [§10.1 Themes](#101-themes) |
 | A-3 | Both are ordinary fields: one `set` op, last-writer-wins, and a conflict row when two devices raced | ✅ | `setTags` and `setPriority` in `src/core/edit.ts`; `src/core/conflicts.ts` classifies them beside `title` and `done`, and `src/core/compact.ts` drops a superseded one like any other field |
-| A-4 | The tree can be filtered to the rows carrying a tag, and several tags are AND-ed | ✅ | `src/core/filter.ts`, `src/ui/TagFilter.svelte`. Every selected tag must be on the row |
-| A-5 | The filter is device-local and never reaches a file | ✅ | `src/app/view-state.svelte.ts`, beside the collapse state — [§2.3 What is never in the Sync Folder](#23-what-is-never-in-the-sync-folder) |
-| A-6 | A row created while a filter is on carries that filter's tags | ✅ | `CreateOptions.tags` in `src/core/edit.ts`, passed by `src/ui/TreeView.svelte`. Without it the new row would vanish as it was typed |
-| A-7 | Every tag in the tree is listed on a page of its own, and choosing one filters the tree to it | ✅ | `src/ui/TagsPage.svelte` at `#/tags`, a nav entry between Search and Done. It derives everything and stores nothing: `tagsInTree` is the scan A-4's bar already runs, and choosing a tag writes A-5's device-local selection — [§4.2 Filtering by tag](#42-filtering-by-tag) |
+| A-4 | Rows can be found by tag, and several tags are AND-ed | ✅ | `taggedRows` in `src/core/filter.ts`, rendered by `src/ui/TagsPage.svelte`. Every selected tag must be on the row. It narrowed the **tree** until M11, through a bar above it; it lists the matching rows on `#/tags` instead — [§4.2 Finding rows by tag](#42-finding-rows-by-tag) |
+| A-5 | Which tags are chosen is device-local and never reaches a file | ✅ | The route — `#/tags/<tag>,<tag>` — which is a fragment and reaches no server either, F-5's argument applied to a tag. It sat in `src/app/view-state.svelte.ts` beside the collapse state until M11; nothing about it is stored now, which is a stronger version of the same promise — [§2.3 What is never in the Sync Folder](#23-what-is-never-in-the-sync-folder) |
+| A-6 | A row created while a filter is on carries that filter's tags | ✗ **Withdrawn** | It existed because a filtered tree could create a row it then hid. Nothing filters the tree since M11, so there is no filter to inherit and nothing to vanish from — [§4.2 Finding rows by tag](#42-finding-rows-by-tag). Tagging at creation is A-8's instead, and is typed rather than inherited |
+| A-7 | Every tag in the tree is listed on a page of its own, and choosing one lists the rows carrying it | ✅ | `src/ui/TagsPage.svelte` at `#/tags` and `#/tags/<tag>,<tag>`, a nav entry between Search and Done. It derives everything and stores nothing — `tagsInTree` and `taggedRows` are two scans of the materialised tree, exactly as F-4's search is. It is the **only** place in the application a tag narrows anything — [§4.2 Finding rows by tag](#42-finding-rows-by-tag) |
 
 **A tag is normalised on the way in, and the normal form is what is stored.** Case-folded, its inner whitespace
 collapsed, a leading `#` dropped, trimmed to 32 characters, and the set held sorted and deduplicated —
@@ -371,29 +371,36 @@ Priority has no row-menu entry, and that is not the [§3.1 Keyboard (desktop)](#
 the flag *is* a control on the row, reachable by thumb and by mouse, and four menu entries would teach nothing the four
 states of one flag do not.
 
-### 4.2 Filtering by tag
+### 4.2 Finding rows by tag
 
-The filter is one set of tags, held by the device rather than by the tree, and it applies to the tree view on every
-page. A row survives it when it carries **every** selected tag — AND rather than OR, because two tags on one row is the
-question people actually ask ("what is tagged `errand` *and* `town`"), and OR is what search already does with two
-words.
+**`#/tags` is the only place in the application where a tag narrows anything.** The page lists every tag in the tree,
+most used first, and choosing one lists the rows carrying it — each with the path it sits on, so the list says where the
+row is and opening one goes to its page. A row survives it when it carries **every** selected tag — AND rather than OR,
+because two tags on one row is the question people actually ask ("what is tagged `errand` *and* `town`"), and OR is what
+search already does with two words.
 
-**A filter shows a matching row's ancestors too, and expands them.** A hit three levels down a collapsed folder is a row
-the filter promised and did not deliver, so the collapse state (T-8) is overridden for as long as the filter is on, and
-it is remembered rather than cleared when the filter comes off. The ancestors are context, not matches: they are drawn
-as ordinary rows because opening one is the whole point of showing it.
+**The tree is no longer filtered at all.** A-4 used to narrow it through a bar above it: the bar showed every tag, the
+selected ones hid every row that did not carry them, the ancestors of a match were added back so a hit in a collapsed
+folder was reachable, T-8's collapse state was overridden while the filter was on, and A-6 had to put the filter's tags
+on any row created under it or the row vanished as it was typed. That is five rules, each of them repairing a hole the
+one before it opened, for a mode the tree could be left in — and a filtered tree with the bar scrolled off is an empty
+list with no explanation. The rules are gone with the mode. `#/tags` answers instead of redirecting, and it needs none
+of them: a list of matches carries the path rather than the ancestors, and nothing is hidden anywhere because nothing is
+being narrowed in place.
 
-**The tags themselves are a page, not only a bar — A-7.** The bar above the tree answers "narrow *this* list", and it is
-drawn against the rows it is narrowing; it is also absent entirely on a tree with no tags in it, which is what makes it
-costless for someone who never uses them. `#/tags` answers the other question — "what have I been tagging?" — which is
-asked away from any one list, so it is a nav entry beside Search rather than a second bar. Choosing a tag there sets the
-same one selection and lands on the tree, because the rows are read in the tree and a second list of them on this page
-would be A-4's answer drawn twice. It is one tag per click and never a selection built up first: several at once is the
-bar's, where the rows being narrowed are on screen to be watched.
+**A tag on a row is a label.** The chips `src/ui/TagChips.svelte` draws say what the row carries and do nothing when
+tapped — they were the shortest way into the filter, and there is no filter. They are deliberately not links to
+`#/tags/<tag>` either: a row is dragged (T-14, T-16) and its title is typed, and a navigation in the middle of that is a
+place a thumb lands by accident.
 
-**Nothing else in the application is filtered.** Search (F-4) already scans every row by name and the Done view (T-12)
-is a list of what has left the tree — a filter over either would be a second answer to a question the user asked
-somewhere else. The filter is the tree's, and the nav says so by showing what is active on the tree's own page.
+**Which tags are chosen is the route — A-5.** `#/tags/errand,town`, one path segment with each tag encoded on its own,
+for the reason F-5 gives for the search query: the fragment reaches no server, so a list of rows is linkable, survives a
+reload and pastes into another device. It used to persist in `localStorage`, because a filter that cleared itself on
+every reload was a filter nobody could rely on. A page does not have that problem — it is where the reader already is —
+so nothing about it is stored, which is a stronger version of the promise A-5 was making.
+
+**Search and the Done view are untouched, and always were.** Search (F-4) scans every row by name and the Done view
+(T-12) lists what has left the tree; a tag narrowing either would be a second answer to a question asked somewhere else.
 
 ### 4.3 Bold and headings in a note body
 
@@ -569,7 +576,7 @@ helper and to the Android WebView unchanged. `src/app/router.svelte.ts` holds th
 | `#/today` | Today: every agenda item whose day has come, including the ones it did not come *on* — G-3, G-4 | `src/ui/AgendaPage.svelte` |
 | `#/tomorrow` | Tomorrow: every agenda item whose day has not come yet — G-3 | `src/ui/AgendaPage.svelte`, the same page on the other day |
 | `#/timely` | Timely: every repeating check item, the due ones live and the waiting ones greyed — R-3, R-4 | `src/ui/TimelyPage.svelte` |
-| `#/tags` | Every tag in the tree, most used first, and choosing one filters the tree to it — A-7 | `src/ui/TagsPage.svelte` |
+| `#/tags` and `#/tags/<tag>,<tag>` | Every tag in the tree, most used first, and the rows carrying the tags chosen from it — A-4, A-7 | `src/ui/TagsPage.svelte` |
 | `#/done` | The Done view of T-12: every ticked and deleted row in one list, newest first | `src/ui/DonePage.svelte` |
 | `#/conflicts` | What the merge decided without asking — [§9 Conflict presentation](#9-conflict-presentation) | `src/ui/ConflictsPage.svelte` |
 | `#/search` and `#/search/<query>` | The search results of [§6 Search](#6-search) | `src/ui/SearchPage.svelte` |

@@ -12,7 +12,6 @@
   import type { ViewState } from '../app/view-state.svelte';
   import type { RowFocus } from './focus.svelte';
   import QuickAdd from './QuickAdd.svelte';
-  import TagFilter from './TagFilter.svelte';
   import TreeView from './TreeView.svelte';
 
   let {
@@ -43,7 +42,7 @@
 >
   <div class="flex max-w-3xl">
     <div class="flex max-w-xl flex-1">
-      <QuickAdd {session} {view} {focus} parent={AGENDA} {day} />
+      <QuickAdd {session} {focus} parent={AGENDA} {day} />
     </div>
   </div>
 </header>
@@ -51,9 +50,6 @@
 <!-- X-23. Left-aligned like every other page, so nothing moves sideways. -->
 <div class="flex max-w-3xl flex-col gap-4 px-4 py-6" data-testid="agenda-page" data-agenda={list}>
   <h1 class="text-2xl font-semibold" data-testid="page-title">{title}</h1>
-
-  <TagFilter {session} {view} />
-
   <TreeView {session} {view} {focus} parent={AGENDA} {now} {only} />
 
   <!-- G-4. An empty day is a state worth saying out loud: the list is empty

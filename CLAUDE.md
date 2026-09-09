@@ -141,7 +141,7 @@ lower this device's top counter, or every peer reads the file as a partial downl
 
 Never in a file, always `localStorage`: the device id, collapse state, which sidebar rows are open, the drawer's state,
 the sidebar's and the note pane's widths, which folder this device chose, which cloud app it belongs to, the chosen
-theme, how large the sidebar's type is, the tag filter, and dismissed conflict rows. The File System Access handle is
+theme, how large the sidebar's type is, and dismissed conflict rows. The File System Access handle is
 the exception, and only because it is an object: IndexedDB.
 
 ### Component catalog
@@ -329,15 +329,16 @@ given its shape — case-folded, `#` dropped, sorted, deduplicated, twelve to a 
 as at the input, so a tag from an older build arrives normalised. A tag set merges whole rather than per member;
 past_decision.md §10 says what an OR-set would have cost.
 
-`src/core/filter.ts` ANDs the selected tags over the materialised tree and adds the ancestors of every match, so a hit
-deep in a collapsed folder is reachable — the filter overrides T-8's collapse state while it is on, and
-`src/ui/TagFilter.svelte` says what is active. The selection is `localStorage`, never a file (A-5). A row created while
-a filter is on carries that filter's tags (A-6), or it would vanish as it was typed.
+**`#/tags` is the only place a tag narrows anything (A-4, A-7).** `src/ui/TagsPage.svelte` lists every tag in the tree
+and then the rows carrying the ones chosen from it, each with the path it sits on — `tagsInTree` and `taggedRows` in
+`src/core/filter.ts`, two scans of the materialised tree and no index, exactly as F-4's search is. The chosen tags are
+the route (`#/tags/errand,town`) rather than `localStorage`: a page is where the reader already is, so nothing about
+them is stored at all, which is a stronger A-5 than the old one.
 
-`src/ui/TagsPage.svelte` at `#/tags` (A-7) is the same scan asked the other question — *what have I been tagging?* — so
-it is a nav entry between Search and Done rather than a second bar. Choosing a tag there sets A-5's one selection and
-lands on the tree: the rows are read in the tree, and a second list of them on the page would be A-4's answer drawn
-twice.
+The tree itself is **not** filtered and `TagFilter.svelte` is gone. The bar cost five rules that each repaired a hole
+the one before it opened — hide the non-matching rows, add the ancestors back, override T-8's collapse state, and A-6 to
+stop a row vanishing as it was typed — for a mode a tree could be left in. `src/ui/TagChips.svelte` draws labels now,
+not buttons, and A-6 is withdrawn: tagging at creation is A-8's `#tag` on the add line.
 
 **The three flag colours are theme tokens** — `flag-low`, `flag-medium`, `flag-high` — so a palette is fourteen
 properties rather than eleven and no component names a colour. `themes.test.ts` fails if a theme leaves one out.

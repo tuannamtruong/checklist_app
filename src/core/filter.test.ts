@@ -1,8 +1,8 @@
-// A-4 and A-5 — requirements.md §4.2. The filter is a read of the tree, so
+// A-4 — requirements.md §4.2. Finding rows by tag is a read of the tree, so
 // everything here is one: no state, no index, nothing to invalidate.
 
 import { beforeEach, describe, expect, it } from 'vitest';
-import { filteredIds, matchCount, tagsInTree } from './filter';
+import { taggedRows, tagsInTree } from './filter';
 import { createFirstChild, createLastChild, remove, setTags, toggleDone } from './edit';
 import { FakeContext, Session } from './test-support';
 import { ROOT, type NodeId } from './types';
@@ -32,8 +32,8 @@ describe('the tags a tree offers', () => {
     ]);
   });
 
-  // The filter is the tree's, and neither a finished row nor a deleted one is
-  // in the tree — T-11 and T-7 took them out before this ever ran.
+  // The list is the tree's, and neither a finished row nor a deleted one is in
+  // the tree — T-11 and T-7 took them out before this ever ran.
   it('does not offer a tag only a finished or deleted row carries', () => {
     const done = add(ROOT, 'done', ['gone']);
     const dead = add(ROOT, 'dead', ['gone']);
@@ -46,48 +46,42 @@ describe('the tags a tree offers', () => {
   });
 });
 
-describe('what a filter shows', () => {
-  it('filters nothing when nothing is selected', () => {
+describe('the rows a tag names', () => {
+  it('names none at all when no tag is chosen: no tags is not a question', () => {
     add(ROOT, 'a', ['town']);
-    expect(filteredIds(session.tree, [])).toBe(null);
+    expect(taggedRows(session.tree, [])).toEqual([]);
   });
 
-  it('keeps a matching row and every ancestor of one', () => {
+  it('names the matching row and carries the path it sits on, not the ancestors as rows', () => {
     const list = add(ROOT, 'Shopping');
     const milk = add(list, 'Milk', ['town']);
     add(list, 'Bread');
-    const other = add(ROOT, 'House');
+    add(ROOT, 'House');
 
-    const shown = filteredIds(session.tree, ['town'])!;
-    expect(shown.has(milk)).toBe(true);
-    expect(shown.has(list)).toBe(true);
-    expect(shown.has(other)).toBe(false);
+    expect(taggedRows(session.tree, ['town'])).toEqual([{ id: milk, path: [list] }]);
   });
 
   it('ANDs the selection: a row needs every tag', () => {
     const both = add(ROOT, 'both', ['errand', 'town']);
-    const one = add(ROOT, 'one', ['town']);
+    add(ROOT, 'one', ['town']);
 
-    const shown = filteredIds(session.tree, ['errand', 'town'])!;
-    expect(shown.has(both)).toBe(true);
-    expect(shown.has(one)).toBe(false);
-    expect(matchCount(session.tree, ['errand', 'town'])).toBe(1);
+    expect(taggedRows(session.tree, ['errand', 'town']).map((row) => row.id)).toEqual([both]);
   });
 
-  it('counts matches rather than shown rows, so the ancestors do not inflate it', () => {
+  it('lists in tree order, so two rows read the way the tree reads', () => {
     const list = add(ROOT, 'Shopping');
-    add(list, 'Milk', ['town']);
-    expect(matchCount(session.tree, ['town'])).toBe(1);
-    expect(filteredIds(session.tree, ['town'])!.size).toBe(2);
+    const milk = add(list, 'Milk', ['town']);
+    const house = add(ROOT, 'House', ['town']);
+    expect(taggedRows(session.tree, ['town']).map((row) => row.id)).toEqual([milk, house]);
   });
 
   it('follows a tag written after the row was made', () => {
     const list = add(ROOT, 'Shopping');
     const kid = createFirstChild(session.tree, ctx.tick(), list, { title: 'Milk' });
     session.apply(kid);
-    expect(filteredIds(session.tree, ['town'])!.size).toBe(0);
+    expect(taggedRows(session.tree, ['town'])).toEqual([]);
     ctx.tick();
     session.apply(setTags(session.tree, ctx, kid[0]!.id, ['town']));
-    expect(filteredIds(session.tree, ['town'])!.size).toBe(2);
+    expect(taggedRows(session.tree, ['town']).map((row) => row.id)).toEqual([kid[0]!.id]);
   });
 });

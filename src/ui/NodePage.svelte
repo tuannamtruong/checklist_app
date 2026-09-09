@@ -14,7 +14,6 @@
   import PageTitle from './PageTitle.svelte';
   import QuickAdd from './QuickAdd.svelte';
   import TagEditor from './TagEditor.svelte';
-  import TagFilter from './TagFilter.svelte';
   import TreeView from './TreeView.svelte';
 
   let {
@@ -56,7 +55,7 @@
 >
   <div class="flex max-w-3xl">
     <div class="flex max-w-xl flex-1">
-      <QuickAdd {session} {view} {focus} {parent} />
+      <QuickAdd {session} {focus} {parent} />
     </div>
   </div>
 </header>
@@ -84,9 +83,6 @@
   {:else}
     <h1 class="text-2xl font-semibold" data-testid="page-title">All</h1>
   {/if}
-
-  <!-- A-4. The bar is the tree's, and it sits with the tree — §4.2. -->
-  <TagFilter {session} {view} />
 
   <TreeView {session} {view} {focus} {parent} {now} />
 </div>

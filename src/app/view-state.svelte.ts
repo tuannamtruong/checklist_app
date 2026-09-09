@@ -7,7 +7,6 @@ import type { NodeId } from '../core/types';
 
 const COLLAPSED_KEY = 'checklist.collapsed';
 const DRAWER_KEY = 'checklist.drawer';
-const TAG_FILTER_KEY = 'checklist.tagfilter';
 const SIDEBAR_OPEN_KEY = 'checklist.sidebaropen';
 const SIDEBAR_WIDTH_KEY = 'checklist.sidebarwidth';
 const NOTE_WIDTH_KEY = 'checklist.notewidth';
@@ -79,13 +78,6 @@ export class ViewState {
   private storage: Storage;
   private collapsedIds = $state<Set<NodeId>>(new Set());
   /**
-   * A-5. Which tags the tree is filtered by. It persists, because a filter that
-   * cleared itself on every reload would be a filter nobody could rely on — and
-   * the bar says what is on for as long as it is on, so a filtered tree is never
-   * mistaken for an empty one.
-   */
-  private tags = $state<Set<string>>(new Set());
-  /**
    * T-17. Which top-level sidebar rows have their second level open. It holds
    * the *open* ids rather than the closed ones, which is what makes "closed" the
    * default with nothing stored: a device that never touches a triangle reads an
@@ -119,7 +111,6 @@ export class ViewState {
     this.storage = storage;
     this.collapsedIds = loadIds(storage, COLLAPSED_KEY);
     this.sidebarOpenIds = loadIds(storage, SIDEBAR_OPEN_KEY);
-    this.tags = loadIds(storage, TAG_FILTER_KEY);
     this.drawerOpen = storage.getItem(DRAWER_KEY) === 'open';
     this.sidebarWidth = loadWidth(storage, SIDEBAR_WIDTH_KEY, SIDEBAR_WIDTH);
     this.noteWidth = loadWidth(storage, NOTE_WIDTH_KEY, this.noteBounds);
@@ -156,29 +147,11 @@ export class ViewState {
     return clampWidth(this.noteWidth, this.noteBounds);
   }
 
-  /** A-4. The selection, as the filter and the bar both read it. */
-  get tagFilter(): ReadonlySet<string> {
-    return this.tags;
-  }
-
-  isFiltering(tag: string): boolean {
-    return this.tags.has(tag);
-  }
-
-  toggleTagFilter(tag: string): void {
-    const next = new Set(this.tags);
-    if (!next.delete(tag)) next.add(tag);
-    this.setTagFilter(next);
-  }
-
-  clearTagFilter(): void {
-    this.setTagFilter(new Set());
-  }
-
-  private setTagFilter(next: Set<string>): void {
-    this.tags = next;
-    this.storage.setItem(TAG_FILTER_KEY, JSON.stringify([...next]));
-  }
+  // A-5. The chosen tags used to live here, beside the collapse state. They are
+  // in the route now — `#/tags/<tag>,<tag>` — because they no longer narrow the
+  // tree at all: `#/tags` is the one place a tag chooses anything, and what a
+  // page is showing is what a route is for. Nothing about them is stored, which
+  // is a stronger version of the promise A-5 was making — §2.3, §4.2.
 
   isCollapsed(id: NodeId): boolean {
     return this.collapsedIds.has(id);

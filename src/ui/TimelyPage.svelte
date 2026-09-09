@@ -13,7 +13,6 @@
   import type { ViewState } from '../app/view-state.svelte';
   import type { RowFocus } from './focus.svelte';
   import QuickAdd from './QuickAdd.svelte';
-  import TagFilter from './TagFilter.svelte';
   import TreeView from './TreeView.svelte';
 
   let {
@@ -40,7 +39,7 @@
 >
   <div class="flex max-w-3xl">
     <div class="flex max-w-xl flex-1">
-      <QuickAdd {session} {view} {focus} parent={TIMELY} {every} taskOnly />
+      <QuickAdd {session} {focus} parent={TIMELY} {every} taskOnly />
     </div>
   </div>
 </header>
@@ -48,8 +47,6 @@
 <!-- X-23. Left-aligned like every other page, so nothing moves sideways. -->
 <div class="flex max-w-3xl flex-col gap-4 px-4 py-6" data-testid="timely-page">
   <h1 class="text-2xl font-semibold" data-testid="page-title">Timely</h1>
-
-  <TagFilter {session} {view} />
 
   <TreeView {session} {view} {focus} parent={TIMELY} {now} />
 </div>

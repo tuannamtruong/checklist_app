@@ -3,6 +3,7 @@
 // launch from a home-screen icon because the document request is always
 // index.html — X-8.
 
+import { cleanTag } from '../core/tags';
 import type { NodeId } from '../core/types';
 
 export type Route =
@@ -14,7 +15,7 @@ export type Route =
   | { name: 'done' }
   | { name: 'conflicts' }
   | { name: 'search'; query: string }
-  | { name: 'tags' }
+  | { name: 'tags'; tags: readonly string[] }
   | { name: 'settings' }
   | { name: 'devices' }
   | { name: 'logs' }
@@ -31,8 +32,12 @@ export function routeOf(hash: string): Route {
   if (path === '/timely') return { name: 'timely' };
   // A-7. The tags of the tree gathered away from any one list, and a route
   // rather than a panel for the reason every other nav entry is one: it is a
-  // place, and a place is linkable.
-  if (path === '/tags') return { name: 'tags' };
+  // place, and a place is linkable. Which tags are chosen rides in it for F-5's
+  // reason too — the fragment reaches no server, so a list of rows carrying two
+  // tags survives a reload and pastes into another device.
+  if (path === '/tags') return { name: 'tags', tags: [] };
+  const tagged = /^\/tags\/(.*)$/.exec(path);
+  if (tagged) return { name: 'tags', tags: decodeTags(tagged[1]!) };
   if (path === '/done') return { name: 'done' };
   if (path === '/conflicts') return { name: 'conflicts' };
   if (path === '/settings') return { name: 'settings' };
@@ -62,7 +67,7 @@ export function hrefOf(route: Route): string {
     case 'timely':
       return '#/timely';
     case 'tags':
-      return '#/tags';
+      return route.tags.length === 0 ? '#/tags' : `#/tags/${encodeTags(route.tags)}`;
     case 'done':
       return '#/done';
     case 'conflicts':
@@ -87,8 +92,28 @@ export const TOMORROW_HREF = hrefOf({ name: 'tomorrow' });
 /** R-8's third, beside them and for the same reason — requirements.md §4.5. */
 export const TIMELY_HREF = hrefOf({ name: 'timely' });
 
+/**
+ * A-7. Several tags in one path segment, comma-separated and each encoded on
+ * its own — a tag may hold a space (`src/core/tags.ts` collapses runs of them
+ * but keeps one), and a comma is not a character `cleanTag` ever leaves in.
+ */
+function encodeTags(tags: readonly string[]): string {
+  return tags.map((tag) => encodeURIComponent(tag)).join(',');
+}
+
+function decodeTags(segment: string): string[] {
+  return segment
+    .split(',')
+    .map((part) => cleanTag(decodeURIComponent(part)))
+    .filter((tag) => tag !== '');
+}
+
 /** A-7's view, in the nav between Search and Done — requirements.md §4.2. */
-export const TAGS_HREF = hrefOf({ name: 'tags' });
+export const TAGS_HREF = hrefOf({ name: 'tags', tags: [] });
+
+export function tagsHref(tags: readonly string[]): string {
+  return hrefOf({ name: 'tags', tags });
+}
 
 /** T-12's view, always in the nav — see requirements.md §5 Navigation and routing. */
 export const DONE_HREF = hrefOf({ name: 'done' });

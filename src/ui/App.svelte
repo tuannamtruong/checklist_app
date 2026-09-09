@@ -87,8 +87,11 @@
   // R-8. A third list that is not the tree, so it is excluded from `listOpen`
   // exactly as the two days are: the phone's bar gets its own line instead.
   const timelyOpen = $derived(router.route.name === 'timely');
-  // A-7. The tags of the tree, gathered away from any one list.
+  // A-7. The tags of the tree, gathered away from any one list — and, since the
+  // filter left the tree, the one place a tag narrows anything (§4.2). Which
+  // tags are chosen is the route's, like the search query.
   const tagsOpen = $derived(router.route.name === 'tags');
+  const chosenTags = $derived(router.route.name === 'tags' ? router.route.tags : []);
   const doneOpen = $derived(router.route.name === 'done');
   const conflictsOpen = $derived(router.route.name === 'conflicts');
   const searchOpen = $derived(router.route.name === 'search');
@@ -209,16 +212,15 @@
        the same `listId` the page on the left is drawn from. -->
   {#snippet topbar()}
     {#if listOpen && session}
-      <QuickAdd {session} {view} {focus} parent={listId ?? ROOT} />
+      <QuickAdd {session} {focus} parent={listId ?? ROOT} />
     {:else if agendaOpen && session}
       <!-- G-5. The same line on a phone, filing under the page's own day. -->
-      <QuickAdd {session} {view} {focus} parent={AGENDA} day={dayOfList(agendaList, now)} />
+      <QuickAdd {session} {focus} parent={AGENDA} day={dayOfList(agendaList, now)} />
     {:else if timelyOpen && session}
       <!-- R-2. And on Timely, filing a row that repeats from the moment it
            exists. Tasks only, so the two kind buttons are not drawn — R-1. -->
       <QuickAdd
         {session}
-        {view}
         {focus}
         parent={TIMELY}
         every={formatPeriod(DEFAULT_PERIOD)}
@@ -264,7 +266,7 @@
     {:else if logsOpen}
       <LogPage {session} />
     {:else if tagsOpen}
-      <TagsPage {session} {view} />
+      <TagsPage {session} tags={chosenTags} />
     {:else if doneOpen}
       <DonePage {session} />
     {:else if currentId !== null && !isVisible(session.tree, currentId)}
