@@ -24,6 +24,16 @@
         if (t) root.setAttribute('data-theme', t);
         var s = localStorage.getItem('checklist.sidebarsize');
         if (s) root.setAttribute('data-sidebar-size', s);
+        // X-35 rides it too, and is the one of the three that has to check what
+        // it read: an id this build does not know falls through to a default,
+        // but a `--accent-pick` that is not a colour makes `--color-accent`
+        // invalid and the app paints without an accent at all.
+        ['accent', 'ink'].forEach(function (role) {
+          var c = localStorage.getItem('checklist.colour.' + role);
+          if (!/^#[0-9a-f]{6}$/i.test(c || '')) return;
+          root.style.setProperty('--' + role + '-pick', c);
+          root.setAttribute('data-' + role + '-pick', c);
+        });
       } catch (e) {}
     </script>
   </head>

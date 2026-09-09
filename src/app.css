@@ -151,6 +151,45 @@
   --color-flag-high: oklch(48% 0.19 15);
 }
 
+/* X-35. What a picked colour means — requirements.md §10.1, past_decision.md
+   §20. The pick itself is one custom property that `src/app/theme-colour.svelte.ts`
+   puts on the document root, with an attribute beside it as the switch; these
+   two blocks are everything else about it, and they sit here beside the palettes
+   because this is where the app's colours are spelled and nothing in TypeScript
+   is allowed to compute one.
+
+   `:root[…]` rather than `[…]`, for two reasons at once. It beats the
+   `[data-theme]` block on the same element, which is what makes a pick sit *on
+   top of* a theme rather than beside it; and it matches the root and nothing
+   else, so the settings screen's six swatches — which declare `--color-accent`
+   on themselves — keep previewing themselves rather than the pick.
+
+   The derived tokens are steps from a colour toward whatever is behind it, so
+   each is a mix with the theme's own surface rather than a second pick. That is
+   what lets one picked colour work on a light palette and a dark one: the same
+   percentage gives a paler `ink-faint` over a light surface and a dimmer one
+   over a dark. Unlayered, for `[data-theme]`'s reason. */
+:root[data-accent-pick] {
+  --color-accent: var(--accent-pick);
+  --color-accent-soft: color-mix(in oklab, var(--accent-pick) 18%, var(--color-surface));
+}
+
+:root[data-ink-pick] {
+  --color-ink: var(--ink-pick);
+  --color-ink-muted: color-mix(in oklab, var(--ink-pick) 70%, var(--color-surface));
+  --color-ink-faint: color-mix(in oklab, var(--ink-pick) 50%, var(--color-surface));
+}
+
+/* X-35. The swatch beside a picker wears the role it sets, so it is the colour
+   the app is actually in whether or not anything has been picked — one element
+   rather than a value kept in step with one. It is painted through sRGB rather
+   than left as `bg-accent` for the picker's sake: `<input type="color">` takes
+   `#rrggbb` and nothing else, so the computed value has to be a spelling
+   `hexFromCss` can read, and an `oklch` palette is not one. */
+.colour-swatch {
+  background-color: color-mix(in srgb, var(--swatch-colour) 100%, transparent);
+}
+
 html {
   color-scheme: light;
   background-color: var(--color-surface);

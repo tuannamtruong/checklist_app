@@ -1605,6 +1605,111 @@ async function main() {
       `${normalType} -> ${await sidebarType()}`,
     );
 
+    // --- X-35: a colour picked over the theme -------------------------------
+    // The half a unit test cannot reach: that a pick arrives at the *rule*
+    // rather than only at the attribute, that the three tokens it does not name
+    // are derived from it, and that clearing one gives the theme its colour
+    // back — test.md §3.5.
+    //
+    // Every colour here is compared as bytes rather than as text: the browser
+    // computes `color-mix` to whichever spelling it likes, and the question
+    // being asked is what the pixel is.
+    const bytesOf = (value) =>
+      page.evaluate((colour) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 1;
+        canvas.height = 1;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = colour;
+        ctx.fillRect(0, 0, 1, 1);
+        return [...ctx.getImageData(0, 0, 1, 1).data].slice(0, 3);
+      }, value);
+    const sameColour = async (a, b) => {
+      const [left, right] = [await bytesOf(a), await bytesOf(b)];
+      return left.every((byte, i) => Math.abs(byte - right[i]) <= 2);
+    };
+    const roleColour = (role) =>
+      page
+        .locator(`[data-colour-role="${role}"] [data-testid="colour-swatch"]`)
+        .evaluate((el) => getComputedStyle(el).backgroundColor);
+    const inkFaint = () =>
+      page
+        .locator('[data-colour-role="ink"] .text-ink-faint')
+        .evaluate((el) => getComputedStyle(el).color);
+    const themeAccent = await roleColour('accent');
+    const themeFaint = await inkFaint();
+
+    check(
+      'the picker opens on the colour the app is wearing, not on black — X-35',
+      await sameColour(
+        await page
+          .locator('[data-colour-role="accent"] [data-testid="colour-picker"]')
+          .inputValue(),
+        themeAccent,
+      ),
+      `${await page.locator('[data-colour-role="accent"] [data-testid="colour-picker"]').inputValue()} for ${themeAccent}`,
+    );
+
+    await page.locator('[data-colour-role="accent"] [data-testid="colour-hex"]').fill('#c81e5a');
+    await page.waitForTimeout(100);
+    const pickedAccent = await roleColour('accent');
+    check(
+      'a picked theme colour reaches the rule, not only the attribute — X-35',
+      (await page.evaluate(() => document.documentElement.dataset.accentPick)) === '#c81e5a' &&
+        !(await sameColour(pickedAccent, themeAccent)) &&
+        (await sameColour(pickedAccent, '#c81e5a')),
+      `${themeAccent} -> ${pickedAccent}`,
+    );
+
+    await page.locator('[data-colour-role="ink"] [data-testid="colour-hex"]').fill('#3a2a55');
+    await page.waitForTimeout(100);
+    const pickedFaint = await inkFaint();
+    check(
+      'the tokens a pick does not name are mixed from it, not set to it — X-35',
+      (await sameColour(await roleColour('ink'), '#3a2a55')) &&
+        !(await sameColour(pickedFaint, themeFaint)) &&
+        !(await sameColour(pickedFaint, '#3a2a55')),
+      `${themeFaint} -> ${pickedFaint}`,
+    );
+    await page.screenshot({ path: join(shots, 'settings-picked.png'), fullPage: true });
+
+    // A pick sits on top of a theme rather than replacing one, and the six
+    // swatches declare their own accent, so each still previews itself — §10.1.
+    check(
+      'the theme swatches still preview themselves under a pick — X-35',
+      !(await sameColour(
+        await page
+          .locator('[data-theme-id="green"] .bg-accent')
+          .evaluate((el) => getComputedStyle(el).backgroundColor),
+        '#c81e5a',
+      )),
+    );
+
+    await page.goto(`${BASE_URL}#/settings`);
+    await page.waitForSelector('[data-testid="settings-page"]');
+    check(
+      'a pick survives a reload, and is applied before the first paint — X-35',
+      (await sameColour(await roleColour('accent'), '#c81e5a')) &&
+        (await page
+          .locator('[data-colour-role="accent"] [data-testid="colour-hex"]')
+          .inputValue()) === '#c81e5a',
+    );
+
+    for (const role of ['accent', 'ink']) {
+      await page.locator(`[data-colour-role="${role}"] [data-testid="colour-clear"]`).click();
+    }
+    await page.waitForTimeout(100);
+    check(
+      'clearing a pick gives the theme its colour back — X-35',
+      (await page.evaluate(() => document.documentElement.hasAttribute('data-accent-pick'))) ===
+        false &&
+        (await sameColour(await roleColour('accent'), themeAccent)) &&
+        (await sameColour(await inkFaint(), themeFaint)) &&
+        (await page
+          .locator('[data-colour-role="accent"] [data-testid="colour-clear"]')
+          .count()) === 0,
+    );
+
     // --- D-5: the name the device gave itself ------------------------------
     // Nothing has typed into this field yet, and it is not empty: the shape is
     // platform-browser-id4, and the last four are the first four of the id

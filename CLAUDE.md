@@ -141,7 +141,7 @@ lower this device's top counter, or every peer reads the file as a partial downl
 
 Never in a file, always `localStorage`: the device id, collapse state, which sidebar rows are open, the drawer's state,
 the sidebar's and the note pane's widths, which folder this device chose, which cloud app it belongs to, the chosen
-theme, how large the sidebar's type is, and dismissed conflict rows. The File System Access handle is
+theme and the two colours picked over it, how large the sidebar's type is, and dismissed conflict rows. The File System Access handle is
 the exception, and only because it is an object: IndexedDB.
 
 ### Component catalog
@@ -391,6 +391,15 @@ is the third and last nav entry, beside Search and Done. Five things sit on it, 
   id under `[data-theme='…']`, and `src/app/theme.svelte.ts` applies it. `themes.test.ts` fails if catalog and
   stylesheet drift. **No component ever names a colour** — that is what makes a seventh theme a CSS block and nothing
   else. The id is applied by a boot line in `index.html` so a dark theme never flashes light, and it never syncs (X-14).
+
+- **The two picked colours** (X-35). The accent and the ink, over whichever theme is chosen — a swatch that opens the
+  system's picker, a hex field beside it, and a reset drawn only while there is something to reset. A pick reaches the
+  page as one custom property plus an attribute as the switch, and `src/app.css` holds what it *means*: `accent-soft`,
+  `ink-muted` and `ink-faint` are `color-mix`ed with the theme's own surface, which is what makes one picked colour work
+  on a light palette and a dark one. **Nothing in TypeScript computes a colour** — `src/core/colour.ts` only decides
+  whether a string is one, and `src/app/theme-colour.svelte.ts` is the half that touches `window`. The rule is
+  `:root[data-…-pick]`, which matches the root and nothing else, so the six theme swatches keep previewing themselves
+  rather than the pick. past_decision.md §20.
 
 - **The keyboard** (X-33). Every key `src/ui/keyboard.ts` binds, written down once as `KEY_HELP` in that same file and
   rendered here — `keyboard.test.ts` fails if a key is bound and taught nowhere, or taught and bound nowhere. It was

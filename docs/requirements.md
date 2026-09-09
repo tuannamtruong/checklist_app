@@ -97,9 +97,9 @@ the rule is [sync-flow.md §4.8 The compaction cut](sync-flow.md#48-the-compacti
 Device-local state, held in `localStorage` and never written to a shared file: the device id, collapse/expand state
 (T-8), which sidebar rows are open (T-17), the sync cadence (S-19), which folder this device reaches the tree through
 ([architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter)), dismissed conflict notices (C-6), the
-chosen theme (X-14), how large the sidebar's type is (X-25), how wide the sidebar and the note pane have been dragged
-(X-20, X-24), and any filter the Done view grows (T-12). Anything the user would not want to converge across devices
-belongs here rather than in the tree.
+chosen theme (X-14) and the two colours picked over it (X-35), how large the sidebar's type is (X-25), how wide the
+sidebar and the note pane have been dragged (X-20, X-24), and any filter the Done view grows (T-12). Anything the user
+would not want to converge across devices belongs here rather than in the tree.
 
 The **search index** is not state at all, in the same sense the Done view is not: F-4 scans the materialised tree on
 each keystroke, so there is nothing to store, nothing to invalidate and nothing to sync.
@@ -848,6 +848,7 @@ to empty, and a dismissal is only for a row the user is content to leave as it l
 | X-32 | The `All` link in the sidebar's corner is a full-width target, exactly like the entries under it | ✅ | `src/ui/Shell.svelte` — the corner and G-7's two day lists and R-8's third are one column of full-width links with one padding, rather than a corner sized to its four letters with a row of links under it. The `✕` that closes the drawer sits beside it and is drawn below `md` only, which is the one width where the corner is not the whole row |
 | X-33 | The keyboard reference lives on the settings screen, and nowhere else | ✅ | `KEY_HELP` in `src/ui/keyboard.ts`, rendered by `src/ui/SettingsPage.svelte` beside the bindings it describes; `keyboard.test.ts` fails if the two drift. It is the same kind of thing as everything else X-12 gathered — a fact about how *this* device is driven — and a reference read once does not belong under a control opened ten times a day — [§3.1 Keyboard (desktop)](#31-keyboard-desktop) |
 | X-34 | The row `⋮` menu carries a row's edits and nothing else: no keys printed beside them, no caret hints under them, and none of the four reorderings a drag already does | ✅ | `menu` on each `RowAction` in `src/ui/actions.ts`, filtered by `menuActions` and rendered by `src/ui/RowMenu.svelte`. Indent, outdent and the two nudges stay defined there because `src/ui/keyboard.ts` resolves a key through the same list — they left the menu, not the app. `actions.test.ts`, `scripts/ui-smoke.mjs` |
+| X-35 | Two of the theme's fourteen tokens are also a free choice on this device: the **theme colour**, which is the accent, and the **text colour**, which is the ink. Either is found in the system's colour picker or typed as a hex code, either is cleared back to whatever the chosen theme says, and both sit on top of any of the six themes rather than replacing one | ✅ | `src/core/colour.ts` is the parser and `src/app/theme-colour.svelte.ts` puts a pick on the document root as `--accent-pick`/`--ink-pick`; `src/app.css` holds what a pick *means*, deriving `accent-soft`, `ink-muted` and `ink-faint` by mixing the picked colour into the theme's own surface, so one colour still reads in a dark room. Device-local and applied before the first paint, for X-14's reasons — [§10.1 Themes](#101-themes). `colour.test.ts`, `scripts/ui-smoke.mjs` |
 
 **A phone's top bar holds the add group rather than the application's name — X-27.** The bar existed to carry a `☰` and
 said `Checklist` beside it, which is a thing to read once on an application with one tree in it: every screen it
@@ -931,9 +932,33 @@ scrollbar, a caret and a form control's default read the browser's own setting, 
 second UI to test — [test.md §3.5 UI](test.md#35-ui) drives one theme for behaviour and checks the rest for contrast
 only.
 
+**Two of the fourteen are also a free choice — X-35.** A palette is fourteen decisions somebody else made, and two of
+them are the ones a person wants back: the colour the app is *in* — the accent, on every link, the selected entry, the
+focus ring and the add button — and the colour it is *written in*. Both sit on the appearance screen as a swatch that
+opens the system's colour picker, with a hex field beside it for a colour that is already written down somewhere, and a
+control that appears once one is set and clears it back to the theme's own. A pick is not a seventh theme and never
+becomes one: it sits **on top of** whichever of the six is chosen, so dark is still dark under it and the six swatches
+still preview themselves rather than the pick.
+
+**A pick re-points two tokens and derives three more.** `accent-soft`, `ink-muted` and `ink-faint` are relationships
+rather than colours — a wash behind accent text, and two steps of quiet away from the ink — so they are mixed out of the
+picked colour and the theme's own `surface` rather than picked in turn. That mix is what makes one colour work in a dark
+room as well as a light one: it moves toward whatever is behind it, so the same number gives a paler `ink-faint` on the
+light surface and a dimmer one on the dark. The other nine are the theme's and stay untouched, `danger` above all: the
+rule that it must not read as `accent` now has a control able to provoke it, and the answer is that a pick cannot reach
+it.
+
+**Nothing refuses a colour, and nothing checks the contrast.** A validator here would be a second opinion about a screen
+it cannot see, in a room it knows nothing about, and it would have to be wrong in one of the two directions. What the
+screen offers instead is immediacy and a way back: the app repaints under the picker as the colour moves, and the pick
+is cleared with one control that is only drawn while there is something to clear.
+
 The choice does not sync, and that is the point rather than a limitation: the phone is read in bed and the laptop in an
 office, and a preference that converged across them would be one the user has to fight on whichever device they are not
-holding. It is `localStorage`, beside the collapse state (T-8) that is device-local for the same reason.
+holding. It is `localStorage`, beside the collapse state (T-8) that is device-local for the same reason. The screen no
+longer says so under the swatches — that was a sentence read once and then re-read by everyone who came back to change a
+colour, and [§10.2 The sync folder, on the settings screen](#102-the-sync-folder-on-the-settings-screen) is where what
+this device shares is actually described.
 
 ### 10.2 The sync folder, on the settings screen
 

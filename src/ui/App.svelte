@@ -16,6 +16,7 @@
   import { Router } from '../app/router.svelte';
   import { Session } from '../app/Session.svelte';
   import { Theme } from '../app/theme.svelte';
+  import { ThemeColours } from '../app/theme-colour.svelte';
   import { SidebarSize } from '../app/sidebar-size.svelte';
   import { SyncCadence } from '../app/sync-cadence';
   import { ViewState } from '../app/view-state.svelte';
@@ -46,6 +47,9 @@
   // X-25. Beside the theme and for its reasons: the size is the sidebar's, which
   // every page is drawn next to, and the screen that changes it is one of them.
   const sidebarSize = new SidebarSize();
+  // X-35. Beside the theme, because a pick sits on top of one: the two colours
+  // that are this device's own rather than the palette's — §10.1.
+  const colours = new ThemeColours();
   const focus = new RowFocus();
   const dismissals = new Dismissals();
 
@@ -260,7 +264,7 @@
     {:else if searchOpen}
       <SearchPage {session} {query} onquery={setQuery} />
     {:else if settingsOpen}
-      <SettingsPage {session} {theme} {sidebarSize} {folder} />
+      <SettingsPage {session} {theme} {colours} {sidebarSize} {folder} />
     {:else if devicesOpen}
       <DevicesPage {session} />
     {:else if logsOpen}

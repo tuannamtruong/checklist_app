@@ -4,10 +4,11 @@
   //
   // Four things share it and they are the same kind of thing: which folder this
   // device syncs through (X-15, X-16), what it calls itself (D-1), what it has
-  // written (D-4), and how it looks — the theme (X-13) and the size of the
-  // sidebar's type (X-25), which are two settings rather than one because a
-  // theme is fourteen colours and never a size (§10.1). Only the name writes an
-  // op; the rest is device-local, which is why none of this needed a nav entry
+  // written (D-4), and how it looks — the theme (X-13), the two colours picked
+  // over it (X-35) and the size of the sidebar's type (X-25), which are three
+  // settings rather than one because a theme is fourteen colours and never a
+  // size (§10.1), and because two of those fourteen are a taste rather than a
+  // palette (past_decision.md §20). Only the name writes an op; the rest is device-local, which is why none of this needed a nav entry
   // of its own before there was a screen to gather them onto.
   //
   // X-33 adds a fifth that changes nothing at all: the keyboard reference. It
@@ -16,11 +17,13 @@
   // once, not on every row's menu where it was read once and then scrolled past
   // ten times a day.
   import { THEMES } from '../core/themes';
+  import { COLOUR_PICKS, normaliseHex, type ColourRole } from '../core/colour';
   import { KEY_HELP } from './keyboard';
   import { SIDEBAR_SIZES } from '../core/sidebar-size';
   import type { OpenFolder } from '../app/folder-choice';
   import { shellActions } from '../app/shell';
   import type { Theme } from '../app/theme.svelte';
+  import { wornColour, type ThemeColours } from '../app/theme-colour.svelte';
   import type { SidebarSize } from '../app/sidebar-size.svelte';
   import type { Session } from '../app/Session.svelte';
   import { DEVICES_HREF, LOGS_HREF } from '../app/router.svelte';
@@ -28,14 +31,69 @@
   let {
     session,
     theme,
+    colours,
     sidebarSize,
     folder,
   }: {
     session: Session;
     theme: Theme;
+    colours: ThemeColours;
     sidebarSize: SidebarSize;
     folder: OpenFolder;
   } = $props();
+
+  // X-35. Three pieces of state per colour, and none of them is the colour: the
+  // pick itself lives in `colours`, and these are what a *picker* needs.
+  //
+  // `worn` is what the app is wearing right now — the pick, or the theme's own
+  // where there is none — read off the swatch after every paint, because
+  // `<input type="color">` opens on its own value and black is not where anyone
+  // wants to start.
+  //
+  // `typed` is what is in the field while somebody is typing into it, and it is
+  // there so that the field is never rewritten under the caret: `#abc` is a
+  // colour the moment it is three characters, and a field showing the pick
+  // would expand it to `#aabbcc` with three more characters still to come. It
+  // falls back to `null` — follow the pick — the moment the field is left or
+  // the colour is set from anywhere else.
+  const swatch = $state<Record<ColourRole, HTMLElement | undefined>>({
+    accent: undefined,
+    ink: undefined,
+  });
+  const worn = $state<Record<ColourRole, string>>({ accent: '#000000', ink: '#000000' });
+  const typed = $state<Record<ColourRole, string | null>>({ accent: null, ink: null });
+
+  $effect(() => {
+    // Re-read whenever either half of the answer moves: the theme under the
+    // pick, or the pick itself.
+    void theme.current;
+    void colours.picks.accent;
+    void colours.picks.ink;
+    for (const pick of COLOUR_PICKS) {
+      const element = swatch[pick.id];
+      if (!element) continue;
+      const hex = wornColour(element);
+      if (hex) worn[pick.id] = hex;
+    }
+  });
+
+  /** A typed code applies the moment it is a colour, and stays on screen until it is one. */
+  function typeColour(role: ColourRole, value: string): void {
+    typed[role] = value;
+    if (value.trim() === '') colours.clear(role);
+    else colours.set(role, value);
+  }
+
+  /** What the field shows: what is being typed, or the pick, or nothing at all. */
+  function shown(role: ColourRole): string {
+    return typed[role] ?? colours.picks[role] ?? '';
+  }
+
+  /** Half a hex code is not a colour yet, and the field says so rather than swallowing it. */
+  function halfTyped(role: ColourRole): boolean {
+    const value = typed[role];
+    return value !== null && value.trim() !== '' && normaliseHex(value) === null;
+  }
 
   const self = $derived(session.devices.find((device) => device.self));
   const peers = $derived(session.devices.length - 1);
@@ -146,9 +204,6 @@
   <section class="flex flex-col gap-3" data-testid="settings-appearance">
     <div class="flex flex-col gap-0.5">
       <h2 class="text-sm font-semibold">Appearance</h2>
-      <p class="text-xs text-ink-faint">
-        Stays on this device. The phone and the laptop can look nothing alike.
-      </p>
     </div>
 
     <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -177,6 +232,83 @@
             <span class="truncate text-xs text-ink-faint">{choice.note}</span>
           </span>
         </button>
+      {/each}
+    </div>
+
+    <!-- X-35. Two of the theme's fourteen tokens, picked over whichever theme is
+         chosen — §10.1. Each row is one control wearing three hats: the swatch
+         shows the colour the app is in whether or not anything is picked, the
+         transparent `<input type="color">` over it is what opens the system's
+         picker, and the field beside it takes a code that is already written
+         down somewhere. Clearing is drawn only while there is something to
+         clear, which is what says "this one is the theme's". -->
+    <div class="flex flex-col gap-2" data-testid="settings-colours">
+      <div class="flex flex-col gap-0.5">
+        <h3 class="text-sm font-medium">Colours</h3>
+      </div>
+
+      {#each COLOUR_PICKS as pick (pick.id)}
+        <div
+          class="flex items-center gap-3"
+          data-testid="colour-pick"
+          data-colour-role={pick.id}
+        >
+          <span class="relative inline-flex size-9 shrink-0">
+            <input
+              type="color"
+              class="row-control absolute inset-0 size-full cursor-pointer opacity-0"
+              value={colours.picks[pick.id] ?? worn[pick.id]}
+              aria-label={pick.label}
+              data-testid="colour-picker"
+              oninput={(event) => {
+                colours.set(pick.id, event.currentTarget.value);
+                typed[pick.id] = null;
+              }}
+            />
+            <span
+              class="colour-swatch pointer-events-none size-full rounded border border-line"
+              style="--swatch-colour: var({pick.token})"
+              bind:this={swatch[pick.id]}
+              data-testid="colour-swatch"
+              aria-hidden="true"
+            ></span>
+          </span>
+
+          <span class="flex min-w-0 flex-1 flex-col">
+            <span class="truncate text-sm">{pick.label}</span>
+            <span class="truncate text-xs text-ink-faint">{pick.note}</span>
+          </span>
+
+          <input
+            type="text"
+            class="w-36 rounded-md border bg-surface-raised px-2 py-1 font-mono text-sm"
+            class:border-danger={halfTyped(pick.id)}
+            class:border-line={!halfTyped(pick.id)}
+            value={shown(pick.id)}
+            placeholder="From the theme"
+            spellcheck="false"
+            autocapitalize="off"
+            aria-label="{pick.label} as a hex code"
+            aria-invalid={halfTyped(pick.id)}
+            data-testid="colour-hex"
+            oninput={(event) => typeColour(pick.id, event.currentTarget.value)}
+            onblur={() => (typed[pick.id] = null)}
+          />
+
+          {#if colours.picks[pick.id]}
+            <button
+              type="button"
+              class="row-control rounded-md border border-line px-2 py-1 text-sm text-ink-muted hover:bg-surface-sunken"
+              data-testid="colour-clear"
+              onclick={() => {
+                colours.clear(pick.id);
+                typed[pick.id] = null;
+              }}
+            >
+              Reset
+            </button>
+          {/if}
+        </div>
       {/each}
     </div>
 

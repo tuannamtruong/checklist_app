@@ -14,6 +14,7 @@ History of project's decision. The situation, its options and resolution.
 | [Undelete](#7-undelete) | A `restore` op, making `deleted` an ordinary contested field | -  a `set` carrying `deleted: false`<br>-  copying the subtree to a new id<br>-  delete-always-wins precedence |
 | [Device naming](#8-device-naming) | Each device names itself, in its own file's header line | -  a shared `devices.json`<br>-  a `device` op in the log<br>-  names kept only in `localStorage` |
 | [Theming](#9-theming) | Swap the semantic tokens under `data-theme` on the document root | -  a stylesheet per theme, loaded at runtime<br>-  Tailwind's `dark:` variant on every component<br>-  `prefers-color-scheme` and no choice at all |
+| [A picked colour, over the theme](#20-a-picked-colour-over-the-theme) | Two picks — the accent and the ink — laid over the chosen theme, with the three related tokens mixed from them | -  a full fourteen-token editor<br>-  a seventh, user-owned theme<br>-  one seed colour re-tinting the whole palette<br>-  a longer catalog of ready-made themes |
 | [Retiring the `list` kind](#11-retiring-the-list-kind) | Read `list` as `folder` at the decoder, and leave every file alone | -  keeping the kind<br>-  a migration pass that rewrites the log<br>-  a log version bump |
 | [Formatting in a note body](#12-formatting-in-a-note-body) | A Markdown subset stored in the body string | -  a rich editor over `contenteditable`, storing HTML<br>-  a JSON document model in a new field<br>-  a `heading` kind of row<br>-  no formatting at all |
 | [One archive rather than two lists](#13-one-archive-rather-than-two-lists) | One list of everything the tree no longer shows, ordered by when it left | -  keeping the finished and deleted lists apart<br>-  one list with a badge saying which kind of gone<br>-  a separate `archived_at` field on the op |
@@ -747,3 +748,50 @@ A period the two units cannot say: "every second Tuesday", "on the first of the 
 option C above, and all three are a recurrence grammar rather than a bigger number — the condition is a real use for one
 rather than the observation that it is expressible. What does *not* reopen it is a longer ladder of presets: the chip
 edits a count and a unit, so every N either unit can say is already reachable.
+
+---
+
+## 20. A picked colour, over the theme
+
+X-13 shipped six palettes and the answer to "none of these" was "pick the nearest". The request was the other one: a
+colour of one's own, and — separately — the colour the app is written in.
+[requirements.md §10.1 Themes](requirements.md#101-themes) is the constraint the answer had to survive: a theme is
+fourteen tokens, no component may ever name a colour, and switching one may not move anything.
+
+### 20.1 How much of the palette a person picks
+
+| # | Option | What it costs |
+| --- | --- | --- |
+| A | **Two picks — the accent and the ink — over the chosen theme, with `accent-soft`, `ink-muted` and `ink-faint` mixed from them** — chosen | Two controls, one CSS block, and no new palette. Light stays light and dark stays dark underneath, so the six themes keep doing the work of deciding a surface — which is the half of a palette nobody wants to pick and the half that decides whether the app is readable in a dark room |
+| B | A picker per token — all fourteen | Fourteen colour decisions to make before the app looks like anything, and the two rules [requirements.md §10.1 Themes](requirements.md#101-themes) states — `ink` readable on `surface`, `danger` not reading as `accent` — become the user's problem in twelve more places than they were |
+| C | A seventh theme the user owns, saved as a palette | A palette is a thing to name, store, edit, reset and eventually sync; and the moment it exists it is *instead of* the six rather than over them, so the reader who wanted a green accent on the dark surface has to rebuild the dark surface first |
+| D | One seed colour, re-tinting surface, line, ink and accent by hue | The prettiest demo and the least controllable result: it takes the surface away from the theme that was chosen for it, and a hue that makes a pleasant accent makes a lurid page. It also cannot express the second half of what was asked — the text colour is not the accent's hue |
+
+**What decided it is which half of a palette is a taste.** The accent is: it is the colour the app is *in*, it appears
+on a link and a button, and it is the one thing a person points at when they say the app is blue. The surface is not —
+it is a decision about the room, and light-versus-dark is the only question in it that anybody wants to answer. So the
+themes keep the surface and the pick takes the accent, and the ink comes along because it was asked for and because it
+is the one other token that is about the person rather than about the room: an ink a shade softer than the theme's is a
+common and reasonable thing to want.
+
+### 20.2 Why three tokens are mixed rather than picked
+
+`accent-soft`, `ink-muted` and `ink-faint` are relationships, not colours — the argument
+[requirements.md §10.1 Themes](requirements.md#101-themes) already makes about `scrim`, applied in the direction where
+it *can* be expressed as arithmetic. Each is a step from a colour toward the surface behind it, so each is one
+`color-mix` against the theme's own `surface`, and the same percentage is right under both a light palette and a dark
+one because the thing it moves toward is what changed. That is what keeps a pick from needing a light variant and a dark
+variant.
+
+It is CSS rather than TypeScript for [§9 Theming](#9-theming)'s reason, unchanged: the app's colours are spelled in
+`src/app.css` and nowhere else. A pick is one custom property on the document root and one attribute saying it is there;
+`src/app.css` holds what the pick *means*. Nothing in TypeScript computes a colour — `src/core/colour.ts` only decides
+whether a string is a colour at all, which is a parsing question rather than a colour one.
+
+### 20.3 What reopens it
+
+A third pick, if one is ever wanted for the same reason these two were: the argument above is about *which* tokens are a
+taste, not about the number two. What does not reopen it is option B — the answer to "I want to set `line`" is that
+`line` is a step away from `surface` and the surface is the theme's. Option C returns if a picked pair ever has to
+travel: a palette a person made on the laptop and wants on the phone is a thing to store and to name, and X-14's
+argument against syncing a preference is weaker for a colour somebody built than for one they chose off a list.

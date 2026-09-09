@@ -164,6 +164,14 @@ reached the rule rather than only the attribute. It survives a reload, for X-14'
 that matters most is the negative one: the *width* of the sidebar does not move when the type does, because that width
 is X-20's and a setting that quietly resized the column would undo a drag the reader made.
 
+X-35 puts a fourth check on that screen, and it is about the half of a pick that lives in CSS. Typing a hex code into
+the theme-colour field puts `--accent-pick` on the document root, and the assertion is not the property but its effect:
+a control wearing `bg-accent` is measurably that colour afterwards, which is the only thing that can say the pick
+reached the rule rather than only the attribute. The derived tokens are checked the same way and in the direction that
+matters — `ink-faint` under a picked ink is neither the ink itself nor the theme's — and the pick survives a reload and
+is gone again when cleared. Contrast is not asserted here either, for the reason the palettes are not: it is a
+screenshot, before and after.
+
 D-5 puts one more check on that screen, and it is a check about a field nobody has touched: the device name is already
 filled in on a first launch, it matches `platform-browser-id4`, and its last four characters are the first four of the
 device id shown beside it. The mapping itself is a unit test — `src/core/device-name.test.ts` over a table of real
