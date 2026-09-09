@@ -60,10 +60,6 @@
       ← Settings
     </a>
     <h1 class="text-2xl font-semibold" data-testid="page-title">Log</h1>
-    <p class="text-sm text-ink-muted">
-      Every op this device has written, newest first. This is the file itself, read back — no other
-      device's log is here, and nothing on this page writes one.
-    </p>
   </header>
 
   <dl
@@ -170,10 +166,4 @@
       Show older ({ops.length - entries.length} more)
     </button>
   {/if}
-
-  <p class="px-1 text-xs text-ink-faint">
-    Compaction rewrites this file in place, dropping ops of this device's own that a later op of its
-    own already overwrote — so a row edited many times shows the writes that survived rather than
-    every one ever made. The tree it folds to is identical either way.
-  </p>
 </div>

@@ -146,7 +146,6 @@
     bind:this={input}
     bind:value={draft}
     class="min-w-0 flex-1 rounded-md border border-line bg-transparent px-2.5 py-1.5 text-sm outline-none placeholder:text-ink-faint focus:border-accent"
-    placeholder=""
     aria-label="Add a task"
     data-testid="quick-add"
     onkeydown={onKeyDown}

@@ -91,7 +91,8 @@ Every storage that can hold a folder can offer them. The prototype ships five:
 `local-folder` is the sixth, and it exists because M1 had one device and no Sync Folder while the payload was already
 decided. It keeps the op log the only persistence and the three methods the only route to it, so M2 replaced an adapter
 rather than a write path — requirement S-21. It is not a sync adapter: `localStorage` is per-origin and nothing mirrors
-it anywhere, which is why the app names it "This browser only" and says so where it shows the folder.
+it anywhere, which is why the app names it "Local storage" in the sidebar and "local browser storage" where the settings
+screen shows the folder.
 
 The production app needs the prototype's five for the same reasons. M1 shipped `memory-folder` and `local-folder`; M2
 added `fsaa-folder`, `http-folder` and `android-folder`, which is every browser-side one. `node-folder` has no caller in
@@ -125,7 +126,7 @@ flowchart TD
 
     S4B -->S5A["reload"]
     S4D -->|yes| S5B
-    S4D -->|no| S5C["setup screen:<br/>this browser only"]
+    S4D -->|no| S5C["setup screen:<br/>local storage"]
 
     S5B -->|granted| S6A["stored fsaa-folder adapter"]
     S5B -->|re-grant needed| S6B["Reopen UI"]
@@ -147,7 +148,7 @@ takes it, on the next load, without being asked. That is a deliberate exception 
 the two shells that hand a folder in *unasked* can override `local`, and they can override nothing else.
 
 The exception is there because without it the fallback has no exit on the browser it matters on. Firefox is the browser
-the loopback helper exists for, and it has no picker to offer instead — so a device that answered "this browser only"
+the loopback helper exists for, and it has no picker to offer instead — so a device that answered "use local storage"
 once, on a launch with no `--folder` or before setup had run, kept that answer forever while the folder sat in the
 process that was serving the page. The way in is easy to fall through and there was no way back out; row 11 of
 [requirements.md §15 Deviations and defects found during verification](requirements.md#15-deviations-and-defects-found-during-verification)

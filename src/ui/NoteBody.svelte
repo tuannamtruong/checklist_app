@@ -284,29 +284,25 @@
       aria-hidden="true"
       data-testid="note-rendered"
     >
-      {#if draft === ''}
-        <p class="text-ink-faint">Write anything here.</p>
-      {:else}
-        {#each blocks as block, index (index)}
-          {#if block.kind === 'heading1'}
-            <h3 class="mt-3 mb-1 text-base font-semibold first:mt-0">
-              {#each block.spans as span, i (i)}{#if span.bold}<strong>{span.text}</strong
-                  >{:else}{span.text}{/if}{/each}
-            </h3>
-          {:else if block.kind === 'heading2'}
-            <h4 class="mt-2 mb-1 text-sm font-semibold text-ink-muted first:mt-0">
-              {#each block.spans as span, i (i)}{#if span.bold}<strong>{span.text}</strong
-                  >{:else}{span.text}{/if}{/each}
-            </h4>
-          {:else}
-            <p>
-              {#each block.spans as span, i (i)}{#if span.bold}<strong class="font-semibold"
-                    >{span.text}</strong
-                  >{:else}{span.text}{/if}{:else}&nbsp;{/each}
-            </p>
-          {/if}
-        {/each}
-      {/if}
+      {#each blocks as block, index (index)}
+        {#if block.kind === 'heading1'}
+          <h3 class="mt-3 mb-1 text-base font-semibold first:mt-0">
+            {#each block.spans as span, i (i)}{#if span.bold}<strong>{span.text}</strong
+                >{:else}{span.text}{/if}{/each}
+          </h3>
+        {:else if block.kind === 'heading2'}
+          <h4 class="mt-2 mb-1 text-sm font-semibold text-ink-muted first:mt-0">
+            {#each block.spans as span, i (i)}{#if span.bold}<strong>{span.text}</strong
+                >{:else}{span.text}{/if}{/each}
+          </h4>
+        {:else}
+          <p>
+            {#each block.spans as span, i (i)}{#if span.bold}<strong class="font-semibold"
+                  >{span.text}</strong
+                >{:else}{span.text}{/if}{:else}&nbsp;{/each}
+          </p>
+        {/if}
+      {/each}
     </div>
   {/if}
 
@@ -322,7 +318,6 @@
     class:inset-0={!editing}
     class:resize-none={!editing || fill}
     class:opacity-0={!editing}
-    placeholder="Write anything here."
     aria-label="Note body"
     data-testid="note-body"
     oninput={onInput}

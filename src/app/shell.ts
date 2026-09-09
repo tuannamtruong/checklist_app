@@ -91,9 +91,6 @@ export function shellActions(source: FolderSource): ShellActions {
       return {
         ...NONE,
         changeFolder: supported() ? pickAndReload : null,
-        changeNote: supported()
-          ? null
-          : 'this browser cannot open a folder, and nothing on this device is serving one',
       };
     case 'memory':
       return { ...NONE, changeNote: 'this is the in-memory folder the UI test runs against' };

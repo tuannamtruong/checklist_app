@@ -783,7 +783,7 @@ to empty, and a dismissal is only for a row the user is content to leave as it l
 | X-15 | The settings screen names the folder this device syncs through, and opens it in the system's file manager where the shell can | ✅ | `src/ui/SettingsPage.svelte`, over `src/app/shell.ts`. Opening a folder is not a fourth adapter method and never becomes one — [architecture.md §4.1 Shell actions, beside the adapter](architecture.md#41-shell-actions-beside-the-adapter) |
 | X-16 | The settings screen points this device at a different folder, and names who decides when it cannot | ✅ | `changeFolder` in `src/app/shell.ts`, which re-enters [architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter)'s picker and reloads. The rows already written do not follow the device to the new folder, and the screen says so before the picker opens |
 | X-17 | The settings screen launches the cloud provider's own app, and which provider that is stays on this device | ✗ **Withdrawn** | Built in M5 and taken out again: a catalog of six cloud clients, a picker on the settings screen, a launch capability in both shells and a `<queries>` block in the manifest, for one button that started an app the phone's own launcher starts — [§10.2 The sync folder, on the settings screen](#102-the-sync-folder-on-the-settings-screen) and [past_decision.md §16 Retiring the cloud-app launcher](past_decision.md#16-retiring-the-cloud-app-launcher) |
-| X-18 | A device on the browser-only fallback takes the folder its own launcher is holding, rather than keeping an answer it gave before there was one | ✅ | `chooseFolder` in `src/app/folder-choice.ts`: the two shells that hand a folder in unasked are asked before a stored `local` is honoured, and nothing is written when one is taken — [architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter). `folder-choice.test.ts`; a real Firefox is [test.md §3.6 Platform](test.md#36-platform) check 3b. Without it, "this browser only" is a one-way door on the one browser the helper exists for |
+| X-18 | A device on the browser-only fallback takes the folder its own launcher is holding, rather than keeping an answer it gave before there was one | ✅ | `chooseFolder` in `src/app/folder-choice.ts`: the two shells that hand a folder in unasked are asked before a stored `local` is honoured, and nothing is written when one is taken — [architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter). `folder-choice.test.ts`; a real Firefox is [test.md §3.6 Platform](test.md#36-platform) check 3b. Without it, "local storage" is a one-way door on the one browser the helper exists for |
 | X-19 | The sidebar's type is a fifth larger than the page beside it | ✅ | `.sidebar-text` and `.sidebar-note` in `src/app.css`, read by `src/ui/Shell.svelte` and `src/ui/SidebarLinks.svelte`. One rule rather than a size named per component, and unlayered so it wins over the `text-sm` it replaces — the icons scale with it so the column keeps its proportions |
 | X-20 | The sidebar's width is dragged by its right edge, and the width is this device's own | ✅ | `src/ui/WidthGrip.svelte` over `sidebarWidth` in `src/app/view-state.svelte.ts`, bounded there rather than at the grip. Pointer events, for T-14's reason — a tablet is wide enough for the `md` layout and has no mouse. Above `md` only: below it the sidebar is a drawer over the page, where a width takes room from nothing. `view-state.svelte.test.ts`, `scripts/ui-smoke.mjs` |
 | X-21 | Above `lg`, a note opens **beside** the list it was opened from rather than instead of it, and the list beside it is the nearest ancestor that is **not** a note — a note nested under a note opens in the pane and leaves the left column where it was | ✅ | `src/ui/App.svelte` composes the two panes; the right one is `src/ui/NotePane.svelte` and the left is `src/ui/NodePage.svelte` on `listAbove` in `src/core/tree.ts`, which is T-6's resolved parent walked up past every note. One route still — [§10.3 A note beside the list](#103-a-note-beside-the-list) |
@@ -900,7 +900,7 @@ optional capability of the *shell*, and each shell answers for itself:
 | Android (`android-folder`) | The system's file viewer, on the granted tree | The system picker, then a reload |
 | Windows helper (`http-folder`) | The desktop's own file manager, from the process that already holds the folder | Not offered: the launcher's `--folder` decides, and the screen says so |
 | Chrome/Edge (`fsaa-folder`) | Not offered: a page holds a directory handle, not a window | The File System Access picker, then a reload |
-| This browser only (`local-folder`) | Nothing to open — there is no folder | The picker, where the browser has one. A folder the *shell* is holding was taken at startup and never reaches this screen — X-18 |
+| Local storage (`local-folder`) | Nothing to open — there is no folder | The picker, where the browser has one. A folder the *shell* is holding was taken at startup and never reaches this screen — X-18 |
 
 A button that a shell cannot honour is absent rather than disabled-with-a-tooltip: the row above it already says what
 this device reaches its folder through, so an absent button reads as "not here" rather than as a fault.
@@ -909,13 +909,13 @@ this device reaches its folder through, so an absent button reads as "not here" 
 new one is read from scratch on the way back up, exactly as a new device reads it. That is stated on the screen before
 the picker opens, because it is the one thing on this page that can lose work.
 
-**"This browser only" must not be a one-way door — X-18.** That last row used to read "the picker, where the browser has
-one", and on Firefox the browser has none: a device that answered "use this browser only" on the setup screen could
-never answer anything else, however much became reachable afterwards. The way in is easy to fall through — launch the
-helper once with no `--folder`, or open the page before setup has run, and the browser-only button is the only one the
-setup screen offers — and there was no way back out. Firefox is precisely the browser the loopback helper was written
-for, so the folder was usually sitting right there, held by the process that served the page, while the screen said
-"this browser cannot open a folder at all" — true of the browser, false of the device.
+**"Local storage" must not be a one-way door — X-18.** That last row used to read "the picker, where the browser has
+one", and on Firefox the browser has none: a device that answered "use local storage" on the setup screen could never
+answer anything else, however much became reachable afterwards. The way in is easy to fall through — launch the helper
+once with no `--folder`, or open the page before setup has run, and the browser-only button is the only one the setup
+screen offers — and there was no way back out. Firefox is precisely the browser the loopback helper was written for, so
+the folder was usually sitting right there, held by the process that served the page, while the screen said "this
+browser cannot open a folder at all" — true of the browser, false of the device.
 
 **The fix is not on this screen, and that is the point.** It was drafted here, as a button offering the folder the
 helper is holding, and that was the wrong altitude: startup already asks the shells that question, so a device that has

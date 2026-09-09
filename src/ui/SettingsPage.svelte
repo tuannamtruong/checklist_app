@@ -64,10 +64,6 @@
 <div class="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-6" data-testid="settings-page">
   <header class="flex flex-col gap-1">
     <h1 class="text-2xl font-semibold" data-testid="page-title">Settings</h1>
-    <p class="text-sm text-ink-muted">
-      This device: which folder it syncs through, what it is called, what it has written, and how it
-      looks and reads. Only the name travels to the other devices — the rest is this device's own.
-    </p>
   </header>
 
   <!-- X-15 and X-16. What this device writes to, how to look inside it, and how
@@ -76,15 +72,13 @@
   <section class="flex flex-col gap-3" data-testid="settings-folder">
     <div class="flex flex-col gap-0.5">
       <h2 class="text-sm font-semibold">Sync folder</h2>
-      <p class="text-xs text-ink-faint">
-        This device writes one file into it and reads every other device's. Nothing is uploaded by
-        this app — the folder's own client carries it.
-      </p>
     </div>
 
     <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
       <dt class="text-ink-faint">Folder</dt>
-      <dd class="min-w-0 truncate" data-testid="settings-folder-label">{folder.label}</dd>
+      <dd class="min-w-0 truncate" data-testid="settings-folder-label">
+        {folder.source === 'local' ? 'local browser storage' : folder.label}
+      </dd>
       <dt class="text-ink-faint">Reaches</dt>
       <!-- A peer in the folder outranks what the adapter says it can do: a
            device that is reading another's file is reaching it, whatever the
@@ -94,7 +88,7 @@
         {#if session.peers > 0}
           {session.peers} other device{session.peers === 1 ? '' : 's'}
         {:else if !folder.synced}
-          This device only — nothing here syncs
+          local browser
         {:else}
           No other device yet
         {/if}
@@ -187,9 +181,6 @@
     <div class="flex flex-col gap-2" data-testid="settings-sidebar-size">
       <div class="flex flex-col gap-0.5">
         <h3 class="text-sm font-medium">Sidebar text</h3>
-        <p class="text-xs text-ink-faint">
-          How large the navigation column reads. The width is the column's own edge, dragged.
-        </p>
       </div>
 
       <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -220,10 +211,6 @@
   <section class="flex flex-col gap-3" data-testid="settings-device">
     <div class="flex flex-col gap-0.5">
       <h2 class="text-sm font-semibold">This device</h2>
-      <p class="text-xs text-ink-faint">
-        The name travels in the file this device writes, so it is the name the other devices see —
-        on a conflict row, and in the list. Naming another one means opening the app on it.
-      </p>
     </div>
 
     <label class="flex flex-col gap-1">

@@ -1358,8 +1358,8 @@ async function main() {
     const footerWarning = await page.locator('[data-testid="not-synced"]').innerText();
     check(
       'settings names the folder this device syncs through — X-15',
-      folderSection.trim() === footerWarning.trim() && folderSection.trim() !== '',
-      folderSection,
+      folderSection.trim() === 'local browser storage' && footerWarning.trim() === 'Local storage',
+      `${folderSection} / ${footerWarning}`,
     );
     check(
       'a browser that cannot open a folder offers no button, only the picker — §10.2',
@@ -2034,8 +2034,10 @@ async function main() {
       await firstRun.locator('[data-testid="setup-local"]').click();
       await firstRun.waitForSelector('[data-testid="tree"]', { state: 'attached' });
       check(
-        'and declining still gets a working app, which says it is not synced',
-        (await firstRun.locator('[data-testid="not-synced"]').innerText()).includes('not synced'),
+        'and declining still gets a working app, which names the fallback it is on',
+        (await firstRun.locator('[data-testid="not-synced"]').innerText()).includes(
+          'Local storage',
+        ),
         await firstRun.locator('[data-testid="not-synced"]').innerText(),
       );
       await firstRun.reload();

@@ -102,7 +102,7 @@ describe('chooseFolder', () => {
   });
 
   it('leaves a stored `local` for a folder the helper is holding — X-18', async () => {
-    // The bug this test is here for: the device said "this browser only" once,
+    // The bug this test is here for: the device asked for local storage once,
     // on a launch that had no folder. It is not a preference to be honoured
     // forever against a launcher that is now holding one.
     helperServing('Dropbox-checklist');
@@ -154,12 +154,12 @@ describe('shellActions on the browser-only fallback', () => {
     expect(shellActions('local').changeFolder).not.toBeNull();
   });
 
-  it('has no button, and says why, where it has none', () => {
+  it('offers nothing at all where the browser has none', () => {
     // Firefox with no helper. It is a true dead end rather than the old false
     // one: there is no folder on this device to reach, so there is nothing the
     // screen could offer — X-18 handles the case where there is.
     const shell = shellActions('local');
     expect(shell.changeFolder).toBeNull();
-    expect(shell.changeNote).toContain('nothing on this device is serving one');
+    expect(shell.changeNote).toBeNull();
   });
 });

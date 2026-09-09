@@ -83,11 +83,5 @@
         Nothing here yet. A row you tick or delete leaves its list and lands here.
       </p>
     {/each}
-    {#if rows.length > 0}
-      <p class="px-2 text-xs text-ink-faint">
-        A row is kept rather than removed, and so is everything inside it, so restoring one brings
-        back what it held.
-      </p>
-    {/if}
   </section>
 </div>

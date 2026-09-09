@@ -71,6 +71,7 @@
       data-testid="setup-local"
       onclick={useThisBrowser}
     >
+      Use local storage
     </button>
   </div>
 
@@ -79,7 +80,7 @@
   {/if}
 
   <p class="text-xs text-ink-faint">
-    "This browser only" keeps everything on this device, in this browser. It can be changed later,
+    "Local storage" keeps everything on this device, in this browser. It can be changed later,
     but the rows already written here do not follow — they are in this browser, not in a folder.
   </p>
 </div>
