@@ -52,3 +52,40 @@ export function hasEveryTag(tags: readonly string[], wanted: Iterable<string>): 
   for (const tag of wanted) if (!tags.includes(tag)) return false;
   return true;
 }
+
+/**
+ * A-8. A title with tags typed in front of it: `#errand #town Buy milk` is a
+ * row called "Buy milk" carrying `errand` and `town` — requirements.md §4.1.
+ *
+ * **Leading tokens only.** A `#` further along the line stays part of the
+ * title, because a title is prose and "Buy milk #2" is a thing people write.
+ * The prefix is a grammar the reader opts into by starting the line with it,
+ * and it ends at the first word that is not a `#word`.
+ *
+ * A bare `#` is not a tag and stops the scan, so a line that begins with one is
+ * a title beginning with one. A line that is *only* tags has no title, and the
+ * caller decides what that means — the add line does nothing and leaves the
+ * text where it is, because there is no row in "#errand".
+ */
+export interface TaggedTitle {
+  title: string;
+  tags: string[];
+}
+
+export function parseTagged(line: string): TaggedTitle {
+  let rest = line.trimStart();
+  const raw: string[] = [];
+  for (;;) {
+    const match = /^#(\S+)(?:\s+|$)/.exec(rest);
+    if (match === null) break;
+    // `cleanTag` answers whether the token is a tag at all: `#` alone, or a run
+    // of hashes, cleans to nothing and is therefore the start of a title.
+    if (cleanTag(match[1]!) === '') break;
+    raw.push(match[1]!);
+    rest = rest.slice(match[0].length);
+  }
+  // The whole set through `cleanTags`, so the twelve cap, the sort and the
+  // deduplication are the ones every other tag goes through — nothing about a
+  // typed tag is special once it has been read off the line.
+  return { title: rest.trim(), tags: cleanTags(raw) };
+}

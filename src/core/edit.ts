@@ -78,7 +78,12 @@ function keyAtStart(siblings: readonly Node[]): string {
 export interface CreateOptions {
   kind?: Kind;
   title?: string;
-  /** A-6. What the tree is filtered by, so a new row does not vanish as it is typed. */
+  /**
+   * A-8. The tags typed in front of the title on the add line — `parseTagged`
+   * in `src/core/tags.ts` is what reads them off it. It carried A-6's tag
+   * filter until M11, and the field is the same field: a `create` and one
+   * companion `set`.
+   */
   tags?: readonly string[];
   /**
    * G-5. The day an agenda item is filed for — the page's own day, so a row
@@ -141,15 +146,21 @@ export function createLastChildren(
   tree: ResolvedTree,
   ctx: EditContext,
   parent: ParentId,
-  titles: readonly string[],
+  /**
+   * A-8. Each row brings its own tags as well as its title, because each line
+   * of a pasted block carries its own `#tag` prefix — the whole block is one
+   * paste and no two lines of it need agree about anything.
+   */
+  rows: readonly { title: string; tags?: readonly string[] }[],
   options: CreateOptions = {},
 ): Op[] {
   const siblings = siblingNodes(tree, parent);
   const ops: Op[] = [];
   let order: string | null = null;
-  for (const title of titles) {
+  for (const row of rows) {
     order = order === null ? keyAtEnd(siblings) : keyBetween(order, null);
-    ops.push(...createAt(ctx, parent, order, { ...options, title }));
+    const tags = [...(options.tags ?? []), ...(row.tags ?? [])];
+    ops.push(...createAt(ctx, parent, order, { ...options, title: row.title, tags }));
   }
   return ops;
 }

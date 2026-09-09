@@ -351,6 +351,20 @@ a date, and a date wants a calendar rather than a field.
 | A-5 | Which tags are chosen is device-local and never reaches a file | ✅ | The route — `#/tags/<tag>,<tag>` — which is a fragment and reaches no server either, F-5's argument applied to a tag. It sat in `src/app/view-state.svelte.ts` beside the collapse state until M11; nothing about it is stored now, which is a stronger version of the same promise — [§2.3 What is never in the Sync Folder](#23-what-is-never-in-the-sync-folder) |
 | A-6 | A row created while a filter is on carries that filter's tags | ✗ **Withdrawn** | It existed because a filtered tree could create a row it then hid. Nothing filters the tree since M11, so there is no filter to inherit and nothing to vanish from — [§4.2 Finding rows by tag](#42-finding-rows-by-tag). Tagging at creation is A-8's instead, and is typed rather than inherited |
 | A-7 | Every tag in the tree is listed on a page of its own, and choosing one lists the rows carrying it | ✅ | `src/ui/TagsPage.svelte` at `#/tags` and `#/tags/<tag>,<tag>`, a nav entry between Search and Done. It derives everything and stores nothing — `tagsInTree` and `taggedRows` are two scans of the materialised tree, exactly as F-4's search is. It is the **only** place in the application a tag narrows anything — [§4.2 Finding rows by tag](#42-finding-rows-by-tag) |
+| A-8 | A `#tag` prefix on the add line tags the row it makes: `#errand #town Buy milk` is a row called "Buy milk" carrying both | ✅ | `parseTagged` in `src/core/tags.ts`, called by `src/ui/QuickAdd.svelte` — leading tokens only, so a `#` further along the line stays part of the title. Every line of a K-9 paste is read on its own, which is why `createLastChildren` takes each row's tags rather than the block's. `tags.test.ts`, `edit.test.ts`, `scripts/ui-smoke.mjs` |
+
+**Tags are typed in front of the title — A-8.** `#errand #town Buy milk` on the add line is one row called "Buy milk"
+carrying two tags, which is how a row gets tagged as it is made now that A-6's filter is gone: typed by the reader
+rather than inherited from a mode. The rule is deliberately small. **Leading tokens only** — the prefix ends at the
+first word that is not a `#word`, so "Buy milk #2" is a title and stays one, because a title is prose and people write
+hashes in prose. A bare `#` is not a tag and ends the scan, so a line starting with one is a title starting with one. A
+line that is *only* tags writes nothing and keeps what was typed: there is no row in `#errand`, and clearing the line
+would throw away a prefix whose title is the next word the reader was about to type.
+
+It is the same grammar on every line of a K-9 paste, read per line rather than per block — each line of a pasted list
+brings its own prefix, and no two lines need agree. `parseTagged` is in `src/core/tags.ts` with every other rule about
+what a tag is, so the add line decides where a row goes and never what a tag looks like, and what it returns goes
+through `cleanTags` like anything else: case-folded, sorted, deduplicated, twelve to a row.
 
 **A tag is normalised on the way in, and the normal form is what is stored.** Case-folded, its inner whitespace
 collapsed, a leading `#` dropped, trimmed to 32 characters, and the set held sorted and deduplicated —

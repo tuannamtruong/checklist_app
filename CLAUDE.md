@@ -335,6 +335,11 @@ and then the rows carrying the ones chosen from it, each with the path it sits o
 the route (`#/tags/errand,town`) rather than `localStorage`: a page is where the reader already is, so nothing about
 them is stored at all, which is a stronger A-5 than the old one.
 
+`parseTagged` in `src/core/tags.ts` is A-8: a `#tag` prefix on the add line tags the row it makes — `#errand #town Buy
+milk`. Leading tokens only, so `Buy milk #2` is a title; a line that is only tags writes nothing and keeps what was
+typed. `src/ui/QuickAdd.svelte` is the one caller, per line of a K-9 paste as well as per Enter, which is why
+`createLastChildren` takes each row's tags rather than the block's.
+
 The tree itself is **not** filtered and `TagFilter.svelte` is gone. The bar cost five rules that each repaired a hole
 the one before it opened — hide the non-matching rows, add the ancestors back, override T-8's collapse state, and A-6 to
 stop a row vanishing as it was typed — for a mode a tree could be left in. `src/ui/TagChips.svelte` draws labels now,

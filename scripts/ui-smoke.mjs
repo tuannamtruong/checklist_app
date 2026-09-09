@@ -515,6 +515,35 @@ async function main() {
       (await titlesUnder(page, 'Shopping')).join('|'),
     );
 
+    // --- A-8: tags typed in front of the title on the add line ---------------
+    await quickAdd.fill('#Town #errand Post the letters');
+    await page.keyboard.press('Enter');
+    const letters = await rowByTitle(page, 'Post the letters');
+    check(
+      'a #tag prefix on the add line tags the row it makes — A-8',
+      (await letters.locator('[data-testid="tag-chip"]').allInnerTexts())
+        .map((text) => text.trim())
+        .join(',') === 'errand,town',
+      (await letters.locator('[data-testid="tag-chip"]').allInnerTexts()).join(','),
+    );
+
+    await quickAdd.fill('Buy milk #2');
+    await page.keyboard.press('Enter');
+    const hashLate = await rowByTitle(page, 'Buy milk #2');
+    check(
+      'and a hash further along the line is part of the title — A-8',
+      (await hashLate.locator('[data-testid="tag-chip"]').count()) === 0,
+    );
+
+    await quickAdd.fill('#town');
+    await page.keyboard.press('Enter');
+    check(
+      'a line of tags alone writes nothing and keeps what was typed — A-8',
+      (await quickAdd.inputValue()) === '#town',
+      await quickAdd.inputValue(),
+    );
+    await quickAdd.fill('');
+
     // --- A-7: the tags of the tree, and the rows they name -------------------
     await page.locator('[data-testid="tags-link"]').click();
     await page.waitForSelector('[data-testid="tags-page"]');
@@ -539,7 +568,7 @@ async function main() {
       .evaluateAll((links) => links.map((link) => link.innerText.split('\n')[0].trim()));
     check(
       'choosing one lists the rows carrying it, in tree order — A-7, A-4',
-      tagged.join('|') === 'Milk|Errand run',
+      tagged.join('|') === 'Milk|Errand run|Post the letters',
       tagged.join('|'),
     );
     check(
@@ -562,9 +591,9 @@ async function main() {
       .waitFor();
     check(
       'a second tag narrows the first: every one of them, on the same row — A-4',
-      (await page.locator('[data-testid="tagged-row"]').count()) === 1 &&
+      (await page.locator('[data-testid="tagged-row"]').count()) === 2 &&
         (await page.locator('[data-testid="tags-summary"]').innerText()).includes(
-          '1 row with town and errand',
+          '2 rows with town and errand',
         ),
       await page.locator('[data-testid="tags-summary"]').innerText(),
     );
@@ -573,7 +602,7 @@ async function main() {
     await page.waitForSelector('[data-testid="tagged-row"]');
     check(
       'and the reload draws the same list, because nothing about it was stored — A-5',
-      (await page.locator('[data-testid="tagged-row"]').count()) === 1,
+      (await page.locator('[data-testid="tagged-row"]').count()) === 2,
     );
 
     const chosenRow = await page.locator('[data-testid="tagged-row"]').first().getAttribute('href');
@@ -890,6 +919,12 @@ async function main() {
       !(await titlesUnder(page, 'Shopping')).includes('Bread'),
       (await titlesUnder(page, 'Shopping')).join('|'),
     );
+    // The tick has to land in a later millisecond than the delete above, or the
+    // two rows tie: `archivedRows` sorts by stamp and breaks a tie by id, which
+    // is deterministic but is not the "newest first" the check below is about.
+    // The two events are a handful of round trips apart and that is usually
+    // enough on its own — usually is not a thing to assert against.
+    await page.waitForTimeout(5);
     await (await rowByTitle(page, 'Milk')).locator('[data-testid="done"]').click();
     check(
       'ticking a row takes it out of its list',

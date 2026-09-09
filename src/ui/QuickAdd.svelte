@@ -15,8 +15,16 @@
   // K-10 puts the other two kinds here as well. They were buttons under the
   // list, a scroll away on any list long enough to want one, and one group is
   // what makes adding one place on the page whichever kind is being added.
+  //
+  // A-8 is the one piece of grammar in the line: `#errand #town Buy milk` is a
+  // row called "Buy milk" carrying two tags. Leading tokens only, and the whole
+  // rule is `parseTagged` in `src/core/tags.ts` — this file decides *where* the
+  // row goes and never what a tag looks like. It is what tagging at creation is
+  // now that A-6's filter is gone: typed rather than inherited, which is a thing
+  // the reader did rather than a thing a mode did to them.
   import { createLastChild, createLastChildren } from '../core/edit';
   import { splitPastedTitles } from '../core/paste';
+  import { parseTagged } from '../core/tags';
   import type { Kind, ParentId } from '../core/types';
   import type { Session } from '../app/Session.svelte';
   import type { RowFocus } from './focus.svelte';
@@ -51,15 +59,16 @@
   let draft = $state('');
   let input = $state<HTMLInputElement | null>(null);
 
-  // A-6 was here: a row created under a tag filter carried that filter's tags,
-  // or it vanished as it was typed. There is no filter over the tree any more —
-  // §4.2 — so there is nothing for a new row to inherit and nothing it can
-  // vanish from.
+  /**
+   * A-8. A line that is *only* tags writes nothing and keeps what was typed:
+   * there is no row in `#errand`, and clearing the line would throw away a
+   * prefix the reader is halfway through — the title is the next word.
+   */
   function commit(): void {
-    const title = draft.trim();
+    const { title, tags } = parseTagged(draft);
     if (title === '') return;
     draft = '';
-    session.run((tree, ctx) => createLastChild(tree, ctx, parent, { title, day, every }));
+    session.run((tree, ctx) => createLastChild(tree, ctx, parent, { title, tags, day, every }));
   }
 
   /**
@@ -77,10 +86,14 @@
     event.preventDefault();
     const caret = input?.selectionStart ?? draft.length;
     const end = input?.selectionEnd ?? draft.length;
-    const titles = splitPastedTitles(draft.slice(0, caret) + pasted + draft.slice(end));
+    // A-8 per line rather than per paste: each line of a pasted list carries
+    // its own prefix, and a line that is only tags is no row at all.
+    const rows = splitPastedTitles(draft.slice(0, caret) + pasted + draft.slice(end))
+      .map((line) => parseTagged(line))
+      .filter((row) => row.title !== '');
     draft = '';
-    if (titles.length === 0) return;
-    session.run((tree, ctx) => createLastChildren(tree, ctx, parent, titles, { day, every }));
+    if (rows.length === 0) return;
+    session.run((tree, ctx) => createLastChildren(tree, ctx, parent, rows, { day, every }));
   }
 
   /**
@@ -93,14 +106,18 @@
    * with no title yet is a row about to be named.
    */
   function addKind(kind: Kind): void {
-    const title = draft.trim();
+    // A-8 reads the same prefix here: `#errand Trip` and `+ Note` is one note
+    // called "Trip" carrying `errand`. A line of tags alone makes the untitled
+    // row the empty line always made, carrying them — the caret lands in its
+    // title, which is the word that was missing.
+    const { title, tags } = parseTagged(draft);
     draft = '';
     const ops = session.run((tree, ctx) =>
       createLastChild(
         tree,
         ctx,
         parent,
-        title === '' ? { kind, day, every } : { kind, title, day, every },
+        title === '' ? { kind, tags, day, every } : { kind, title, tags, day, every },
       ),
     );
     if (title === '' && ops[0]) focus.request(ops[0].id);
@@ -144,6 +161,7 @@
     bind:value={draft}
     class="min-w-0 flex-1 rounded-md border border-line bg-transparent px-2.5 py-1.5 text-sm outline-none placeholder:text-ink-faint focus:border-accent"
     aria-label="Add a task"
+    placeholder="Add a task, or #tag it first"
     data-testid="quick-add"
     onkeydown={onKeyDown}
     onpaste={onPaste}

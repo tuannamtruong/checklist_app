@@ -90,11 +90,16 @@ describe('creating rows', () => {
   });
 });
 
+/** K-9's titles, as the rows `createLastChildren` takes since A-8. */
+function rowsFor(titles: readonly string[]): { title: string }[] {
+  return titles.map((title) => ({ title }));
+}
+
 describe('several rows at once — K-9', () => {
   it('appends one row per title, in the order they were given', () => {
     const [a, b, c] = threeRows();
     ctx.tick();
-    const ops = createLastChildren(session.tree, ctx, ROOT, ['Milk', 'Bread', 'Eggs']);
+    const ops = createLastChildren(session.tree, ctx, ROOT, rowsFor(['Milk', 'Bread', 'Eggs']));
     session.apply(ops);
     expect(titlesOf(session.tree, childrenOf(session.tree, ROOT))).toEqual([
       'a',
@@ -109,19 +114,32 @@ describe('several rows at once — K-9', () => {
 
   it('mints a key per row against the row before it, not against the tree', () => {
     ctx.tick();
-    const ops = createLastChildren(session.tree, ctx, ROOT, ['one', 'two', 'three']);
+    const ops = createLastChildren(session.tree, ctx, ROOT, rowsFor(['one', 'two', 'three']));
     const keys = ops.filter((op) => op.op === 'create').map((op) => op.order);
     expect(new Set(keys).size).toBe(3);
     expect([...keys].sort()).toEqual(keys);
   });
 
-  it('is every row a task, carrying the filter the list was under — K-1, A-6', () => {
+  it('is every row a task — K-1', () => {
     ctx.tick();
-    const ops = createLastChildren(session.tree, ctx, ROOT, ['Milk', 'Bread'], { tags: ['Town'] });
+    const ops = createLastChildren(session.tree, ctx, ROOT, rowsFor(['Milk', 'Bread']));
     session.apply(ops);
     const rows = childrenOf(session.tree, ROOT).map((id) => session.tree.nodes[id]!);
     expect(rows.map((row) => row.kind)).toEqual(['task', 'task']);
-    expect(rows.map((row) => row.tags)).toEqual([['town'], ['town']]);
+  });
+
+  // A-8. Each line of a paste brings its own `#tag` prefix, so the tags are the
+  // row's rather than the block's — `parseTagged` in `tags.ts` reads them off.
+  it('gives each row its own tags, and no two lines need agree', () => {
+    ctx.tick();
+    const ops = createLastChildren(session.tree, ctx, ROOT, [
+      { title: 'Milk', tags: ['Town'] },
+      { title: 'Bread' },
+      { title: 'Eggs', tags: ['errand'] },
+    ]);
+    session.apply(ops);
+    const rows = childrenOf(session.tree, ROOT).map((id) => session.tree.nodes[id]!);
+    expect(rows.map((row) => row.tags)).toEqual([['town'], [], ['errand']]);
   });
 
   it('writes nothing when there is nothing to write — S-10', () => {
