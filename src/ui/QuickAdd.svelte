@@ -159,9 +159,8 @@
   <input
     bind:this={input}
     bind:value={draft}
-    class="min-w-0 flex-1 rounded-md border border-line bg-transparent px-2.5 py-1.5 text-sm outline-none placeholder:text-ink-faint focus:border-accent"
+    class="min-w-0 flex-1 rounded-md border border-line bg-transparent px-2.5 py-1.5 text-sm outline-none focus:border-accent"
     aria-label="Add a task"
-    placeholder="Add a task, or #tag it first"
     data-testid="quick-add"
     onkeydown={onKeyDown}
     onpaste={onPaste}
