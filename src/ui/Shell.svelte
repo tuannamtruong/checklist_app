@@ -88,22 +88,34 @@
     data-testid="sidebar"
     data-open={view.drawerOpen}
   >
-    <div class="border-b border-line px-3 py-3">
-      <div class="flex items-center justify-between">
+    <!-- G-7 and X-32. Three links in one column with one padding: the two day
+         lists are not in the tree, so they sit with the corner and above the
+         rule that separates it from the lists under it — requirements.md §4.4.
+         Same weight as the corner and no glyph, and the block's padding is one
+         step narrower than the corner's used to be so that each link's own
+         padding puts the labels back on the same left edge — with the whole
+         width behind them to be hit on. -->
+    <div class="flex flex-col border-b border-line px-2 py-3">
+      <div class="flex items-center gap-1">
         <!-- X-28. Named for the page it opens rather than for the application:
              this is the way back to the top of the tree, and that page has been
-             headed with the same word since it existed — requirements.md §10. -->
+             headed with the same word since it existed — requirements.md §10.
+             X-32 gives it the row rather than its own four letters: it is the
+             first of three entries that do the same thing, and it was the only
+             one a click had to land on the word to reach. -->
         <a
           href="#/"
-          class="sidebar-text font-semibold"
+          class="sidebar-text min-w-0 flex-1 truncate rounded-md px-1 py-1 font-semibold hover:bg-surface-sunken"
           data-testid="all-lists-link"
           onclick={() => view.setDrawer(false)}
         >
           All
         </a>
+        <!-- The one thing beside it, and only at the width where the sidebar is
+             a drawer over the page: above `md` the corner is the whole row. -->
         <button
           type="button"
-          class="sidebar-text row-control rounded px-2 text-ink-muted hover:text-ink md:hidden"
+          class="sidebar-text row-control shrink-0 rounded px-2 text-ink-muted hover:text-ink md:hidden"
           aria-label="Close navigation"
           onclick={() => view.setDrawer(false)}
         >
@@ -111,12 +123,7 @@
         </button>
       </div>
 
-      <!-- G-7. The two day lists belong with the corner rather than with the
-           tree: they are not in it, so they sit above the rule that separates
-           `All` from the lists under it — requirements.md §4.4. Same weight as
-           the corner and no glyph, and the negative margin puts their labels on
-           the corner's own left edge while the padding keeps a hover target. -->
-      <div class="-mx-1 mt-1 flex flex-col">
+      <div class="flex flex-col">
         {#each [{ href: TODAY_HREF, label: 'Today', open: todayOpen }, { href: TOMORROW_HREF, label: 'Tomorrow', open: tomorrowOpen }] as entry (entry.href)}
           <!-- The corner's colour as well as its weight: these two read as part
                of `All` rather than as entries under it, so the open one is

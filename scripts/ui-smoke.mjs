@@ -592,6 +592,23 @@ async function main() {
     await page.keyboard.press('Escape');
     await page.locator('[data-testid="row-menu"]').waitFor({ state: 'detached' });
 
+    // --- X-32: the corner is a target as wide as its neighbours -------------
+    // Measured rather than eyeballed: what X-32 asks is that a click anywhere on
+    // the row reaches the link, and a width is the only way to say that.
+    const cornerWidths = await page.evaluate(() => {
+      const width = (selector) =>
+        Math.round(document.querySelector(selector)?.getBoundingClientRect().width ?? 0);
+      return {
+        all: width('[data-testid="all-lists-link"]'),
+        today: width('[data-testid="agenda-link"][data-agenda="today"]'),
+      };
+    });
+    check(
+      'All is the same full-width target its neighbours are — X-32',
+      cornerWidths.all > 0 && cornerWidths.all === cornerWidths.today,
+      JSON.stringify(cornerWidths),
+    );
+
     // --- ↑ / ↓ move the caret --------------------------------------------
     // The caret goes back where the keyboard checks left it: the tag block above
     // was driven with a mouse, and a button does not hold a caret.
