@@ -80,6 +80,10 @@ describe('the row menu and the keyboard', () => {
     for (const structural of ['indent', 'outdent', 'move-up', 'move-down']) {
       expect(shown, `${structural} is a drag, not a menu entry`).not.toContain(structural);
     }
+    // A-1's tagging is not a menu entry either, and is not an action at all:
+    // the editor is drawn open on the row's own page — X-34.
+    expect(shown).not.toContain('tags');
+    expect(rowActions(context(id)).map((action) => action.name)).not.toContain('tags');
     // Everything else a key binds is still reachable by thumb.
     for (const bound of KEY_BOUND_ACTIONS) {
       if (['indent', 'outdent', 'move-up', 'move-down'].includes(bound)) continue;

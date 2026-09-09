@@ -10,6 +10,10 @@
 // no. A phone reorders by dragging (T-14, T-16), which is the gesture those
 // keys stand in for on a desktop, so the menu was offering a second, worse way
 // to do a thing the finger already does — requirements.md §3.1.
+//
+// X-34 also took the tag entry out, and that one is not defined here at all:
+// tagging is A-1's, on the row's own page, where the editor is drawn open
+// rather than opened from a menu — requirements.md §4.1.
 
 import * as edit from '../core/edit';
 import { dayKey, nextDayKey } from '../core/agenda';
@@ -35,17 +39,10 @@ export interface RowActionContext {
    */
   now: number;
   /**
-   * A-1. Opens the row's own tag editor, which only the row can do — it is a
-   * field on screen rather than an edit. A caller with no editor (the tests,
-   * and any future list of rows that is not the tree) leaves it out, and the
-   * menu shows the entry disabled rather than lying about where tags live.
-   */
-  editTags?: () => void;
-  /**
-   * R-7. Opens the row's own repeat editor, and absent for the same reason
-   * `editTags` can be: it is a field on screen rather than an edit, so a caller
-   * with no editor shows the entry disabled rather than lying about where the
-   * period lives.
+   * R-7. Opens the row's own repeat editor: a field on screen rather than an
+   * edit, so a caller with no editor to open (the tests, and the sidebar's
+   * entries) leaves it out and the menu shows it disabled rather than lying
+   * about where the period lives.
    */
   editRepeat?: () => void;
 }
@@ -192,13 +189,8 @@ export function rowActions(ctx: RowActionContext): RowAction[] {
     },
     ...dayMove,
     ...repeat,
-    {
-      name: 'tags',
-      label: node.tags.length === 0 ? 'Add tags' : `Tags (${node.tags.length})`,
-      menu: true,
-      enabled: ctx.editTags !== undefined,
-      run: () => ctx.editTags?.(),
-    },
+    // A-1's tagging is not here. It is on the row's own page, where the editor
+    // is drawn open rather than opened — X-34.
     // R-1. Timely holds check items and nothing else, so there is nothing to
     // turn a row in it into: a folder among the chores is a list that never
     // comes back, and a note there has no tick to give.

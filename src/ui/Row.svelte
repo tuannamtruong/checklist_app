@@ -18,7 +18,6 @@
   import RepeatEditor from './RepeatEditor.svelte';
   import RowMenu from './RowMenu.svelte';
   import TagChips from './TagChips.svelte';
-  import TagEditor from './TagEditor.svelte';
   import { nodeHref } from '../app/router.svelte';
   import type { RowDrag } from './drag.svelte';
 
@@ -42,8 +41,6 @@
   let input = $state<HTMLInputElement | null>(null);
   let editing = $state(false);
   let draft = $state('');
-  /** A-1. The row's tag editor, opened from the menu and closed by Escape. */
-  let taggingOpen = $state(false);
   /** R-7. The row's repeat editor, opened from the chip or from the menu. */
   let repeatOpen = $state(false);
 
@@ -269,23 +266,12 @@
     {/if}
     <PriorityFlag {session} {id} priority={node.priority} />
 
-    <RowMenu
-      ctx={{ ...ctx, editTags: () => (taggingOpen = true), editRepeat: () => (repeatOpen = true) }}
-    />
+    <RowMenu ctx={{ ...ctx, editRepeat: () => (repeatOpen = true) }} />
   </div>
 
-  <!-- Under the row rather than inside it: the row is what a drop is measured
-       against — T-14 — and a row that grew when its tags opened would move the
-       target out from under the pointer. -->
-  {#if taggingOpen}
-    <div class="pb-1" style="padding-left: {depth * 1.25 + 2.5}rem">
-      <TagEditor {session} {id} autofocus onclose={() => (taggingOpen = false)} />
-    </div>
-  {/if}
-
-  <!-- R-7, under the row for the same reason the tag editor is: a row that grew
-       when its period opened would move the drop target out from under T-14's
-       pointer. -->
+  <!-- R-7, under the row rather than inside it: the row is what a drop is
+       measured against — T-14 — and a row that grew when its period opened would
+       move the target out from under the pointer. -->
   {#if repeatOpen}
     <div class="pb-1" style="padding-left: {depth * 1.25 + 2.5}rem">
       <RepeatEditor {session} {id} autofocus onclose={() => (repeatOpen = false)} />
