@@ -19,12 +19,19 @@
     view,
     focus,
     parent,
+    now,
     only = null,
   }: {
     session: Session;
     view: ViewState;
     focus: RowFocus;
     parent: ParentId;
+    /**
+     * G-6 and R-4. The day, handed down rather than read here: a row asks
+     * whether a timely item is due and the menu asks which day move it offers,
+     * and both have to turn over when the page they are on does.
+     */
+    now: number;
     /**
      * G-3. The ids this list may draw, or null for all of them. It is A-4's
      * filter mechanism with a second caller: the agenda's two pages are one
@@ -65,7 +72,7 @@
 
 <div class="flex flex-col" data-testid="tree">
   {#each rows as row (row.id)}
-    <Row ctx={{ session, view, focus, rows, id: row.id }} depth={row.depth} {drag} />
+    <Row ctx={{ session, view, focus, rows, now, id: row.id }} depth={row.depth} {drag} />
   {/each}
 </div>
 

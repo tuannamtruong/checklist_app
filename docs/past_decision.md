@@ -706,3 +706,44 @@ feature: it would keep the `day` field exactly as it is and add a second reader 
 show tree rows beside agenda items. What would *not* reopen it is B: a write fired by a clock rather than by a person is
 what [requirements.md §7.3 Fixed constraints](requirements.md#73-fixed-constraints) exists to keep out.
 
+
+## 19. Timely
+
+A third list, for the check items that come back: water the plants every day, change the filter every five, pay the rent
+every month. One sentence to satisfy, and it is not the one M9 satisfied: a ticked item has to *return*, on a day that
+depends on when it was ticked rather than on when it was due.
+
+### 19.1 What a tick writes
+
+| # | Option | What it costs |
+| --- | --- | --- |
+| A | **Nothing new: the tick writes the day the item is next due, into G-2's `day`** — chosen | The two states are one comparison the app already makes — due is `day <= today`, waiting is `day > today` — so R-4's countdown is G-3's rollover with a third question asked of it. `done` is never written, which is what keeps a chore out of T-12's archive and out of T-11's filter for free |
+| B | A `lastTicked` field, with the due day computed from it and the period at render time | A second field for the same fact, and every reader has to do the arithmetic. It also makes "bring it back" (R-6) a write of a date in the past rather than a write of today |
+| C | `done` as usual, plus a job that un-ticks the item when its day comes | A write nobody made, fired by a clock — the thing [requirements.md §7.3 Fixed constraints](requirements.md#73-fixed-constraints) exists to keep out, and §18.2 B already refused for the same reason |
+| D | A new op, `tick`, carrying the period | A fifth op for something four ops already express. The merge, compaction and the conflict rows would each learn a case, and the payload would stop being readable by a build that predates it |
+
+**A is what makes R-5 true by construction.** The next due day is `now + period`, and the day the item was carrying is
+not an input to the sum — so an item that was due on Monday and is ticked on Thursday is next due five days after
+Thursday. Option B computes from the same clock and would have been equally correct here; what it costs is a second
+field that can disagree with the first, and a reader that has to hold both to answer "is this due".
+
+### 19.2 Where the period lives
+
+| # | Option | What it costs |
+| --- | --- | --- |
+| A | **One field, `every`, as `<n>d` or `<n>m`** — chosen | One string, merged last-writer-wins like a tag or a flag. It is legible in D-4's log — `every 5d` — which is the same argument A-2 made for naming the four priorities rather than numbering them |
+| B | Two fields, a count and a unit | Two fields that are one value: a device that wrote `5` and one that wrote `m` concurrently would merge into "every five months", which neither device asked for |
+| C | An RFC 5545 recurrence rule | A grammar, a parser and a library, for a list of chores. "Every third Tuesday" is not what was asked for, and the rule would be the largest thing in the payload by an order of magnitude |
+| D | A fixed ladder of presets, cycled by one control | It matches the shape A-2's flag has, and it is what the row's chip nearly became. What it cannot express is the arbitrary N the feature was asked for — "every five days" is only on the ladder if somebody put it there |
+
+**Two units, and the second one is calendar arithmetic.** Days are addition; months are not, so `nextDue` adds months by
+the calendar and clamps the day of the month, and "every month" on the 31st is the 30th in a month with thirty days. The
+alternative — thirty days — makes "monthly" drift a day every other month, which is exactly the kind of quiet wrongness
+a chore list is never checked closely enough to catch.
+
+### 19.3 What reopens it
+
+A period the two units cannot say: "every second Tuesday", "on the first of the month", "weekdays only". All three are
+option C above, and all three are a recurrence grammar rather than a bigger number — the condition is a real use for one
+rather than the observation that it is expressible. What does *not* reopen it is a longer ladder of presets: the chip
+edits a count and a unit, so every N either unit can say is already reachable.

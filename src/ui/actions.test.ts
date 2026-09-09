@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { memoryFolder } from '../adapters/memory-folder';
 import { createFirstChild, createLastChild, createSiblingBelow } from '../core/edit';
 import { childrenOf } from '../core/tree';
-import { AGENDA, ROOT } from '../core/types';
+import { AGENDA, ROOT, TIMELY } from '../core/types';
 import { Session } from '../app/Session.svelte';
 import { ViewState } from '../app/view-state.svelte';
 import { actionNamed, rowActions, type RowActionContext } from './actions';
@@ -31,7 +31,10 @@ let focus: RowFocus;
 
 function context(id: string, parent: string = ROOT): RowActionContext {
   const rows = visibleRows(session.tree, parent, (rowId) => view.isCollapsed(rowId));
-  return { session, view, focus, rows, id };
+  // G-6 and R-4. The day the list is being read on, which the view hands down —
+  // these tests file rows relative to the same clock, so they agree by
+  // construction rather than by a frozen date.
+  return { session, view, focus, rows, id, now: Date.now() };
 }
 
 /** G-5. One agenda item, filed for the day the caller names. */
@@ -153,5 +156,49 @@ describe('the day move — G-6', () => {
     expect(session.tree.nodes[id]!.day).toBe(dayFrom(0));
     expect(session.tree.nodes[id]!.parent).toBe(AGENDA);
     expect(rowActions(context(id, AGENDA)).map((a) => a.name)).toContain('move-to-tomorrow');
+  });
+});
+
+describe('a timely row — R-1, R-7', () => {
+  function chore(every: string): string {
+    return session.run((tree, ctx) =>
+      createLastChild(tree, ctx, TIMELY, { title: 'Plants', every }),
+    )[0]!.id;
+  }
+
+  it('offers the repeat editor, and says what it repeats at — R-7', () => {
+    const id = chore('5d');
+    const entry = actionNamed(rowActions(context(id, TIMELY)), 'repeat')!;
+    expect(entry.label).toBe('Repeats every 5 days');
+    // Disabled without an editor to open, exactly as the tag entry is.
+    expect(entry.enabled).toBe(false);
+
+    let opened = false;
+    const withEditor = { ...context(id, TIMELY), editRepeat: () => (opened = true) };
+    actionNamed(rowActions(withEditor), 'repeat')!.run();
+    expect(opened).toBe(true);
+  });
+
+  it('offers no kind change and no indent — R-1', () => {
+    const first = chore('1d');
+    const second = chore('7d');
+    const actions = rowActions(context(second, TIMELY));
+    expect(actions.filter((action) => action.name.startsWith('turn-into-'))).toEqual([]);
+    expect(actionNamed(actions, 'indent')!.enabled).toBe(false);
+    // The order of the list is still dragged and nudged.
+    expect(actionNamed(actions, 'move-up')!.enabled).toBe(true);
+    expect(first).not.toBe(second);
+  });
+
+  it('offers no day move: a chore is in no list that a day names — G-6', () => {
+    const id = chore('1d');
+    const actions = rowActions(context(id, TIMELY));
+    expect(actionNamed(actions, 'move-to-tomorrow')).toBeUndefined();
+    expect(actionNamed(actions, 'move-to-today')).toBeUndefined();
+  });
+
+  it('leaves the rows of every other list without a repeat entry', () => {
+    const id = add(ROOT);
+    expect(actionNamed(rowActions(context(id)), 'repeat')).toBeUndefined();
   });
 });

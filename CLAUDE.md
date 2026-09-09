@@ -5,13 +5,15 @@
 A checklist and notes app for one person across several devices. Local-first, no application server: devices synchronise
 through a folder that a cloud provider's own client keeps in sync.
 
-**Status: milestones M1 to M8 are built** — the local-first core, sync through the folder, then compaction, search,
+**Status: milestones M1 to M10 are built** — the local-first core, sync through the folder, then compaction, search,
 device names, undelete and the two platform bundles, then the settings screen and its six themes, then M5: the sync
 folder section, drag and drop, tags and priority with a filter, and the quick-add line. M6 mostly removed: three kinds
 rather than four (`list` is gone), one control for a kind change rather than two, a sidebar one level deep — and one
 addition, a pasted paragraph becoming one row per line. M7 is bold and headings in a note body, as marks inside the body
 string, and M8 opens a note beside the list rather than instead of it — from the icon, which navigates, and from the
-caret (X-30), which does not. The production tree is `src/`, driven by `package.json`.
+caret (X-30), which does not. M9 is Today and Tomorrow, two lists that are not the tree, and M10 is Timely, a third one
+for the check items that come back — both are a parent that is not a node and a `day` compared with today, so nothing
+happens at midnight on any device. The production tree is `src/`, driven by `package.json`.
 
 ## Development
 
@@ -207,9 +209,9 @@ page it always did: a list beside a list is the same drawing twice.
 **"The nearest list above it" is a walk, not the parent.** `listAbove` in `src/core/tree.ts` climbs T-6's resolved
 parents past every `note`, so opening a note *inside* a note swaps the pane and leaves the left column exactly where the
 reader put it — the nested note is a row in that column's own tree, which draws the whole subtree, so the click is a
-click on the left and only the pane answers it. Drawing the parent note on the left instead was the first cut: it put a second body and a second K-7
-debounce on screen, and moved the list on every step down. `closeHref` walks the same way, or ✕ on a nested note would
-open its parent rather than close anything.
+click on the left and only the pane answers it. Drawing the parent note on the left instead was the first cut: it put a
+second body and a second K-7 debounce on screen, and moved the list on every step down. `closeHref` walks the same way,
+or ✕ on a nested note would open its parent rather than close anything.
 
 **The divider between them is dragged — X-24.** `src/ui/WidthGrip.svelte` is X-20's sidebar grip generalised: the same
 pointer capture and the same `role="slider"`, with `sign={-1}` at the pane because the divider is the pane's *left*
@@ -284,16 +286,38 @@ caller. The nav entries sit in the corner's own block, under `All` and **above**
 in the corner's weight and colour and with no glyph — so they are pinned where `All` is rather than scrolling with the
 lists, and the open one is marked by its background alone.
 
-**A second root means every walk that stopped at one now stops at two.** `isRoot` in `types.ts` is what they call:
+**More roots mean every walk that stopped at one now stops at three.** `isRoot` in `types.ts` is what they call:
 `resolveTree`'s cycle and missing-parent walks — reading `agenda` as a parent that failed to arrive would repair every
 agenda item into `All` — the T-7 tombstone walk, `ancestorsOf`, `isAncestorOrSelf`, `listAbove`, `canRestore` and
 `canOutdent`, which is what stops Shift-Tab pushing a top-level agenda item into the tree. `rootOf` answers which root a
-row hangs under, and `src/ui/paths.ts` is the one place that turns that into a word: `All`, `Today` or `Tomorrow`, for
-the breadcrumb, the Done view and search.
+row hangs under, and `src/ui/paths.ts` is the one place that turns that into a word: `All`, `Today`, `Tomorrow` or
+`Timely`, for the breadcrumb, the Done view and search.
 
 The items are otherwise ordinary rows — same ops, same merge, same Done view, same search, same conflict rows. `day` is
 an ordinary last-writer-wins field: `op-log.ts` reads and writes it, `compact.ts` drops a superseded one, `conflicts.ts`
 offers the one that lost, and `edit.ts`'s `setDay` is both the G-6 menu control and the C-1 restore.
+
+### Timely
+
+A third list that is not the tree either — R-1 to R-8, requirements.md §4.5. `TIMELY` is a third parent beside `ROOT`
+and `AGENDA`, holding **tasks only, one level deep**: `canMoveTo` refuses a move whose root would change and a move
+*into* a timely row, so indent, `Alt-↓` and a drop-inside are refused by the model rather than by each view.
+
+**A tick does not write `done`.** `tickTimely` in `src/core/edit.ts` writes one `set day` carrying the day the item is
+next due, so T-11 never takes the row out of the list and T-12's archive never collects a chore that has no end. Due is
+`day <= today` and waiting is `day > today` — G-3's comparison asked a third question — and the row is drawn ticked and
+muted while it waits. Un-ticking is the same op writing today.
+
+**The countdown starts at the tick.** `nextDue` in `src/core/timely.ts` is a function of `now` and the period alone; the
+day the item was carrying is not an input, which is the whole of R-5. `every` is the period, `<n>d` or `<n>m`, an
+ordinary last-writer-wins field — `op-log.ts` reads and writes it, `compact.ts` drops a superseded one, `conflicts.ts`
+offers the one that lost, and `setEvery` is the one writer. Months are added by the calendar with the day of the month
+clamped, so the 31st repeats on the 30th of a thirty-day month. past_decision.md §19 says what a `lastTicked` field and
+a recurrence grammar would have cost.
+
+`src/ui/TimelyPage.svelte` is the page, `src/ui/RepeatChip.svelte` the control on the row and
+`src/ui/RepeatEditor.svelte` the count-and-unit editor it opens — the shape `TagChips`/`TagEditor` already had. The nav
+entry sits with `All` and the two days, above the rule (R-8), and X-32 gave all four the same full-width target.
 
 ### Attributes
 

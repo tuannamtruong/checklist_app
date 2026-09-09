@@ -10,8 +10,10 @@
 // this device's file, so the ops here are the survivors rather than the history.
 // The page says so; this module only reports what it was handed.
 
+import { parsePeriod, periodLabel } from './timely';
 import {
   AGENDA,
+  TIMELY,
   ROOT,
   type DeviceId,
   type NodeId,
@@ -51,6 +53,8 @@ function labelOfParent(parent: ParentId, nodes: NodeMap): string {
   // G-1. The op names the parent, and the parent of both lists is one thing:
   // which of the two an item is in is the `day` on the line after it.
   if (parent === AGENDA) return 'Today or Tomorrow';
+  // R-1. The third list, and the line that follows says the day it is next due.
+  if (parent === TIMELY) return 'Timely';
   return quote(nodes[parent]?.title ?? parent);
 }
 
@@ -73,6 +77,17 @@ function setDetail(op: Extract<Op, { op: 'set' }>): string {
   }
   if (op.priority !== undefined) {
     parts.push(op.priority === 'none' ? 'flag cleared' : `flagged ${op.priority}`);
+  }
+  // G-2 and R-3. The one op both a day move and a tick on a chore write, and
+  // without it either would read as "set nothing" — the line D-4 owes a person
+  // who is asking what this device did.
+  if (op.day !== undefined) parts.push(op.day === null ? 'unfiled' : `filed for ${op.day}`);
+  // R-2. In words rather than as the field: `every 5 days` is what D-4 owes a
+  // reader where `5d` is a guess — the same argument A-2 made for naming the
+  // four priorities rather than numbering them.
+  if (op.every !== undefined) {
+    const period = parsePeriod(op.every);
+    parts.push(period === null ? 'stopped repeating' : `repeats ${periodLabel(period)}`);
   }
   // An op that reached the file with nothing in it should be impossible — S-10
   // drops a no-op edit before it is written — so say what was seen rather than

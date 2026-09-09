@@ -71,6 +71,7 @@ export function panesFor(
 
 function nearestList(tree: ResolvedTree, noteId: NodeId): NodeId | null {
   const above = listAbove(tree, noteId);
-  // G-1. Either root means there is no list row to draw beside the note.
+  // G-1 and R-1. Any of the three roots means there is no list row to draw
+  // beside the note.
   return isRoot(above) ? null : above;
 }

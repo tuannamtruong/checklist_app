@@ -24,6 +24,12 @@ export class FakeContext implements EditContext {
     return this.clock;
   }
 
+  /** Time is a parameter, never the machine's clock — test.md §4. */
+  at(time: number): this {
+    this.clock = time;
+    return this;
+  }
+
   tick(by = 1): this {
     this.clock += by;
     return this;

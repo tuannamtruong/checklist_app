@@ -35,6 +35,9 @@ function created(op: Extract<Op, { op: 'create' }>): Node {
     // G-2. Null on a tree row and set by the `set` that follows the create on
     // an agenda one, exactly as a title is.
     day: null,
+    // R-2. Null here as well: the page that creates a timely row is what gives
+    // it a period, in the `set` that follows the create — exactly as a day is.
+    every: null,
     order: op.order,
     orderBy: op.dev,
     deleted: false,
@@ -76,6 +79,7 @@ export function applyOp(nodes: NodeMap, op: Op): NodeMap {
       if (op.tags !== undefined) next.tags = op.tags;
       if (op.priority !== undefined) next.priority = op.priority;
       if (op.day !== undefined) next.day = op.day;
+      if (op.every !== undefined) next.every = op.every;
       if (op.kind !== undefined) {
         next.kind = op.kind;
         // A row turned into a note owes the editor a body to open on. Turning

@@ -24,15 +24,17 @@ import {
   setBody,
   setDay,
   setPriority,
+  setEvery,
   setTags,
   setTitle,
+  tickTimely,
   toggleDone,
   turnInto,
   unarchive,
 } from './edit';
 import { FakeContext, Session, titlesOf } from './test-support';
 import { childrenOf, parentOf } from './tree';
-import { AGENDA, ROOT, type NodeId } from './types';
+import { AGENDA, ROOT, TIMELY, type NodeId } from './types';
 
 let ctx: FakeContext;
 let session: Session;
@@ -547,5 +549,95 @@ describe('the agenda — G-1, G-5, G-6', () => {
     session.apply(setDay(session.tree, ctx.tick(), id, '2026-09-09'));
     expect(session.tree.nodes[id]!.day).toBe('2026-09-09');
     expect(parentOf(session.tree, id)).toBe(AGENDA);
+  });
+});
+
+describe('Timely — R-1 to R-6', () => {
+  /** 2026-09-08, 10:00 local — the day these tests are written against. */
+  const NOON = new Date(2026, 8, 8, 10, 0, 0).getTime();
+
+  function chore(title: string, every: string): NodeId {
+    const ops = createLastChild(session.tree, ctx.tick(), TIMELY, { title, every });
+    session.apply(ops);
+    return ops[0]!.id;
+  }
+
+  it('creates a task carrying its period from the moment it exists — R-2', () => {
+    const ops = createLastChild(session.tree, ctx, TIMELY, { title: 'Plants', every: '3d' });
+    expect(ops[0]).toMatchObject({ op: 'create', parent: TIMELY, kind: 'task' });
+    expect(ops[1]).toMatchObject({ op: 'set', title: 'Plants', every: '3d' });
+    session.apply(ops);
+    expect(session.tree.nodes[ops[0]!.id]!.every).toBe('3d');
+  });
+
+  it('writes the period as one last-writer-wins set, and refuses one it cannot read', () => {
+    const id = chore('Plants', '1d');
+    expect(setEvery(session.tree, ctx.tick(), id, '5d')).toMatchObject([
+      { op: 'set', id, every: '5d' },
+    ]);
+    // S-10: a period that is already the row's costs no write, and neither does
+    // one this build cannot parse.
+    expect(setEvery(session.tree, ctx.tick(), id, '1d')).toEqual([]);
+    expect(setEvery(session.tree, ctx.tick(), id, '2 weeks')).toEqual([]);
+  });
+
+  it('ticks by writing the next due day and never `done` — R-3', () => {
+    const id = chore('Plants', '5d');
+    const ops = tickTimely(session.tree, ctx.at(NOON), id);
+    expect(ops).toMatchObject([{ op: 'set', id, day: '2026-09-13' }]);
+    expect(ops[0]).not.toHaveProperty('done');
+    session.apply(ops);
+    expect(session.tree.nodes[id]!.done).toBe(false);
+    // T-11 would have taken it out of the list; nothing did.
+    expect(childrenOf(session.tree, TIMELY)).toContain(id);
+  });
+
+  it('counts the period from the tick rather than from the day it was due — R-5', () => {
+    const id = chore('Filter', '5d');
+    session.apply(tickTimely(session.tree, ctx.at(NOON), id));
+    expect(session.tree.nodes[id]!.day).toBe('2026-09-13');
+    // Three days late: the next one is five days after *this* tick, not after
+    // the 13th.
+    session.apply(tickTimely(session.tree, ctx.at(NOON + 8 * 24 * 60 * 60 * 1000), id));
+    expect(session.tree.nodes[id]!.day).toBe('2026-09-21');
+  });
+
+  it('brings a waiting item back with the same control — R-6', () => {
+    const id = chore('Plants', '1d');
+    session.apply(tickTimely(session.tree, ctx.at(NOON), id));
+    expect(session.tree.nodes[id]!.day).toBe('2026-09-09');
+    session.apply(tickTimely(session.tree, ctx.at(NOON), id));
+    expect(session.tree.nodes[id]!.day).toBe('2026-09-08');
+  });
+
+  it('holds nothing inside a chore, so indent and a drop are refused — R-1', () => {
+    const first = chore('Plants', '1d');
+    const second = chore('Filter', '5d');
+    expect(canMoveTo(session.tree, second, first)).toBe(false);
+    expect(canIndent(session.tree, second)).toBe(false);
+    expect(indent(session.tree, ctx.tick(), second)).toEqual([]);
+    expect(canDrop(session.tree, second, first, 'inside')).toBe(false);
+    // Above and below are still ordinary moves: the list is dragged into order.
+    expect(canDrop(session.tree, second, first, 'before')).toBe(true);
+  });
+
+  it('lets nothing cross between the three lists — G-1, R-1', () => {
+    const chorish = chore('Plants', '1d');
+    const filed = createLastChild(session.tree, ctx.tick(), AGENDA, {
+      title: 'Parcel',
+      day: '2026-09-08',
+    });
+    session.apply(filed);
+    const parcel = filed[0]!.id;
+    const rooted = createLastChild(session.tree, ctx.tick(), ROOT, { title: 'Shopping' });
+    session.apply(rooted);
+    const shopping = rooted[0]!.id;
+    expect(canMoveTo(session.tree, shopping, TIMELY)).toBe(false);
+    expect(canMoveTo(session.tree, chorish, ROOT)).toBe(false);
+    expect(canMoveTo(session.tree, parcel, TIMELY)).toBe(false);
+    expect(moveTo(session.tree, ctx.tick(), shopping, TIMELY, null)).toEqual([]);
+    // And each stays a move inside its own list.
+    expect(canMoveTo(session.tree, chorish, TIMELY)).toBe(true);
+    expect(canMoveTo(session.tree, parcel, AGENDA)).toBe(true);
   });
 });

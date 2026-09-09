@@ -13,6 +13,7 @@
     DONE_HREF,
     SEARCH_HREF,
     SETTINGS_HREF,
+    TIMELY_HREF,
     TODAY_HREF,
     TOMORROW_HREF,
   } from '../app/router.svelte';
@@ -25,6 +26,7 @@
     currentId,
     todayOpen,
     tomorrowOpen,
+    timelyOpen,
     doneOpen,
     conflictsOpen,
     searchOpen,
@@ -43,6 +45,8 @@
     /** G-7. Which of the two day lists is open, if either. */
     todayOpen: boolean;
     tomorrowOpen: boolean;
+    /** R-8. The third list beside them, which is not a day at all. */
+    timelyOpen: boolean;
     doneOpen: boolean;
     conflictsOpen: boolean;
     searchOpen: boolean;
@@ -57,6 +61,27 @@
   // otherwise. A permanent one would be empty almost always, which is how a nav
   // entry teaches a user to stop reading it.
   const pending = $derived(session.conflicts.filter((row) => !dismissals.has(row.id)).length);
+
+  // G-7's two and R-8's third, in one list because they are one block of links.
+  // `data-agenda` stays the two days' own attribute — Timely is not a day, and
+  // the test id says which of the two kinds of entry a link is.
+  const cornerLinks = $derived([
+    { href: TODAY_HREF, label: 'Today', open: todayOpen, testid: 'agenda-link', day: 'today' },
+    {
+      href: TOMORROW_HREF,
+      label: 'Tomorrow',
+      open: tomorrowOpen,
+      testid: 'agenda-link',
+      day: 'tomorrow',
+    },
+    {
+      href: TIMELY_HREF,
+      label: 'Timely',
+      open: timelyOpen,
+      testid: 'timely-link',
+      day: undefined,
+    },
+  ]);
 </script>
 
 <!-- X-29. The shell is the window's height and clips, rather than being the
@@ -88,20 +113,20 @@
     data-testid="sidebar"
     data-open={view.drawerOpen}
   >
-    <!-- G-7 and X-32. Three links in one column with one padding: the two day
-         lists are not in the tree, so they sit with the corner and above the
-         rule that separates it from the lists under it — requirements.md §4.4.
-         Same weight as the corner and no glyph, and the block's padding is one
-         step narrower than the corner's used to be so that each link's own
-         padding puts the labels back on the same left edge — with the whole
-         width behind them to be hit on. -->
+    <!-- G-7, R-8 and X-32. Four links in one column with one padding: the two
+         day lists and Timely are not in the tree, so they sit with the corner
+         and above the rule that separates it from the lists under it —
+         requirements.md §4.4, §4.5. Same weight as the corner and no glyph, and
+         the block's padding is one step narrower than the corner's used to be
+         so that each link's own padding puts the labels back on the same left
+         edge — with the whole width behind them to be hit on. -->
     <div class="flex flex-col border-b border-line px-2 py-3">
       <div class="flex items-center gap-1">
         <!-- X-28. Named for the page it opens rather than for the application:
              this is the way back to the top of the tree, and that page has been
              headed with the same word since it existed — requirements.md §10.
              X-32 gives it the row rather than its own four letters: it is the
-             first of three entries that do the same thing, and it was the only
+             first of four entries that do the same thing, and it was the only
              one a click had to land on the word to reach. -->
         <a
           href="#/"
@@ -123,23 +148,21 @@
         </button>
       </div>
 
-      <div class="flex flex-col">
-        {#each [{ href: TODAY_HREF, label: 'Today', open: todayOpen }, { href: TOMORROW_HREF, label: 'Tomorrow', open: tomorrowOpen }] as entry (entry.href)}
-          <!-- The corner's colour as well as its weight: these two read as part
-               of `All` rather than as entries under it, so the open one is
-               marked by its background alone. -->
-          <a
-            href={entry.href}
-            class="sidebar-text truncate rounded-md px-1 py-1 font-semibold hover:bg-surface-sunken"
-            class:bg-accent-soft={entry.open}
-            data-testid="agenda-link"
-            data-agenda={entry.label.toLowerCase()}
-            onclick={() => view.setDrawer(false)}
-          >
-            {entry.label}
-          </a>
-        {/each}
-      </div>
+      {#each cornerLinks as entry (entry.href)}
+        <!-- The corner's colour as well as its weight: these read as part of
+             `All` rather than as entries under it, so the open one is marked by
+             its background alone. -->
+        <a
+          href={entry.href}
+          class="sidebar-text truncate rounded-md px-1 py-1 font-semibold hover:bg-surface-sunken"
+          class:bg-accent-soft={entry.open}
+          data-testid={entry.testid}
+          data-agenda={entry.day}
+          onclick={() => view.setDrawer(false)}
+        >
+          {entry.label}
+        </a>
+      {/each}
     </div>
 
     <nav class="min-h-0 flex-1 overflow-y-auto p-2" aria-label="Lists">

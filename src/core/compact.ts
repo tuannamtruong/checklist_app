@@ -45,6 +45,7 @@ function keysOf(op: Op): string[] {
       if (op.tags !== undefined) keys.push(`${op.id}:tags`);
       if (op.priority !== undefined) keys.push(`${op.id}:priority`);
       if (op.day !== undefined) keys.push(`${op.id}:day`);
+      if (op.every !== undefined) keys.push(`${op.id}:every`);
       return keys;
     }
   }
@@ -80,6 +81,10 @@ function trimmedSet(op: SetOp, keeps: (key: string) => boolean): SetOp | null {
   }
   if (op.day !== undefined && keeps(`${op.id}:day`)) {
     kept.day = op.day;
+    any = true;
+  }
+  if (op.every !== undefined && keeps(`${op.id}:every`)) {
+    kept.every = op.every;
     any = true;
   }
   return any ? kept : null;

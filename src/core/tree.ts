@@ -80,9 +80,10 @@ export function resolveTree(nodes: NodeMap): ResolvedTree {
       path.push(cursor);
 
       const parent: ParentId = nodes[cursor]!.parent;
-      // G-1. Two parents are not nodes, and neither is a parent that failed to
-      // arrive: reading `agenda` as missing would repair every agenda item into
-      // the tree the moment it was folded.
+      // G-1 and R-1. Three parents are not nodes, and none of them is a parent
+      // that failed to arrive: reading `agenda` as missing would repair every
+      // agenda item into the tree the moment it was folded, and `timely` every
+      // chore.
       if (isRoot(parent)) break;
       if (nodes[parent] === undefined) {
         // A half-synced folder can hold a child whose parent has not arrived.
@@ -235,12 +236,15 @@ export function sidebarChildren(tree: ResolvedTree, parent: ParentId): readonly 
 }
 
 /**
- * G-1. Which of the two roots a node hangs under, walked through T-6's repair.
- * It is what tells an agenda item from a tree row, and the only thing that has
- * to ask is a view naming the place a row came from — a breadcrumb, the Done
- * view's path, a search result's.
+ * G-1 and R-1. Which of the three roots a node hangs under, walked through
+ * T-6's repair. It tells an agenda item and a timely one from a tree row, and
+ * two things ask: a view naming the place a row came from — a breadcrumb, the
+ * Done view's path, a search result's — and `canMoveTo`, which refuses a move
+ * that would carry a row from one of the three lists into another.
+ *
+ * A root is its own answer, so a parent that is not a node may be passed in.
  */
-export function rootOf(tree: ResolvedTree, id: NodeId): ParentId {
+export function rootOf(tree: ResolvedTree, id: ParentId): ParentId {
   let cursor: ParentId = id;
   while (!isRoot(cursor)) {
     const next = parentOf(tree, cursor);

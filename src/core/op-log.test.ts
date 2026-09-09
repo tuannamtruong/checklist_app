@@ -8,7 +8,7 @@ import {
   LOG_VERSION,
   type LogHeader,
 } from './op-log';
-import { AGENDA, ROOT, type Op } from './types';
+import { AGENDA, ROOT, TIMELY, type Op } from './types';
 
 const DEV = 'aaaa0001';
 const header: LogHeader = { v: LOG_VERSION, dev: DEV, clock: { [DEV]: 3, bbbb0002: 4 } };
@@ -71,6 +71,29 @@ describe('the day on the wire — G-2', () => {
     expect(back.ops[0]).toMatchObject({ title: 'Ring back' });
     expect(back.ops[0]).not.toHaveProperty('day');
     expect(back.skipped).toBe(0);
+  });
+});
+
+describe('the period on the wire — R-2', () => {
+  const chore: Op[] = [
+    { op: 'create', id: 'n_2', parent: TIMELY, kind: 'task', order: 'a1', c: 4, at: 400, dev: DEV },
+    { op: 'set', id: 'n_2', title: 'Plants', every: '5d', c: 5, at: 500, dev: DEV },
+    { op: 'set', id: 'n_2', day: '2026-09-13', c: 6, at: 600, dev: DEV },
+    { op: 'set', id: 'n_2', every: null, c: 7, at: 700, dev: DEV },
+  ];
+
+  it('survives a round trip, third root and all', () => {
+    expect(decodeLog(encodeLog(header, chore))!.ops).toEqual(chore);
+  });
+
+  it('drops a period it cannot read, rather than the line carrying it', () => {
+    for (const every of ['2 weeks', '0d', '5w', 5]) {
+      const line = JSON.stringify({ op: 'set', id: 'n_2', title: 'Plants', every, c: 5, at: 500 });
+      const back = decodeLog(`${JSON.stringify(header)}\n${line}\n`)!;
+      expect(back.ops[0]).toMatchObject({ title: 'Plants' });
+      expect(back.ops[0]).not.toHaveProperty('every');
+      expect(back.skipped).toBe(0);
+    }
   });
 });
 

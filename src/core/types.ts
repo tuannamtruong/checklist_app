@@ -19,17 +19,26 @@ export const ROOT = 'root';
  */
 export const AGENDA = 'agenda';
 
-export type ParentId = NodeId | typeof ROOT | typeof AGENDA;
+/**
+ * R-1. The third, and the same trick a third time: Timely's repeating check
+ * items hang here rather than in the tree or in the agenda. What tells it from
+ * `agenda` is not the parent but what a tick means — ticking an item under it
+ * files it for its next due day instead of finishing it, so `done` is never
+ * written and the row never leaves the list. requirements.md §4.5.
+ */
+export const TIMELY = 'timely';
+
+export type ParentId = NodeId | typeof ROOT | typeof AGENDA | typeof TIMELY;
 
 /**
  * The parents that are not nodes. Every walk that climbs a parent chain stops
- * at one of these, and `resolveTree` must not read either as a node that failed
- * to arrive — a missing-parent repair would put an agenda item in the tree.
+ * at one of these, and `resolveTree` must not read one as a node that failed to
+ * arrive — a missing-parent repair would put an agenda item in the tree.
  */
-export const ROOTS: readonly ParentId[] = [ROOT, AGENDA];
+export const ROOTS: readonly ParentId[] = [ROOT, AGENDA, TIMELY];
 
 export function isRoot(parent: ParentId): boolean {
-  return parent === ROOT || parent === AGENDA;
+  return parent === ROOT || parent === AGENDA || parent === TIMELY;
 }
 
 /**
@@ -99,6 +108,13 @@ export interface Node {
    * `core/agenda.ts` is the only module that compares one.
    */
   day: string | null;
+  /**
+   * R-2. How often a timely item repeats — `<n>d` or `<n>m` — and null on every
+   * other row. `core/timely.ts` is the only module that spells the shape, and
+   * the period is read from the tick rather than from the day the item was
+   * carrying, which is the whole of R-5.
+   */
+  every: string | null;
   /** Fractional index among siblings — T-2, sync-flow.md §5. */
   order: string;
   /** The device that minted `order`, and the sort tiebreak — sync-flow.md §5.3. */
@@ -147,8 +163,14 @@ export interface SetOp extends OpBase {
   /** A-3. The whole set, which is what makes it one field — past_decision.md §10. */
   tags?: readonly string[];
   priority?: Priority;
-  /** G-2, G-6. Moving an item between the two lists is this field and no other. */
+  /**
+   * G-2, G-6. Moving an item between the two lists is this field and no other —
+   * and R-3's tick is this field as well, carrying the day the item next comes
+   * due rather than a tick that would take the row out of the list.
+   */
   day?: string | null;
+  /** R-2. The repeat period of a timely item. */
+  every?: string | null;
 }
 
 export interface MoveOp extends OpBase {

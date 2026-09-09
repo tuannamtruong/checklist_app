@@ -22,7 +22,15 @@
     view,
     focus,
     id,
-  }: { session: Session; view: ViewState; focus: RowFocus; id: NodeId | null } = $props();
+    now,
+  }: {
+    session: Session;
+    view: ViewState;
+    focus: RowFocus;
+    id: NodeId | null;
+    /** Handed down to the rows, which is where a day is asked about — TreeView. */
+    now: number;
+  } = $props();
 
   const node = $derived(id === null ? null : session.tree.nodes[id]);
   const parent: ParentId = $derived(id ?? ROOT);
@@ -80,5 +88,5 @@
   <!-- A-4. The bar is the tree's, and it sits with the tree — §4.2. -->
   <TagFilter {session} {view} />
 
-  <TreeView {session} {view} {focus} {parent} />
+  <TreeView {session} {view} {focus} {parent} {now} />
 </div>

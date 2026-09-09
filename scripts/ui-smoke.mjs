@@ -592,21 +592,164 @@ async function main() {
     await page.keyboard.press('Escape');
     await page.locator('[data-testid="row-menu"]').waitFor({ state: 'detached' });
 
-    // --- X-32: the corner is a target as wide as its neighbours -------------
-    // Measured rather than eyeballed: what X-32 asks is that a click anywhere on
-    // the row reaches the link, and a width is the only way to say that.
+    // --- R-1 to R-8: Timely --------------------------------------------------
+    // A third list that is not the tree, and the one place a tick does not
+    // finish anything — requirements.md §4.5. X-32's widths are asked here
+    // because the entry it gains is the third of them: measured rather than
+    // eyeballed, since what X-32 asks is that a click anywhere on the row
+    // reaches the link, and a width is the only way to say that.
     const cornerWidths = await page.evaluate(() => {
       const width = (selector) =>
         Math.round(document.querySelector(selector)?.getBoundingClientRect().width ?? 0);
       return {
         all: width('[data-testid="all-lists-link"]'),
         today: width('[data-testid="agenda-link"][data-agenda="today"]'),
+        timely: width('[data-testid="timely-link"]'),
       };
     });
     check(
       'All is the same full-width target its neighbours are — X-32',
       cornerWidths.all > 0 && cornerWidths.all === cornerWidths.today,
       JSON.stringify(cornerWidths),
+    );
+    check(
+      'Timely sits with them, above the rule — R-8',
+      (await page.locator('[data-testid="timely-link"]').innerText()).trim() === 'Timely' &&
+        cornerWidths.timely === cornerWidths.today,
+      JSON.stringify(cornerWidths),
+    );
+
+    await page.locator('[data-testid="timely-link"]').click();
+    await page.waitForSelector('[data-testid="timely-page"]');
+    check(
+      'an empty Timely says nothing repeats yet — R-3',
+      (await page.locator('[data-testid="timely-empty"]').count()) === 1,
+      await page.locator('[data-testid="page-title"]').innerText(),
+    );
+    check(
+      'and its add line offers no kind but a check item — R-1',
+      (await page.locator('[data-testid="add-note"]:visible').count()) === 0 &&
+        (await page.locator('[data-testid="add-folder"]:visible').count()) === 0,
+    );
+
+    await page.locator('[data-testid="quick-add"]:visible').fill('Water the plants');
+    await page.keyboard.press('Enter');
+    let plants = await rowByTitle(page, 'Water the plants');
+    check(
+      'a new chore repeats daily from the moment it exists — R-2',
+      (await plants.locator('[data-testid="repeat-chip"]').innerText()).trim() === '↻ 1d' &&
+        (await plants.getAttribute('data-waiting')) === 'false',
+      await plants.innerText(),
+    );
+
+    // R-7. The chip opens the count and the unit, which is the whole period.
+    await plants.locator('[data-testid="repeat-chip"]').click();
+    await page.locator('[data-testid="repeat-count"]').fill('5');
+    await page.screenshot({ path: join(shots, 'timely-repeat.png'), fullPage: true });
+    await page.locator('[data-testid="repeat-close"]').click();
+    plants = await rowByTitle(page, 'Water the plants');
+    check(
+      'the chip sets an arbitrary count, not a preset off a ladder — R-7',
+      (await plants.locator('[data-testid="repeat-chip"]').innerText()).trim() === '↻ 5d',
+      await plants.innerText(),
+    );
+
+    // R-3 and R-5. The tick files it forward and leaves it exactly where it is.
+    await plants.locator('[data-testid="done"]').click();
+    plants = await rowByTitle(page, 'Water the plants');
+    check(
+      'ticking greys the chore and leaves it in the list rather than finishing it — R-3',
+      (await plants.getAttribute('data-waiting')) === 'true' &&
+        (await plants.locator('[data-testid="done"]').isChecked()),
+      await plants.innerText(),
+    );
+    check(
+      'and the row says when it comes back, counted from the tick — R-5',
+      (await plants.locator('[data-testid="repeat-due"]').innerText()).trim() === 'due in 5 days',
+      await plants.innerText(),
+    );
+    // The waiting state is the one worth a picture: it is the only row in the
+    // app that is ticked and still in its list.
+    await page.screenshot({ path: join(shots, 'timely.png'), fullPage: true });
+
+    // The claim R-3 rests on, read off the folder rather than off the screen:
+    // the tick is a `set day` and there is no `done` on this row anywhere.
+    const choreId = await plants.getAttribute('data-row-id');
+    // Waited for rather than read: the write is on `device-log.ts`'s 250 ms
+    // debounce, and reading straight after the click races it — the same reason
+    // `landed` exists. Every file in the folder, because the device this page is
+    // running as is not the seeded peer whose id `landed` knows.
+    const wrote = await page
+      .waitForFunction(
+        (id) => {
+          const lines = Object.keys(localStorage)
+            .filter((key) => key.startsWith('checklist:folder:'))
+            .map((key) => localStorage.getItem(key) ?? '')
+            .join('\n')
+            .split('\n')
+            .filter((line) => line.includes(`"${id}"`));
+          const seen = {
+            day: lines.some((line) => line.includes('"day"')),
+            every: lines.some((line) => line.includes('"every":"5d"')),
+            done: lines.some((line) => line.includes('"done"')),
+          };
+          return seen.day && seen.every ? seen : null;
+        },
+        choreId,
+        { timeout: 10_000 },
+      )
+      .then((handle) => handle.jsonValue())
+      .catch(() => ({ day: false, every: false, done: true }));
+    check(
+      'the tick wrote a day and never a tick — R-3',
+      wrote.day && wrote.every && !wrote.done,
+      JSON.stringify(wrote),
+    );
+
+    await page.locator('[data-testid="done-link"]').click();
+    await page.waitForSelector('[data-testid="done-page"]');
+    check(
+      'a chore never reaches the Done view — R-3',
+      !(await archivedTitles(page)).includes('Water the plants'),
+      (await archivedTitles(page)).join('|'),
+    );
+
+    await page.locator('[data-testid="timely-link"]').click();
+    await page.waitForSelector('[data-testid="timely-page"]');
+    plants = await rowByTitle(page, 'Water the plants');
+    await plants.locator('[data-testid="done"]').click();
+    plants = await rowByTitle(page, 'Water the plants');
+    check(
+      'un-ticking brings it back to today, with the same control — R-6',
+      (await plants.getAttribute('data-waiting')) === 'false' &&
+        !(await plants.locator('[data-testid="done"]').isChecked()),
+      await plants.innerText(),
+    );
+
+    await plants.locator('[data-testid="row-menu-button"]').click();
+    check(
+      'the menu carries the period a phone would otherwise have to tap for — R-7',
+      (await page.locator('[data-testid="row-menu"] [data-action="repeat"]').innerText()).trim() ===
+        'Repeats every 5 days',
+      await page.locator('[data-testid="row-menu"]').innerText(),
+    );
+    check(
+      'and offers no kind change and no indent: check items, one level — R-1',
+      (await page.locator('[data-testid="row-menu"] [data-action^="turn-into-"]').count()) === 0 &&
+        (await page
+          .locator('[data-testid="row-menu"] [data-action="indent"]')
+          .isDisabled()),
+      await page.locator('[data-testid="row-menu"]').innerText(),
+    );
+    await page.keyboard.press('Escape');
+    await page.locator('[data-testid="row-menu"]').waitFor({ state: 'detached' });
+
+    await page.locator('[data-testid="all-lists-link"]').click();
+    await page.waitForSelector('[data-testid="timely-page"]', { state: 'detached' });
+    check(
+      'and nothing in All holds a chore — R-1',
+      !(await titlesOf(page)).includes('Water the plants'),
+      (await titlesOf(page)).join('|'),
     );
 
     // --- ↑ / ↓ move the caret --------------------------------------------
@@ -1454,6 +1597,38 @@ async function main() {
       (await topLevelTitles(page)).includes('Torch batteries'),
       (await topLevelTitles(page)).join('|'),
     );
+
+    // R-1 and R-8 at this width: Timely is one of the routes X-27 fills the bar
+    // for, and the line it fills it with is the task-only one — the two kind
+    // buttons would offer a folder in a list that holds check items.
+    await page.locator('[data-testid="drawer-button"]').click();
+    await page.waitForTimeout(300);
+    await page.locator('[data-testid="timely-link"]').click();
+    await page.waitForSelector('[data-testid="timely-page"]');
+    // The link closes the drawer on its way out (X-2), and the drawer slides:
+    // without this the picture below catches it half gone.
+    await page.waitForTimeout(300);
+    const phoneTimely = page.locator('[data-testid="topbar"] [data-testid="quick-add"]');
+    check(
+      'the phone’s bar carries Timely’s line, and it offers no other kind — R-1, X-27',
+      (await phoneTimely.count()) === 1 &&
+        (await page.locator('[data-testid="topbar"] [data-testid="add-folder"]').count()) === 0,
+    );
+    await phoneTimely.fill('Rinse the filter');
+    await page.keyboard.press('Enter');
+    check(
+      'and typing in it files a chore that already repeats — R-2',
+      (await (await rowByTitle(page, 'Rinse the filter'))
+        .locator('[data-testid="repeat-chip"]')
+        .innerText()) === '↻ 1d',
+      (await titlesOf(page)).join('|'),
+    );
+    await page.screenshot({ path: join(shots, 'phone-timely.png'), fullPage: true });
+
+    await page.locator('[data-testid="drawer-button"]').click();
+    await page.waitForTimeout(300);
+    await page.locator('[data-testid="all-lists-link"]').click();
+    await page.waitForSelector('[data-testid="timely-page"]', { state: 'detached' });
 
     await page.locator('[data-testid="drawer-button"]').click();
     await page.waitForTimeout(300);

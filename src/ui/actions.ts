@@ -9,7 +9,8 @@
 import * as edit from '../core/edit';
 import { dayKey, nextDayKey } from '../core/agenda';
 import { childrenOf, parentOf, rootOf } from '../core/tree';
-import { AGENDA, KINDS, type Kind, type NodeId } from '../core/types';
+import { periodOf, periodLabel } from '../core/timely';
+import { AGENDA, KINDS, TIMELY, type Kind, type NodeId } from '../core/types';
 import type { Session } from '../app/Session.svelte';
 import type { ViewState } from '../app/view-state.svelte';
 import type { RowFocus } from './focus.svelte';
@@ -22,12 +23,26 @@ export interface RowActionContext {
   rows: readonly VisibleRow[];
   id: NodeId;
   /**
+   * G-6 and R-4. The day this list is being read on, handed in rather than read
+   * here: which day move an agenda item offers depends on it, and so does what
+   * a timely row's tick means. `core/` may not read a clock and this layer may,
+   * but a page that turns over at midnight has to turn its rows over with it.
+   */
+  now: number;
+  /**
    * A-1. Opens the row's own tag editor, which only the row can do — it is a
    * field on screen rather than an edit. A caller with no editor (the tests,
    * and any future list of rows that is not the tree) leaves it out, and the
    * menu shows the entry disabled rather than lying about where tags live.
    */
   editTags?: () => void;
+  /**
+   * R-7. Opens the row's own repeat editor, and absent for the same reason
+   * `editTags` can be: it is a field on screen rather than an edit, so a caller
+   * with no editor shows the entry disabled rather than lying about where the
+   * period lives.
+   */
+  editRepeat?: () => void;
 }
 
 export interface RowAction {
@@ -48,7 +63,7 @@ const KIND_LABELS: Record<Kind, string> = {
 };
 
 export function rowActions(ctx: RowActionContext): RowAction[] {
-  const { session, view, focus, rows, id } = ctx;
+  const { session, view, focus, rows, id, now } = ctx;
   const tree = session.tree;
   const node = tree.nodes[id];
   if (!node) return [];
@@ -65,8 +80,10 @@ export function rowActions(ctx: RowActionContext): RowAction[] {
    * moved to. The clock is read here rather than in `core/`, where nothing may
    * read one.
    */
-  const inAgenda = rootOf(tree, id) === AGENDA;
-  const today = dayKey(Date.now());
+  const root = rootOf(tree, id);
+  const inAgenda = root === AGENDA;
+  const inTimely = root === TIMELY;
+  const today = dayKey(now);
   const filedForToday = node.day === null || node.day <= today;
   const dayMove: RowAction[] = !inAgenda
     ? []
@@ -77,10 +94,28 @@ export function rowActions(ctx: RowActionContext): RowAction[] {
           keys: null,
           enabled: true,
           run: () => {
-            const now = Date.now();
-            const day = filedForToday ? nextDayKey(now) : dayKey(now);
+            const at = Date.now();
+            const day = filedForToday ? nextDayKey(at) : dayKey(at);
             session.run((t, c) => edit.setDay(t, c, id, day));
           },
+        },
+      ];
+
+  /**
+   * R-7. A timely row's one extra control, and the row menu's copy of the chip:
+   * a phone reaches the menu, and §3.1 asks that everything a row can do be in
+   * it. The label says the period, so the menu also says what the row repeats
+   * at without opening anything.
+   */
+  const repeat: RowAction[] = !inTimely
+    ? []
+    : [
+        {
+          name: 'repeat',
+          label: `Repeats ${periodLabel(periodOf(node))}`,
+          keys: null,
+          enabled: ctx.editRepeat !== undefined,
+          run: () => ctx.editRepeat?.(),
         },
       ];
 
@@ -144,6 +179,7 @@ export function rowActions(ctx: RowActionContext): RowAction[] {
       },
     },
     ...dayMove,
+    ...repeat,
     {
       name: 'tags',
       label: node.tags.length === 0 ? 'Add tags' : `Tags (${node.tags.length})`,
@@ -151,7 +187,10 @@ export function rowActions(ctx: RowActionContext): RowAction[] {
       enabled: ctx.editTags !== undefined,
       run: () => ctx.editTags?.(),
     },
-    ...KINDS.filter((kind) => kind !== node.kind).map((kind) => ({
+    // R-1. Timely holds check items and nothing else, so there is nothing to
+    // turn a row in it into: a folder among the chores is a list that never
+    // comes back, and a note there has no tick to give.
+    ...(inTimely ? [] : KINDS.filter((kind) => kind !== node.kind)).map((kind) => ({
       name: `turn-into-${kind}`,
       label: `Turn into ${KIND_LABELS[kind].toLowerCase()}`,
       keys: null,

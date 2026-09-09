@@ -8,7 +8,8 @@
   // rather than by a timer (S-19).
   import { isVisible } from '../core/tree';
   import { dayOfList } from '../core/agenda';
-  import { AGENDA, ROOT } from '../core/types';
+  import { AGENDA, ROOT, TIMELY } from '../core/types';
+  import { DEFAULT_PERIOD, formatPeriod } from '../core/timely';
   import { deviceId, suggestedDeviceName } from '../app/device';
   import { chooseFolder, type FolderChoice } from '../app/folder-choice';
   import { Dismissals } from '../app/dismissals.svelte';
@@ -34,6 +35,7 @@
   import SearchPage from './SearchPage.svelte';
   import SettingsPage from './SettingsPage.svelte';
   import Shell from './Shell.svelte';
+  import TimelyPage from './TimelyPage.svelte';
 
   const router = new Router();
   const view = new ViewState();
@@ -81,6 +83,9 @@
   const tomorrowOpen = $derived(router.route.name === 'tomorrow');
   const agendaList = $derived(todayOpen ? 'today' : 'tomorrow');
   const agendaOpen = $derived(todayOpen || tomorrowOpen);
+  // R-8. A third list that is not the tree, so it is excluded from `listOpen`
+  // exactly as the two days are: the phone's bar gets its own line instead.
+  const timelyOpen = $derived(router.route.name === 'timely');
   const doneOpen = $derived(router.route.name === 'done');
   const conflictsOpen = $derived(router.route.name === 'conflicts');
   const searchOpen = $derived(router.route.name === 'search');
@@ -128,6 +133,7 @@
       router.route.name !== 'unknown' &&
       !doneOpen &&
       !agendaOpen &&
+      !timelyOpen &&
       !conflictsOpen &&
       !searchOpen &&
       !settingsOpen &&
@@ -203,6 +209,17 @@
     {:else if agendaOpen && session}
       <!-- G-5. The same line on a phone, filing under the page's own day. -->
       <QuickAdd {session} {view} {focus} parent={AGENDA} day={dayOfList(agendaList, now)} />
+    {:else if timelyOpen && session}
+      <!-- R-2. And on Timely, filing a row that repeats from the moment it
+           exists. Tasks only, so the two kind buttons are not drawn — R-1. -->
+      <QuickAdd
+        {session}
+        {view}
+        {focus}
+        parent={TIMELY}
+        every={formatPeriod(DEFAULT_PERIOD)}
+        taskOnly
+      />
     {/if}
   {/snippet}
 
@@ -214,6 +231,7 @@
     {currentId}
     {todayOpen}
     {tomorrowOpen}
+    {timelyOpen}
     {doneOpen}
     {conflictsOpen}
     {searchOpen}
@@ -226,6 +244,8 @@
       <ConflictsPage {session} {dismissals} />
     {:else if agendaOpen}
       <AgendaPage {session} {view} {focus} list={agendaList} {now} />
+    {:else if timelyOpen}
+      <TimelyPage {session} {view} {focus} {now} />
     {:else if router.route.name === 'unknown'}
       <RecoveryPage {session} id={null} />
     {:else if searchOpen}
@@ -247,7 +267,7 @@
            the last rows out from under the peeked sheet — §10.3. -->
       <div class="flex flex-col lg:flex-row lg:items-start">
         <div class="min-w-0 flex-1 {noteId !== null && !panes.fromCaret ? 'pb-[60dvh] lg:pb-0' : ''}">
-          <NodePage {session} {view} {focus} id={listId} />
+          <NodePage {session} {view} {focus} id={listId} {now} />
         </div>
         {#if noteId !== null}
           <!-- X-30. The ✕ is the only thing that differs by how the pane was

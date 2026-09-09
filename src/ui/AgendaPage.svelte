@@ -54,7 +54,7 @@
 
   <TagFilter {session} {view} />
 
-  <TreeView {session} {view} {focus} parent={AGENDA} {only} />
+  <TreeView {session} {view} {focus} parent={AGENDA} {now} {only} />
 
   <!-- G-4. An empty day is a state worth saying out loud: the list is empty
        because nothing is filed for it, not because a filter is on. -->

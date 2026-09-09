@@ -10,11 +10,21 @@
 import type { ConflictField, FieldValue } from './conflicts';
 import { keyBetween } from './order';
 import { cleanTags, sameTags } from './tags';
-import { childrenOf, isAncestorOrSelf, parentOf, siblingsOf, type ResolvedTree } from './tree';
+import { dayKey } from './agenda';
+import { isDue, nextDue, parsePeriod, periodOf } from './timely';
+import {
+  childrenOf,
+  isAncestorOrSelf,
+  parentOf,
+  rootOf,
+  siblingsOf,
+  type ResolvedTree,
+} from './tree';
 import {
   isRoot,
   KINDS,
   PRIORITIES,
+  TIMELY,
   type EditContext,
   type Kind,
   type Node,
@@ -75,6 +85,12 @@ export interface CreateOptions {
    * typed on Tomorrow is in Tomorrow rather than in Today for a moment.
    */
   day?: string | null;
+  /**
+   * R-2. The period a timely item repeats at, carried by the same companion
+   * `set` the day is: a row created in Timely repeats from the moment it exists,
+   * or its first tick would have nothing to add.
+   */
+  every?: string | null;
 }
 
 /** A new row directly below `id`, among its siblings — `Enter` on a leaf row. */
@@ -144,11 +160,13 @@ function createAt(ctx: EditContext, parent: ParentId, order: string, options: Cr
   const ops: Op[] = [{ op: 'create', id, parent, kind, order, ...stamp(ctx) }];
   const tags = cleanTags(options.tags ?? []);
   const day = options.day ?? null;
-  if (options.title || tags.length > 0 || day !== null) {
+  const every = options.every ?? null;
+  if (options.title || tags.length > 0 || day !== null || every !== null) {
     const set: Op = { op: 'set', id, ...stamp(ctx) };
     if (options.title) set.title = options.title;
     if (tags.length > 0) set.tags = tags;
     if (day !== null) set.day = day;
+    if (every !== null) set.every = every;
     ops.push(set);
   }
   return ops;
@@ -244,6 +262,44 @@ export function setDay(tree: ResolvedTree, ctx: EditContext, id: NodeId, day: st
 }
 
 /**
+ * R-2. How often a timely item repeats, as one last-writer-wins field.
+ *
+ * A period this build cannot read is refused rather than written as null: the
+ * caller is `RepeatEditor`, which builds the string from a count and a unit, and
+ * a value that got past it is a bug rather than a clearing.
+ */
+export function setEvery(
+  tree: ResolvedTree,
+  ctx: EditContext,
+  id: NodeId,
+  every: string | null,
+): Op[] {
+  const node = tree.nodes[id];
+  if (!isWritable(node) || node.every === every) return [];
+  if (every !== null && parsePeriod(every) === null) return [];
+  return [{ op: 'set', id, every, ...stamp(ctx) }];
+}
+
+/**
+ * R-3, R-5 and R-6: the box on a timely row, which writes a day rather than a
+ * tick.
+ *
+ * A due item is filed for `now + every`, so it leaves the way it came back and
+ * the countdown starts at the tick — the day the item was carrying is not an
+ * input to that sum. A waiting item is filed for today, which is the same
+ * control meaning "no, it is due": there is no third state to reach.
+ *
+ * `done` is never written here, and that is what keeps a chore out of T-11's
+ * filter and out of T-12's archive without either of them learning about it.
+ */
+export function tickTimely(tree: ResolvedTree, ctx: EditContext, id: NodeId): Op[] {
+  const node = tree.nodes[id];
+  if (!isWritable(node) || node.kind !== 'task') return [];
+  const now = ctx.now();
+  return setDay(tree, ctx, id, isDue(node, now) ? nextDue(now, periodOf(node)) : dayKey(now));
+}
+
+/**
  * What the flag on the row does: one control, four states, highest first —
  * requirements.md §4.1. A menu of four entries would teach nothing this does not.
  */
@@ -308,6 +364,10 @@ export function restoreValue(
     // the other device filed it for.
     case 'day':
       return typeof value === 'string' || value === null ? setDay(tree, ctx, id, value) : [];
+    // R-2. Taking the dropped period back is what makes the item repeat at the
+    // rate the other device asked for, and it is the same `set` as setting one.
+    case 'every':
+      return typeof value === 'string' || value === null ? setEvery(tree, ctx, id, value) : [];
     case 'parent':
       return [];
   }
@@ -323,7 +383,10 @@ function isKind(value: FieldValue): value is Kind {
 
 export function canIndent(tree: ResolvedTree, id: NodeId): boolean {
   const siblings = siblingsOf(tree, id);
-  return siblings.indexOf(id) > 0;
+  const index = siblings.indexOf(id);
+  // R-1. The sibling above may refuse to hold it: Timely is one level deep, and
+  // the refusal belongs to the model rather than to the key that provokes it.
+  return index > 0 && canMoveTo(tree, id, siblings[index - 1]!);
 }
 
 /** T-3: become a child of the sibling above, at the end of its children. */
@@ -332,6 +395,7 @@ export function indent(tree: ResolvedTree, ctx: EditContext, id: NodeId): Op[] {
   const index = siblings.indexOf(id);
   if (index <= 0) return [];
   const newParent = siblings[index - 1]!;
+  if (!canMoveTo(tree, id, newParent)) return [];
   return [
     { op: 'move', id, parent: newParent, order: keyAtEnd(siblingNodes(tree, newParent)), ...stamp(ctx) },
   ];
@@ -390,6 +454,13 @@ export function moveDown(tree: ResolvedTree, ctx: EditContext, id: NodeId): Op[]
 export function canMoveTo(tree: ResolvedTree, id: NodeId, newParent: ParentId): boolean {
   if (!tree.nodes[id]) return false;
   if (!isRoot(newParent) && !tree.nodes[newParent]) return false;
+  // G-1 and R-1. The three roots are three lists and nothing crosses between
+  // them: what is in Today was put there by hand and is not a row of any folder,
+  // and a chore that repeats is not a row of one either.
+  if (rootOf(tree, id) !== rootOf(tree, newParent)) return false;
+  // R-1. Timely is one level deep, so no timely row holds anything — a chore
+  // nested under a chore is a question about which of the two a tick belongs to.
+  if (!isRoot(newParent) && rootOf(tree, newParent) === TIMELY) return false;
   return !isAncestorOrSelf(tree, id, newParent);
 }
 

@@ -28,6 +28,8 @@
     focus,
     parent,
     day = null,
+    every = null,
+    taskOnly = false,
   }: {
     session: Session;
     view: ViewState;
@@ -35,6 +37,18 @@
     parent: ParentId;
     /** G-5. The day this page files under, and null on every list in the tree. */
     day?: string | null;
+    /**
+     * R-2. The period this page files under, and null everywhere but Timely: a
+     * chore repeats from the moment it exists, or its first tick would have
+     * nothing to add to.
+     */
+    every?: string | null;
+    /**
+     * R-1. Timely holds check items and nothing else, so the two kind buttons
+     * are not drawn there. It is the page saying what its list is rather than a
+     * setting — the model refuses the move that would carry another kind in.
+     */
+    taskOnly?: boolean;
   } = $props();
 
   let draft = $state('');
@@ -46,7 +60,7 @@
     if (title === '') return;
     draft = '';
     const tags = [...view.tagFilter];
-    session.run((tree, ctx) => createLastChild(tree, ctx, parent, { title, tags, day }));
+    session.run((tree, ctx) => createLastChild(tree, ctx, parent, { title, tags, day, every }));
   }
 
   /**
@@ -68,7 +82,7 @@
     draft = '';
     if (titles.length === 0) return;
     const tags = [...view.tagFilter];
-    session.run((tree, ctx) => createLastChildren(tree, ctx, parent, titles, { tags, day }));
+    session.run((tree, ctx) => createLastChildren(tree, ctx, parent, titles, { tags, day, every }));
   }
 
   /**
@@ -85,7 +99,12 @@
     const tags = [...view.tagFilter];
     draft = '';
     const ops = session.run((tree, ctx) =>
-      createLastChild(tree, ctx, parent, title === '' ? { kind, tags, day } : { kind, title, tags, day }),
+      createLastChild(
+        tree,
+        ctx,
+        parent,
+        title === '' ? { kind, tags, day, every } : { kind, title, tags, day, every },
+      ),
     );
     if (title === '' && ops[0]) focus.request(ops[0].id);
   }
@@ -134,22 +153,24 @@
     onpaste={onPaste}
     onblur={onBlur}
   />
-  <button
-    type="button"
-    class="shrink-0 rounded-md border border-line px-2.5 py-1.5 text-sm text-ink-muted hover:border-accent hover:text-accent"
-    data-testid="add-note"
-    onpointerdown={keepCaret}
-    onclick={() => addKind('note')}
-  >
-    + Note
-  </button>
-  <button
-    type="button"
-    class="shrink-0 rounded-md border border-line px-2.5 py-1.5 text-sm text-ink-muted hover:border-accent hover:text-accent"
-    data-testid="add-folder"
-    onpointerdown={keepCaret}
-    onclick={() => addKind('folder')}
-  >
-    + Folder
-  </button>
+  {#if !taskOnly}
+    <button
+      type="button"
+      class="shrink-0 rounded-md border border-line px-2.5 py-1.5 text-sm text-ink-muted hover:border-accent hover:text-accent"
+      data-testid="add-note"
+      onpointerdown={keepCaret}
+      onclick={() => addKind('note')}
+    >
+      + Note
+    </button>
+    <button
+      type="button"
+      class="shrink-0 rounded-md border border-line px-2.5 py-1.5 text-sm text-ink-muted hover:border-accent hover:text-accent"
+      data-testid="add-folder"
+      onpointerdown={keepCaret}
+      onclick={() => addKind('folder')}
+    >
+      + Folder
+    </button>
+  {/if}
 </div>

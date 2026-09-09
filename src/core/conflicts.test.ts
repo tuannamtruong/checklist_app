@@ -14,6 +14,7 @@ import {
   remove,
   restoreValue,
   setBody,
+  setEvery,
   setPriority,
   setTags,
   setTitle,
@@ -22,7 +23,7 @@ import {
 } from './edit';
 import { setDay } from './edit';
 import { Replica, settle } from './test-support';
-import { AGENDA, ROOT, type Kind, type NodeId } from './types';
+import { AGENDA, ROOT, TIMELY, type Kind, type NodeId } from './types';
 
 function pair(): { a: Replica; b: Replica } {
   return { a: new Replica('aaaa0001', 1_000), b: new Replica('bbbb0002', 1_000) };
@@ -230,6 +231,30 @@ describe('the day two devices filed one item for — G-2', () => {
     a.at(3_000).run((tree, ctx) => restoreValue(tree, ctx, parcel, 'day', rows[0]!.dropped));
     settle([a, b]);
     expect(b.tree.nodes[parcel]!.day).toBe('2026-09-09');
+    expect(rowsOf(b)).toEqual([]);
+  });
+});
+
+describe('the period two devices set for one chore — R-2', () => {
+  it('is an ordinary raced field: newest wins and the row offers the other one', () => {
+    const { a, b } = pair();
+    const plants = a.run((tree, ctx) =>
+      createLastChild(tree, ctx, TIMELY, { title: 'Plants', every: '1d' }),
+    )[0]!.id;
+    b.pull(a);
+    a.at(2_000).run((tree, ctx) => setEvery(tree, ctx, plants, '3d'));
+    b.at(2_001).run((tree, ctx) => setEvery(tree, ctx, plants, '7d'));
+    settle([a, b]);
+
+    expect(a.tree.nodes[plants]!.every).toBe('7d');
+    const rows = rowsOf(a).filter((row): row is FieldConflict => row.kind === 'field');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.field).toBe('every');
+    expect(rows[0]!.dropped).toBe('3d');
+
+    a.at(3_000).run((tree, ctx) => restoreValue(tree, ctx, plants, 'every', rows[0]!.dropped));
+    settle([a, b]);
+    expect(b.tree.nodes[plants]!.every).toBe('3d');
     expect(rowsOf(b)).toEqual([]);
   });
 });

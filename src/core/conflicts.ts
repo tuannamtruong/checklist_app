@@ -17,8 +17,9 @@
 import { compareOps } from './materialise';
 import { opVectors, type DeviceOps } from './merge';
 import { concurrent } from './sclock';
+import { parsePeriod, periodLabel } from './timely';
 import type { ResolvedTree } from './tree';
-import { AGENDA, ROOT, type DeviceId, type NodeId, type Op, type ParentId } from './types';
+import { AGENDA, ROOT, TIMELY, type DeviceId, type NodeId, type Op, type ParentId } from './types';
 
 /** The fields two devices can write independently. */
 export type ConflictField =
@@ -30,7 +31,8 @@ export type ConflictField =
   | 'deleted'
   | 'tags'
   | 'priority'
-  | 'day';
+  | 'day'
+  | 'every';
 
 /**
  * A-3 widened this: a tag set is one value, so the value a race dropped can be
@@ -94,6 +96,7 @@ function writesOf(op: Op): readonly (readonly [ConflictField, FieldValue])[] {
   if (op.tags !== undefined) writes.push(['tags', op.tags]);
   if (op.priority !== undefined) writes.push(['priority', op.priority]);
   if (op.day !== undefined) writes.push(['day', op.day]);
+  if (op.every !== undefined) writes.push(['every', op.every]);
   return writes;
 }
 
@@ -250,6 +253,8 @@ export function describeField(field: ConflictField): string {
       return 'priority';
     case 'day':
       return 'day';
+    case 'every':
+      return 'repeat';
   }
 }
 
@@ -264,8 +269,14 @@ export function describeValue(field: ConflictField, value: FieldValue, tree: Res
   }
   if (field === 'parent') {
     if (value === AGENDA) return 'Today or Tomorrow';
+    if (value === TIMELY) return 'Timely';
     if (value === ROOT || typeof value !== 'string') return 'the top level';
     return tree.nodes[value]?.title || 'an untitled row';
+  }
+  // R-2. A period reads as the words the row and the menu already use for it.
+  if (field === 'every') {
+    const period = parsePeriod(typeof value === 'string' ? value : null);
+    return period === null ? 'no repeat' : periodLabel(period);
   }
   if (value === null || value === '') return 'empty';
   return String(value);

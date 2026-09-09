@@ -46,7 +46,7 @@ and never replays per read — [sync-flow.md §4.6 The decision](sync-flow.md#46
 | Field | Type | Settles |
 | --- | --- | --- |
 | `id` | string | Minted by the creating device, never reused |
-| `parent` | node id, `root` or `agenda` | Always read through the cycle-repair resolver, never directly — T-6. `agenda` is the second root, and the only thing that separates G-1's two lists from the tree |
+| `parent` | node id, `root`, `agenda` or `timely` | Always read through the cycle-repair resolver, never directly — T-6. `agenda` and `timely` are the second and third roots, and the only thing that separates G-1's two lists and R-1's third from the tree |
 | `parentSetAt` | timestamp | When the move was written. The repair reads it; nothing reads the local clock |
 | `parentSetBy` | device id | The device that wrote the move, and the repair's tiebreak when two `parentSetAt` collide — [sync-flow.md §6.2 The repair](sync-flow.md#62-the-repair) |
 | `kind` | one of `folder`, `note`, `task` | K-1. Mutable after the fact — K-5. A `list` in an older file decodes as `folder` |
@@ -59,7 +59,8 @@ and never replays per read — [sync-flow.md §4.6 The decision](sync-flow.md#46
 | `order` | base-62 string | Fractional index among siblings — T-2 |
 | `orderBy` | device id | The device that minted `order`, and the sort tiebreak |
 | `deleted` | boolean | T-7. Absence and deletion must stay distinguishable |
-| `day` | `YYYY-MM-DD` or null | G-2. The day an agenda item is filed for, and null on every row in the tree. It is what makes G-3's rollover a read rather than a write |
+| `day` | `YYYY-MM-DD` or null | G-2. The day an agenda item is filed for and the day a timely item is next due, and null on every row in the tree. It is what makes G-3's rollover and R-4's countdown reads rather than writes |
+| `every` | `<n>d`, `<n>m` or null | R-2. How often a timely item repeats, and null everywhere else. `src/core/timely.ts` is the only module that spells the shape |
 | `deletedAt` | timestamp or null | |
 
 Children sort on `(order, orderBy, id)`. Kind constrains rendering, not structure: any kind may own children, which is
@@ -75,7 +76,7 @@ receipt changes. The encoding and an example are in
 | Op | Carries |
 | --- | --- |
 | `create` | `id`, `parent`, `kind`, `order` |
-| `set` | `id` plus the fields that changed — `title`, `done`, `body`, `kind`, `tags`, `priority`, `day` |
+| `set` | `id` plus the fields that changed — `title`, `done`, `body`, `kind`, `tags`, `priority`, `day`, `every` |
 | `move` | `id`, `parent`, `order`; `at` becomes the node's `parentSetAt` |
 | `delete` | `id`; tombstones the subtree at read time, per T-7 |
 | `restore` | `id`; clears that node's own tombstone — T-13 |
@@ -446,7 +447,7 @@ second root beside `root`, holding rows of the ordinary kind — `src/core/agend
 | --- | --- | --- | --- |
 | G-1 | `Today` and `Tomorrow` hold items of their own, outside the tree: nothing in them is a child of any row in `All`, and no row can be moved from one side to the other | ✅ | `AGENDA` in `src/core/types.ts` is a second parent that is not a node, exactly as `root` is; `resolveTree` in `src/core/tree.ts` treats both as roots, and `canMoveTo` refuses a move whose root would change. `tree.test.ts`, `edit.test.ts` |
 | G-2 | An agenda item carries the day it is filed for. Nothing in the tree carries one | ✅ | `day` on the node, written by one `set` op and merged last-writer-wins like a tag or a flag — [§2.1 The node](#21-the-node). `src/core/op-log.ts` reads and writes it, `src/core/compact.ts` drops a superseded one, `src/core/conflicts.ts` offers the value that lost. `op-log.test.ts`, `compact.test.ts`, `conflicts.test.ts` |
-| G-3 | An item in Tomorrow is in Today the next day, and it costs no write | ✅ | Today is every agenda item whose day has come and Tomorrow every one whose day has not — `todayRows` and `tomorrowRows` in `src/core/agenda.ts`, over a `now` the caller passes in. The day turns on every device at once because nothing has to happen for it to turn. `agenda.test.ts` |
+| G-3 | An item in Tomorrow is in Today the next day, and it costs no write | ✅ | Today is every agenda item whose day has come and Tomorrow every one whose day has not — `agendaRows` in `src/core/agenda.ts`, over a `now` the caller passes in. The day turns on every device at once because nothing has to happen for it to turn. `agenda.test.ts` |
 | G-4 | An item whose day has passed and which is not ticked stays in Today | ✅ | The cut is `day <= today` rather than `day === today`, so a day nobody got to does not empty itself — `src/core/agenda.ts`. A ticked item leaves by T-11 and lands in the Done view like any other row. `agenda.test.ts` |
 | G-5 | Items are added by the same line every list has, and land on the day of the page they were typed on | ✅ | `src/ui/AgendaPage.svelte` hands K-8's `src/ui/QuickAdd.svelte` the page's day, and `createLastChild` carries it into the `create`'s companion `set`. `edit.test.ts`, `scripts/ui-smoke.mjs` |
 | G-6 | An item is moved between the two lists from the row menu | ✅ | `setDay` in `src/core/edit.ts`, offered by `src/ui/actions.ts` as `move-to-tomorrow` and `move-to-today` — one `set day`, and the item is in the other list because that is what the other list means. `actions.test.ts`, `scripts/ui-smoke.mjs` |
@@ -481,6 +482,56 @@ than trusting that no view puts the two on screen together. Scheduling a row tha
 different feature, and [past_decision.md §18 Today and Tomorrow](past_decision.md#18-today-and-tomorrow) says what it
 would cost.
 
+### 4.5 Timely
+
+A third list outside the tree, for the things that come back rather than get finished: water the plants, change the
+filter, pay the rent. The rows are the rows every other list holds — a third parent that is not a node, holding tasks —
+and what separates them is what a tick means. Ticking a task in `All` finishes it, and T-11 takes it out of the list.
+Ticking a timely item finishes it *for now*: the item stays exactly where it is, greyed out, and comes back on its own.
+
+| ID | Requirement | State | Where / test |
+| --- | --- | --- | --- |
+| R-1 | `Timely` holds check items and nothing else: every row in it is a task, it is one level deep, and no row can be moved into it from `All`, Today or Tomorrow | ✅ | `TIMELY` in `src/core/types.ts` is a third parent that is not a node, beside `root` and `agenda`; `canMoveTo` in `src/core/edit.ts` refuses a move whose root would change and a move *into* a timely row, which is what makes indent and a drop-inside refusals rather than conventions. `src/ui/TimelyPage.svelte` adds tasks and offers no kind change. `tree.test.ts`, `edit.test.ts` |
+| R-2 | A timely item carries how often it repeats — every N days or every N months | ✅ | `every` on the node, as `<n>d` or `<n>m`, written by one `set` op and merged last-writer-wins like a tag or a flag — [§2.1 The node](#21-the-node). `src/core/timely.ts` is the only module that spells the shape, and it normalises at the decoder as well as at the input. `timely.test.ts`, `op-log.test.ts` |
+| R-3 | Ticking a timely item does not finish it: it files the item for its next due day and leaves it in the list, greyed out until that day comes. It is never in the Done view | ✅ | `tickTimely` in `src/core/edit.ts` writes one `set day` and never `done`, so T-11 never takes the row out of the list and T-12's archive never collects it. `src/ui/Row.svelte` draws the box ticked and the row muted while the item is waiting. `edit.test.ts`, `done.test.ts`, `scripts/ui-smoke.mjs` |
+| R-4 | An item repeating daily is due again the next day, and it costs no write at midnight | ✅ | Due is `day <= today` and waiting is `day > today` — `isDue` in `src/core/timely.ts`, over a `now` the caller passes in. It is G-3's read with a third question asked of it, so the day turns on every device at its own midnight with nothing written. `timely.test.ts`, `scripts/ui-smoke.mjs` |
+| R-5 | An item repeating every N days counts them from the **tick**, not from the day it was due: one ticked three days late is next due N days after that tick | ✅ | `nextDue` in `src/core/timely.ts` is a function of `now` and the period alone — the day the item was carrying is not an input. Months are added by calendar and the day of the month is clamped, so the 31st of a month repeats on the 30th of a month that has no 31st. `timely.test.ts` |
+| R-6 | A waiting item is brought back by un-ticking it | ✅ | The same control and the same op: `tickTimely` on a waiting item writes today's day, which is due by R-4's comparison. `edit.test.ts`, `scripts/ui-smoke.mjs` |
+| R-7 | The period is set on the row itself, and the row says when the item is next due | ✅ | `src/ui/RepeatChip.svelte` shows the period and opens `src/ui/RepeatEditor.svelte` under the row — a count and a unit, the shape `src/ui/TagEditor.svelte` already has. The row menu opens the same editor, because a phone reaches the menu and a chip alike — [§3.1 Keyboard (desktop)](#31-keyboard-desktop). `actions.test.ts`, `scripts/ui-smoke.mjs` |
+| R-8 | Timely sits with `All`, Today and Tomorrow above the rule, and has a route of its own | ✅ | `#/timely` — [§5 Navigation and routing](#5-navigation-and-routing) — rendered by `src/ui/TimelyPage.svelte` and linked from `src/ui/Shell.svelte`, in the corner's block for G-7's reason: it is not in the tree either. `router.svelte.test.ts`, `scripts/ui-smoke.mjs` |
+
+**The countdown is a read, and it is G-3's read.** "Every five days" could have been a timer, a due-date job, or a
+`lastTicked` field with arithmetic over it at render time. It is none of those: the item records the day it is **next
+due**, which is the `day` field G-2 already added, and the two states are one comparison — due is `day <= today`,
+waiting is `day > today`. Nothing happens at midnight, nothing can race, and a device that was shut for a week finds the
+item due when it opens rather than five ticks behind. past_decision.md §19 says what the alternatives cost.
+
+**The tick is the only write, and it writes a day rather than a tick.** `tickTimely` reads the clock once, adds the
+period to it, and writes one `set day`. That is why R-5 is true by construction: the day the item *was* carrying is not
+an input to the sum, so an item ticked three days late is next due N days after the tick and not N days after the day it
+was ignored. It is also why R-3 is true — `done` is never written, so T-11 never takes the row out of the list and
+T-12's archive never collects a chore that has no end.
+
+**Un-ticking is the same op the other way.** A waiting item's box is ticked because the item is waiting, so clicking it
+must mean "no, it is due" — one `set day` carrying today. There is no third state and no second control: the box says
+whether the item is waiting, and pressing it changes that.
+
+**Only check items, one level deep — R-1.** A folder in a list of chores is a list of chores that never comes back, and
+a chore nested under a chore is a question about which of the two the tick belongs to. `canMoveTo` refuses both — a move
+whose root would change, and a move that would put a row *inside* a timely one — so `Tab`, `Alt-↓` and a drop are all
+refused by the model rather than by each view remembering to. The quick-add line on the page makes tasks and shows no
+kind buttons, and the row menu offers no "Turn into".
+
+**Two units, not five.** Days and months, because those are the two a repeating chore is actually described in — "every
+three days", "every month" — and a week is `7d` typed once. A unit per row of a table of seven would be a vocabulary to
+learn where two is a number and a toggle. Months are added by the calendar rather than by 30 days, so "every month" on
+the 15th stays the 15th, and a day of the month the target month does not have is clamped to its last.
+
+**A timely item is otherwise an ordinary row.** Same ops, same merge, same conflict rows, same compaction, same search
+results, same tags and the same priority flag. `every` is an ordinary last-writer-wins field: `op-log.ts` reads and
+writes it, `compact.ts` drops a superseded one, `conflicts.ts` offers the one that lost, and `edit.ts`'s `setEvery` is
+the one writer.
+
 ## 5. Navigation and routing
 
 Hash routing, per X-7, so the fragment never reaches a server and the app deploys to a static host, to the loopback
@@ -492,6 +543,7 @@ helper and to the Android WebView unchanged. `src/app/router.svelte.ts` holds th
 | `#/n/<node-id>` | One node's page — its path, its title, its body if it is a note, and its children. A **note** is drawn beside the nearest list above it rather than instead of it — X-21, X-22 | `src/ui/NodePage.svelte`, and `src/ui/NotePane.svelte` for a note |
 | `#/today` | Today: every agenda item whose day has come, including the ones it did not come *on* — G-3, G-4 | `src/ui/AgendaPage.svelte` |
 | `#/tomorrow` | Tomorrow: every agenda item whose day has not come yet — G-3 | `src/ui/AgendaPage.svelte`, the same page on the other day |
+| `#/timely` | Timely: every repeating check item, the due ones live and the waiting ones greyed — R-3, R-4 | `src/ui/TimelyPage.svelte` |
 | `#/done` | The Done view of T-12: every ticked and deleted row in one list, newest first | `src/ui/DonePage.svelte` |
 | `#/conflicts` | What the merge decided without asking — [§9 Conflict presentation](#9-conflict-presentation) | `src/ui/ConflictsPage.svelte` |
 | `#/search` and `#/search/<query>` | The search results of [§6 Search](#6-search) | `src/ui/SearchPage.svelte` |
@@ -745,7 +797,7 @@ to empty, and a dismissal is only for a row the user is content to leave as it l
 | X-29 | The sidebar scrolls in its own column: a page long enough to scroll moves the list and leaves the sidebar whole, and the sidebar scrolls itself when its own entries outgrow the window | ✅ | `src/ui/Shell.svelte` — the shell is one `h-dvh` row holding two scrollers rather than one document that scrolls entire. The nav has been `overflow-y-auto` since X-2 and never got the chance to use it; what it lacked was a column the height of the window rather than of the page — `scripts/ui-smoke.mjs` |
 | X-30 | Putting the caret in a **note** row's title raises that note in the pane, and the list beside it does not move: a caret is not a navigation, so the route, the history and the left column are exactly where the reader left them. A caret in a folder's or a task's title leaves the pane as it is; the ✕ and a navigation are what end it | ✅ | `src/ui/panes.ts` derives both panes from the route and `RowFocus.noteId`, which only a note's title ever writes, and `src/ui/App.svelte` composes them as it already did. Above `lg` only — below it the pane is X-22's sheet, and a sheet raised by typing would cover the row being typed. How the pane was opened changes exactly one thing, the ✕: a link out of the route, or a button that clears the caret's note — [§10.3 A note beside the list](#103-a-note-beside-the-list). `panes.test.ts`, `focus.svelte.test.ts`, `scripts/ui-smoke.mjs` |
 | X-31 | The note pane is an editor and nothing else: the add line and its two kind buttons are its top row, the body takes whatever height is left under the title and scrolls inside itself when the note outgrows it, and neither a path above the note nor the note's own children are drawn in it | ✅ | `src/ui/NotePane.svelte` — `src/ui/QuickAdd.svelte` in the header row `src/ui/Breadcrumbs.svelte` used to hold, and `src/ui/NoteBody.svelte` given `fill`, which is the height the pane has instead of the `min-h` floor a page's body needs. Nothing is lost with the children: the list beside the pane draws the whole subtree, so they are on screen one level in under the note's own row, and a row added here appears there — K-4. `scripts/ui-smoke.mjs` |
-| X-32 | The `All` link in the sidebar's corner is a full-width target, exactly like the entries under it | ✅ | `src/ui/Shell.svelte` — the corner and G-7's two day lists are one column of full-width links with one padding, rather than a corner sized to its four letters with a row of links under it. The `✕` that closes the drawer sits beside it and is drawn below `md` only, which is the one width where the corner is not the whole row |
+| X-32 | The `All` link in the sidebar's corner is a full-width target, exactly like the entries under it | ✅ | `src/ui/Shell.svelte` — the corner and G-7's two day lists and R-8's third are one column of full-width links with one padding, rather than a corner sized to its four letters with a row of links under it. The `✕` that closes the drawer sits beside it and is drawn below `md` only, which is the one width where the corner is not the whole row |
 
 **A phone's top bar holds the add group rather than the application's name — X-27.** The bar existed to carry a `☰` and
 said `Checklist` beside it, which is a thing to read once on an application with one tree in it: every screen it
@@ -1129,6 +1181,7 @@ every possible destination is a second navigation to build and to test, and the 
 | M8 | A note beside the list | **Closed.** X-21 to X-24 — [§10.3 A note beside the list](#103-a-note-beside-the-list) — a note opens beside the nearest list above it at `lg` and as a 60%-tall sheet over it below, a page's column is left-aligned so nothing moves when it does, and the divider between the two columns is dragged. Like M7 it adds a feature and changes nothing about the payload: no route, no op, no field. The one thing it stores is X-24's width, and that is device-local like every other width here. It is one composition change in `src/ui/App.svelte`, one new view, and one grip that the sidebar now shares |
 
 | M9 | Today and Tomorrow | **Closed.** G-1 to G-7 — [§4.4 Today and Tomorrow](#44-today-and-tomorrow) — two lists that are not the tree, and the first milestone since M6 to touch the payload: one parent that is not a node and one field, `day`. What it did *not* add is a write nobody made — the rollover is a date comparison at read time, so nothing happens at midnight on any device. It also carried T-17's second level in the sidebar and X-28's shorter corner, both of which are what made room for two more nav entries |
+| M10 | Timely | **Closed.** R-1 to R-8 — [§4.5 Timely](#45-timely) — a third list outside the tree, for the check items that come back rather than get finished. It is M9's shape a second time and costs almost as little: one more parent that is not a node, one more field (`every`), and a tick that writes the `day` M9 already added instead of writing `done`. Nothing happens at midnight here either — an item is due because a date comparison says so. It also carried X-32, the corner's link taking the width its neighbours already had |
 
 M2 is closed against a folder, not against a provider. The three adapters it added are the three methods every other
 adapter already offers, so what remains untested is the client underneath them, and observing that needs a Windows and

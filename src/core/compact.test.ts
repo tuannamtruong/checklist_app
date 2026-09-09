@@ -15,13 +15,14 @@ import {
   restore,
   setBody,
   setDay,
+  setEvery,
   setTitle,
   toggleDone,
 } from './edit';
 import { foldOps } from './materialise';
 import { allOps, opVectors, type DeviceOps } from './merge';
 import { Replica, random, settle } from './test-support';
-import { AGENDA, ROOT, type Kind, type NodeId, type Op, type ParentId } from './types';
+import { AGENDA, ROOT, TIMELY, type Kind, type NodeId, type Op, type ParentId } from './types';
 
 const SEED = Number(process.env['SEED'] ?? 20_260_819);
 
@@ -252,5 +253,22 @@ describe('a superseded day — G-2', () => {
     expect(after.length).toBeLessThan(before.length);
     expect(foldOps(after)).toEqual(foldOps(before));
     expect(foldOps(after)[parcel]!.day).toBe('2026-09-10');
+  });
+});
+
+describe('a superseded period — R-2', () => {
+  it('is dropped like any other field this device overwrote, and the fold is identical', () => {
+    const replica = new Replica('aaaa0001', 1_000);
+    const plants = replica.run((tree, ctx) =>
+      createLastChild(tree, ctx, TIMELY, { title: 'Plants', every: '1d' }),
+    )[0]!.id;
+    replica.at(2_000).run((tree, ctx) => setEvery(tree, ctx, plants, '3d'));
+    replica.at(3_000).run((tree, ctx) => setEvery(tree, ctx, plants, '5d'));
+
+    const before = replica.own;
+    const after = compactOps(before);
+    expect(after.length).toBeLessThan(before.length);
+    expect(foldOps(after)).toEqual(foldOps(before));
+    expect(foldOps(after)[plants]!.every).toBe('5d');
   });
 });

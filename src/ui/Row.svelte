@@ -5,14 +5,17 @@
   // The title in the input is a draft, not the node's title. An op is emitted
   // when the edit is committed, so a rename costs one write rather than one per
   // keystroke — and Escape can put the row back without ever having written.
-  import { canDrop, dropOnto, setTitle, toggleDone } from '../core/edit';
-  import { childrenOf } from '../core/tree';
-  import type { NodeId } from '../core/types';
+  import { canDrop, dropOnto, setTitle, tickTimely, toggleDone } from '../core/edit';
+  import { childrenOf, rootOf } from '../core/tree';
+  import { isDue } from '../core/timely';
+  import { TIMELY, type NodeId } from '../core/types';
   import type { RowActionContext } from './actions';
   import { handleRowKey } from './keyboard';
   import { rowAbove, rowBelow } from './rows';
   import KindIcon from './KindIcon.svelte';
   import PriorityFlag from './PriorityFlag.svelte';
+  import RepeatChip from './RepeatChip.svelte';
+  import RepeatEditor from './RepeatEditor.svelte';
   import RowMenu from './RowMenu.svelte';
   import TagChips from './TagChips.svelte';
   import TagEditor from './TagEditor.svelte';
@@ -30,11 +33,19 @@
   const children = $derived(childrenOf(session.tree, id));
   const collapsed = $derived(view.isCollapsed(id));
 
+  // R-3. A timely row's box says whether the chore is waiting rather than
+  // whether it is finished — nothing here is ever `done`, which is what keeps it
+  // out of T-11's filter and T-12's archive. `waiting` is the whole difference.
+  const inTimely = $derived(rootOf(session.tree, id) === TIMELY);
+  const waiting = $derived(inTimely && node !== undefined && !isDue(node, ctx.now));
+
   let input = $state<HTMLInputElement | null>(null);
   let editing = $state(false);
   let draft = $state('');
   /** A-1. The row's tag editor, opened from the menu and closed by Escape. */
   let taggingOpen = $state(false);
+  /** R-7. The row's repeat editor, opened from the chip or from the menu. */
+  let repeatOpen = $state(false);
 
   // A rename that arrives from outside — a peer's, in M2 — must show without
   // stealing what this device is halfway through typing. X-10 with a caret.
@@ -60,6 +71,12 @@
   // put somewhere. The row below is the one the user is working towards; the row
   // above is the fallback when this was the last one.
   function tick(): void {
+    // R-3. A timely row does not leave, so the caret has nowhere to be put: the
+    // row under the pointer is still the row under the pointer afterwards.
+    if (inTimely) {
+      session.run((tree, c) => tickTimely(tree, c, id));
+      return;
+    }
     const next = rowBelow(ctx.rows, id) ?? rowAbove(ctx.rows, id);
     session.run((tree, c) => toggleDone(tree, c, id));
     if (next) focus.request(next);
@@ -144,7 +161,7 @@
 {#if node}
   <div
     class="group flex items-center gap-1 rounded-md border-y-2 border-transparent pr-1 hover:bg-surface-sunken"
-    class:opacity-50={drag.id === id}
+    class:opacity-50={drag.id === id || waiting}
     class:border-t-accent={drop?.where === 'before' && !refused}
     class:border-b-accent={drop?.where === 'after' && !refused}
     class:bg-accent-soft={drop?.where === 'inside' && !refused}
@@ -157,6 +174,7 @@
     data-drop={drop?.where ?? ''}
     data-drop-refused={refused}
     data-dragging={drag.id === id}
+    data-waiting={waiting}
     role="group"
     aria-label={node.title || 'Untitled'}
     onpointerdown={onRowPointerDown}
@@ -206,7 +224,7 @@
         <input
           type="checkbox"
           class="size-[0.8rem] accent-accent"
-          checked={node.done}
+          checked={inTimely ? waiting : node.done}
           aria-label="Done"
           data-testid="done"
           onchange={tick}
@@ -244,9 +262,16 @@
 
     <!-- A-1 and A-2, right of the title: what the row is for, after what it is. -->
     <TagChips tags={node.tags} {view} />
+    {#if inTimely}
+      <!-- R-7. Only where there is a period to show: every other list's rows do
+           not repeat, and a chip saying so on all of them would be noise. -->
+      <RepeatChip {node} now={ctx.now} onedit={() => (repeatOpen = true)} />
+    {/if}
     <PriorityFlag {session} {id} priority={node.priority} />
 
-    <RowMenu ctx={{ ...ctx, editTags: () => (taggingOpen = true) }} />
+    <RowMenu
+      ctx={{ ...ctx, editTags: () => (taggingOpen = true), editRepeat: () => (repeatOpen = true) }}
+    />
   </div>
 
   <!-- Under the row rather than inside it: the row is what a drop is measured
@@ -255,6 +280,15 @@
   {#if taggingOpen}
     <div class="pb-1" style="padding-left: {depth * 1.25 + 2.5}rem">
       <TagEditor {session} {id} autofocus onclose={() => (taggingOpen = false)} />
+    </div>
+  {/if}
+
+  <!-- R-7, under the row for the same reason the tag editor is: a row that grew
+       when its period opened would move the drop target out from under T-14's
+       pointer. -->
+  {#if repeatOpen}
+    <div class="pb-1" style="padding-left: {depth * 1.25 + 2.5}rem">
+      <RepeatEditor {session} {id} autofocus onclose={() => (repeatOpen = false)} />
     </div>
   {/if}
 {/if}

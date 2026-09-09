@@ -10,6 +10,7 @@
 // only thing that spells one.
 
 import { cleanTags } from './tags';
+import { isPeriod } from './timely';
 import {
   KINDS,
   PRIORITIES,
@@ -176,6 +177,11 @@ function parseOp(line: string, dev: DeviceId): Op | null {
       // other field's read has, so one malformed value costs one field rather
       // than the row it belongs to.
       if (isDay(value['day']) || value['day'] === null) op.day = value['day'] as string | null;
+      // R-2, and the same read `day` gets: a period this build cannot parse is
+      // a field the line did not write, rather than a line that did not parse.
+      if (isPeriod(value['every']) || value['every'] === null) {
+        op.every = value['every'] as string | null;
+      }
       return op;
     }
     case 'move': {

@@ -47,8 +47,11 @@ function leftAt(node: Node): number | null {
 /** True when some resolved ancestor is already the entry that answers for this row. */
 function coveredByAncestor(tree: ResolvedTree, id: NodeId): boolean {
   let cursor = parentOf(tree, id);
-  // G-1. Either root ends the walk: an agenda item's chain stops at `agenda`,
-  // and reading that as a node would be reading a node that does not exist.
+  // G-1 and R-1. Any of the three roots ends the walk: an agenda item's chain
+  // stops at `agenda` and a chore's at `timely`, and reading either as a node
+  // would be reading a node that does not exist. Nothing under `timely` reaches
+  // here in practice — R-3's tick writes a day rather than `done` — but the walk
+  // is the tree's and knows nothing about that.
   while (!isRoot(cursor)) {
     if (archived(tree.nodes[cursor]!)) return true;
     cursor = parentOf(tree, cursor);

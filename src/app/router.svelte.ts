@@ -10,6 +10,7 @@ export type Route =
   | { name: 'node'; id: NodeId }
   | { name: 'today' }
   | { name: 'tomorrow' }
+  | { name: 'timely' }
   | { name: 'done' }
   | { name: 'conflicts' }
   | { name: 'search'; query: string }
@@ -25,6 +26,8 @@ export function routeOf(hash: string): Route {
   // person links to and returns to, and a day is not a parameter of anything.
   if (path === '/today') return { name: 'today' };
   if (path === '/tomorrow') return { name: 'tomorrow' };
+  // R-8. A third list that is not the tree, and a third route beside the two.
+  if (path === '/timely') return { name: 'timely' };
   if (path === '/done') return { name: 'done' };
   if (path === '/conflicts') return { name: 'conflicts' };
   if (path === '/settings') return { name: 'settings' };
@@ -51,6 +54,8 @@ export function hrefOf(route: Route): string {
       return '#/today';
     case 'tomorrow':
       return '#/tomorrow';
+    case 'timely':
+      return '#/timely';
     case 'done':
       return '#/done';
     case 'conflicts':
@@ -71,6 +76,9 @@ export function hrefOf(route: Route): string {
 /** G-7's two, in the nav under `All` — requirements.md §4.4. */
 export const TODAY_HREF = hrefOf({ name: 'today' });
 export const TOMORROW_HREF = hrefOf({ name: 'tomorrow' });
+
+/** R-8's third, beside them and for the same reason — requirements.md §4.5. */
+export const TIMELY_HREF = hrefOf({ name: 'timely' });
 
 /** T-12's view, always in the nav — see requirements.md §5 Navigation and routing. */
 export const DONE_HREF = hrefOf({ name: 'done' });

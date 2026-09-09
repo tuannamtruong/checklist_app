@@ -10,6 +10,11 @@
 // No clock here either. `now` is a parameter, exactly as it is everywhere else
 // in this layer, which is what lets a test assert the day boundary rather than
 // wait for one.
+//
+// `dayKey` and `nextDayKey` are the app's whole vocabulary for a local day, and
+// `core/timely.ts` is their second reader: R-4 asks the same question of the
+// same field, so it asks it in the same words rather than growing a second
+// notion of what day it is.
 
 import { childrenOf, type ResolvedTree } from './tree';
 import { AGENDA, type NodeId } from './types';
