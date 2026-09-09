@@ -622,9 +622,10 @@ async function main() {
     await page.locator('[data-testid="timely-link"]').click();
     await page.waitForSelector('[data-testid="timely-page"]');
     check(
-      'an empty Timely says nothing repeats yet — R-3',
-      (await page.locator('[data-testid="timely-empty"]').count()) === 1,
-      await page.locator('[data-testid="page-title"]').innerText(),
+      'Timely opens on a list of its own, empty and unannotated',
+      (await page.locator('[data-testid="page-title"]').innerText()) === 'Timely' &&
+        (await titlesOf(page)).length === 0,
+      (await titlesOf(page)).join('|'),
     );
     check(
       'and its add line offers no kind but a check item — R-1',

@@ -8,7 +8,7 @@
   // second level. Both are `canMoveTo`'s rather than this file's, so the tree
   // view under it is the ordinary one — requirements.md §4.5.
   import { TIMELY } from '../core/types';
-  import { DEFAULT_PERIOD, formatPeriod, timelyRows } from '../core/timely';
+  import { DEFAULT_PERIOD, formatPeriod } from '../core/timely';
   import type { Session } from '../app/Session.svelte';
   import type { ViewState } from '../app/view-state.svelte';
   import type { RowFocus } from './focus.svelte';
@@ -29,7 +29,6 @@
     now: number;
   } = $props();
 
-  const rows = $derived(timelyRows(session.tree));
   const every = formatPeriod(DEFAULT_PERIOD);
 </script>
 
@@ -53,12 +52,4 @@
   <TagFilter {session} {view} />
 
   <TreeView {session} {view} {focus} parent={TIMELY} {now} />
-
-  <!-- R-3. An empty list here means nothing repeats yet, which is worth saying:
-       the list is never emptied by ticking, so an empty one was never filled. -->
-  {#if rows.length === 0}
-    <p class="px-2 py-6 text-sm text-ink-muted" data-testid="timely-empty">
-      Nothing repeats yet. Add a check item and it comes back on its own.
-    </p>
-  {/if}
 </div>
