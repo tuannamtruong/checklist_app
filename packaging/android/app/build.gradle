@@ -34,7 +34,12 @@ dependencies {
 def webSrc = rootProject.file("../../dist")
 def webOut = layout.buildDirectory.dir("webassets")
 
-tasks.register("copyWebAssets", Copy) {
+// Sync rather than Copy, because Copy never removes what the source dropped: a
+// vite build names its assets by content hash, so every earlier build's
+// index-<hash>.js stayed in build/webassets and shipped inside the APK — nine of
+// them by the time anyone weighed it. The directory is this task's alone, so
+// mirroring it is safe, and mirroring is what "the phone cannot drift" means.
+tasks.register("copyWebAssets", Sync) {
     from(webSrc)
     into webOut
     doFirst {

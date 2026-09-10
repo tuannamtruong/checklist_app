@@ -344,12 +344,6 @@
   function textOf(spans: readonly Span[]): string {
     return spans.map((span) => span.text).join('');
   }
-
-  /** B-10. A tab is a bigger step than a space, which is what a person typing one means. */
-  function indentOf(indent: string): string {
-    const steps = [...indent].reduce((total, one) => total + (one === '\t' ? 4 : 1), 0);
-    return `${steps * 0.5}rem`;
-  }
 </script>
 
 <!-- The bold, code and plain runs of one line. One snippet rather than the same
@@ -490,22 +484,27 @@
               ></pre>
           </div>
         {:else if block.kind === 'heading1'}
-          <h3 class="mt-3 mb-1 text-base font-semibold first:mt-0">{@render runs(block.spans)}</h3>
+          <h3
+            class="mt-3 mb-1 text-base font-semibold whitespace-pre-wrap first:mt-0"
+          >{@render runs(block.spans)}</h3>
         {:else if block.kind === 'heading2'}
-          <h4 class="mt-2 mb-1 text-sm font-semibold text-ink-muted first:mt-0">
-            {@render runs(block.spans)}
-          </h4>
+          <h4
+            class="mt-2 mb-1 text-sm font-semibold whitespace-pre-wrap text-ink-muted first:mt-0"
+          >{@render runs(block.spans)}</h4>
         {:else if block.list}
           <!-- B-10. One row per line, like every other block: the marker is
                drawn rather than typed out, and the indent is the one in the
                string, so what is on screen is what the field holds. -->
-          <p class="flex gap-2" style="padding-left: {indentOf(block.list.indent)}">
-            <span class="shrink-0 tabular-nums text-ink-muted select-none"
-              >{block.kind === 'bullet' ? '•' : block.list.marker}</span
-            ><span>{@render runs(block.spans)}</span>
-          </p>
+          <p class="flex gap-2 whitespace-pre-wrap"><span
+              class="shrink-0 tabular-nums text-ink-muted select-none"
+              >{block.list.indent}{block.kind === 'bullet'
+                ? '•'
+                : block.list.marker}</span
+            ><span>{@render runs(block.spans)}</span></p>
         {:else}
-          <p>{#if block.spans.length > 0}{@render runs(block.spans)}{:else}&nbsp;{/if}</p>
+          <p class="whitespace-pre-wrap"
+            >{#if block.spans.length > 0}{@render runs(block.spans)}{:else}&nbsp;{/if}</p
+          >
         {/if}
       {/each}
     </div>

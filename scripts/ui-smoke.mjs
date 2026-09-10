@@ -1581,6 +1581,35 @@ async function main() {
     );
     await page.screenshot({ path: join(shots, 'note-lists.png'), fullPage: true });
 
+    // --- B-3: the rendered half keeps the spacing the field holds ---------
+    await codeField.click();
+    await page.keyboard.press('Control+End');
+    for (const typed of ['spec:', '  type: NodePort   three between', '    - name: http']) {
+      await page.keyboard.press('Shift+Enter');
+      await page.keyboard.type(typed);
+    }
+    await page.locator('[data-testid="page-title"]').first().click();
+    await page.waitForSelector('[data-testid="note-rendered"]');
+    const indented = await noteView
+      .locator('p', { hasText: 'type: NodePort' })
+      .first()
+      .evaluate((el) => el.textContent);
+    check(
+      'an indented line is drawn where the field put it, spaces and all — B-3',
+      indented === '  type: NodePort   three between',
+      JSON.stringify(indented),
+    );
+    const marker = await noteView
+      .locator('p', { hasText: 'name: http' })
+      .first()
+      .evaluate((el) => el.firstElementChild.textContent);
+    check(
+      "and a list item's indent is the characters it is, in front of the marker — B-10",
+      marker === '    \u2022',
+      JSON.stringify(marker),
+    );
+    await page.screenshot({ path: join(shots, 'note-indent.png'), fullPage: true });
+
     // The body is one JSON string in the op, so a newline in it is `\n` in the
     // file — the run of code is what is looked for rather than the fences.
     await landed(page, 'npm run dev');
