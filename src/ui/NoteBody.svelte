@@ -48,7 +48,21 @@
     id,
     compact = false,
     fill = false,
-  }: { session: Session; id: NodeId; compact?: boolean; fill?: boolean } = $props();
+    preview = false,
+  }: {
+    session: Session;
+    id: NodeId;
+    compact?: boolean;
+    fill?: boolean;
+    /**
+     * X-37. The body is being *shown* rather than edited — X-22's peeked sheet,
+     * which carries a transparent layer that swallows every tap in it. The
+     * controls it hides are hidden below `lg` alone, because the pane above the
+     * breakpoint is a column that is never peeked: one flag, and the width it
+     * means anything at is CSS's question rather than this component's.
+     */
+    preview?: boolean;
+  } = $props();
 
   const floor = $derived(compact ? 'min-h-32' : 'min-h-64');
 
@@ -361,11 +375,22 @@
         class="font-semibold">{span.text}</strong
       >{:else}{span.text}{/if}{/each}{/snippet}
 
-<!-- B-4. The controls are always here rather than only while the caret is in
-     the field: a phone has no Ctrl key, so this row is the only way to reach
-     them with nothing selected — requirements.md §3.1 applied to a body rather
-     than to a row. B-7's pair is these same controls, at the selection. -->
-<div class="mb-2 flex gap-1" data-testid="note-controls">
+<!-- B-4. The controls are here whether or not the caret is in the field: a
+     phone has no Ctrl key, so this row is the only way to reach them with
+     nothing selected — requirements.md §3.1 applied to a body rather than to a
+     row. B-7's pair is these same controls, at the selection.
+
+     X-37 is the one place they are not drawn, and it is not an exception to
+     that argument: a peeked sheet cannot be typed into at all. -->
+{#if preview}
+  <!-- X-37. What stands in their place while the sheet is peeked: the word for
+       what the reader is looking at, rather than three controls over text the
+       tap layer above them will not let anyone select. -->
+  <div class="mb-2 flex lg:hidden" data-testid="note-preview-tag">
+    <span class="rounded border border-line px-2 py-1 text-xs text-ink-faint">Preview</span>
+  </div>
+{/if}
+<div class="mb-2 gap-1 {preview ? 'hidden lg:flex' : 'flex'}" data-testid="note-controls">
   <button
     type="button"
     class="row-control rounded border border-line px-2 py-1 text-xs font-bold text-ink-muted hover:border-accent hover:text-accent"

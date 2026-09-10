@@ -172,7 +172,10 @@
          free space to distribute under an auto height, so X-22's "as tall as
          the note" and the peek's floor both stand. -->
     {#if node?.kind === 'note'}
-      <NoteBody {session} {id} compact fill />
+      <!-- X-37. `preview` for as long as the sheet is peeked: the tap layer
+           over it swallows every tap, so a control there is one that cannot be
+           used on text that cannot be selected. -->
+      <NoteBody {session} {id} compact fill preview={!expanded} />
     {/if}
   </div>
 

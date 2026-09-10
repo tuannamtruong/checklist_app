@@ -931,6 +931,7 @@ to empty, and a dismissal is only for a row the user is content to leave as it l
 | X-34 | The row `⋮` menu carries a row's edits and nothing else: no keys printed beside them, no caret hints under them, and none of the four reorderings a drag already does | ✅ | `menu` on each `RowAction` in `src/ui/actions.ts`, filtered by `menuActions` and rendered by `src/ui/RowMenu.svelte`. Indent, outdent and the two nudges stay defined there because `src/ui/keyboard.ts` resolves a key through the same list — they left the menu, not the app. `actions.test.ts`, `scripts/ui-smoke.mjs` |
 | X-35 | Two of the theme's fourteen tokens are also a free choice on this device: the **theme colour**, which is the accent, and the **text colour**, which is the ink. Either is found in the system's colour picker or typed as a hex code, either is cleared back to whatever the chosen theme says, and both sit on top of any of the six themes rather than replacing one | ✅ | `src/core/colour.ts` is the parser and `src/app/theme-colour.svelte.ts` puts a pick on the document root as `--accent-pick`/`--ink-pick`; `src/app.css` holds what a pick *means*, deriving `accent-soft`, `ink-muted` and `ink-faint` by mixing the picked colour into the theme's own surface, so one colour still reads in a dark room. Device-local and applied before the first paint, for X-14's reasons — [§10.1 Themes](#101-themes). `colour.test.ts`, `scripts/ui-smoke.mjs` |
 | X-36 | Below `lg` the sheet's way out is a **back arrow in its top left corner** rather than a ✕ on its right: a sheet laid over the list is somewhere the reader went, and on a phone the way back out of somewhere is the arrow in that corner. Above `lg` the pane is a column beside the list and keeps the ✕, which is what closes a panel rather than what leaves a page | ✅ | `src/ui/NotePane.svelte` — one control in the pane's header row, first below the breakpoint and last above it, with the glyph swapped at the same breakpoint. What it *does* is untouched: a route's pane still leaves the route and a caret's still clears the caret — X-30 |
+| X-37 | A peeked sheet is a **preview**: the body's three format controls are not drawn on it, a `Preview` tag stands where they were, and opening the sheet fully brings them back. Above `lg` the pane is never peeked, so the controls are always there | ✅ | `src/ui/NoteBody.svelte` takes `preview`, which `src/ui/NotePane.svelte` passes for as long as the sheet is peeked; which of the two is drawn is a `lg:` class over that one flag rather than anything measured, so the column above the breakpoint keeps its controls whatever the sheet below it would have done — X-22, B-4 |
 
 **A phone's top bar holds the add group rather than the application's name — X-27.** The bar existed to carry a `☰` and
 said `Checklist` beside it, which is a thing to read once on an application with one tree in it: every screen it
@@ -1214,6 +1215,14 @@ application on the phone puts the way back out of a place in the top left corner
 becomes `←` at the width where the pane becomes a sheet. It is one button either way — the same aria label, the same two
 behaviours X-30 already gave it — because a second control would be a second thing to keep in step with how the pane was
 opened.
+
+**A peek is a preview, and a preview has no controls — X-37.** X-22 covers the peeked sheet with one transparent layer,
+so nothing on it can be typed into: the tap it swallows means "open this" and the field underneath never gets the caret.
+B-4's three controls were drawn on it all the same — bold, heading and code, over text that cannot be selected, in the
+one third of the sheet that is on screen. So the peek draws a `Preview` tag in that row instead, which says what the
+sheet is rather than offering an edit it will refuse, and opening it fully is what brings the controls back. It is one
+flag and a `lg:` class, never a measurement: the pane above the breakpoint is a column that is never peeked, so it keeps
+its controls whatever the sheet below it is doing.
 
 **The pane is an editor, and only that — X-31.** It opened as the note's page redrawn in a column: a path, the title and
 its flag, the tags, the body, then the add line and the note's own children under it. Three of those five were the
