@@ -496,6 +496,11 @@ async function main() {
       (await milkRow2.locator('[data-testid="tag-chip"]').innerText()).trim(),
     );
     await page.keyboard.press('Escape');
+    // A-9. Kept for the Tags page below: the same tag has to draw in the same
+    // colour there, and nothing anywhere stored it.
+    const townChipTint = await milkRow2
+      .locator('[data-testid="tag-chip"][data-tag="town"]')
+      .evaluate((el) => el.style.getPropertyValue('--tag-tint'));
     check(
       'the chip is a label, not a filter: nothing on a row narrows anything — §4.2',
       (await milkRow2.locator('[data-testid="tag-chip"] button').count()) === 0 &&
@@ -564,6 +569,30 @@ async function main() {
       'and shows nothing else at all until a tag is chosen — F-6',
       (await page.locator('[data-testid="tagged-row"]').count()) === 0 &&
         (await page.locator('[data-testid="tags-summary"]').count()) === 0,
+    );
+
+    // --- A-9: a colour per tag, derived from the tag itself -----------------
+    // Two claims, and neither of them can be seen in a unit test: two tags draw
+    // in two colours, and one tag draws in the *same* colour in two views — the
+    // catalog here and the chip on the row — with nothing stored anywhere.
+    const tint = (tag, where) =>
+      page
+        .locator(`${where}[data-tag="${tag}"]`)
+        .first()
+        .evaluate((el) => [el.style.getPropertyValue('--tag-tint'), getComputedStyle(el).color]);
+    const [townEntry, errandEntry] = [
+      await tint('town', '[data-testid="tag-entry"]'),
+      await tint('errand', '[data-testid="tag-entry"]'),
+    ];
+    check(
+      'two tags draw in two colours, both of them derived — A-9',
+      townEntry[0] !== '' && townEntry[0] !== errandEntry[0] && townEntry[1] !== errandEntry[1],
+      `town ${townEntry.join(' ')} | errand ${errandEntry.join(' ')}`,
+    );
+    check(
+      'and one tag is the same colour here as on its row in the tree — A-9',
+      townEntry[0] === townChipTint,
+      `${townEntry[0]} vs ${townChipTint}`,
     );
 
     await page.locator('[data-testid="tag-entry"][data-tag="town"]').click();

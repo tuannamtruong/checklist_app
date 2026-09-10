@@ -362,6 +362,14 @@ the one before it opened — hide the non-matching rows, add the ancestors back,
 stop a row vanishing as it was typed — for a mode a tree could be left in. `src/ui/TagChips.svelte` draws labels now,
 not buttons, and A-6 is withdrawn: tagging at creation is A-8's `#tag` on the add line.
 
+**A tag's colour is the tag's own name (A-9).** `src/core/tag-colour.ts` hashes it to one of twelve tints and returns a
+*number*; `.tag-chip` in `src/app.css` is what a tint looks like, mixed from that hue toward the palette's own `ink`,
+`line` and `surface` so one rule serves six themes. Nothing is stored, chosen or merged — a colour per tag as a field
+would be a second last-writer-wins value with a conflict row, for a decoration — and a tag is the same colour on the
+row, in `TagEditor` and on `#/tags` because all three call the same function. Chosen on `#/tags` is that same hue turned
+up (`.tag-chip-chosen`) rather than the accent, which would have taken the tag's colour away exactly when it is being
+pointed at.
+
 **The three flag colours are theme tokens** — `flag-low`, `flag-medium`, `flag-high` — so a palette is fourteen
 properties rather than eleven and no component names a colour. `themes.test.ts` fails if a theme leaves one out.
 

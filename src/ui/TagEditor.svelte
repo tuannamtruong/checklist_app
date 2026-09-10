@@ -6,6 +6,7 @@
   // field is: one value, merged like a title — past_decision.md §10.
   import { addTag, removeTag } from '../core/edit';
   import { MAX_TAGS } from '../core/tags';
+  import { tagTint } from '../core/tag-colour';
   import type { Session } from '../app/Session.svelte';
 
   let {
@@ -54,11 +55,14 @@
 
 <div class="flex flex-wrap items-center gap-1" data-testid="tag-editor">
   {#each tags as tag (tag)}
-    <span class="flex shrink-0 items-center gap-1 rounded-full border border-line px-1.5 text-xs text-ink-muted">
+    <span
+      class="tag-chip flex shrink-0 items-center gap-1 rounded-full border px-1.5 text-xs"
+      style="--tag-tint: {tagTint(tag)}"
+    >
       {tag}
       <button
         type="button"
-        class="text-ink-faint hover:text-danger"
+        class="opacity-60 hover:text-danger hover:opacity-100"
         aria-label="Remove tag {tag}"
         data-testid="tag-remove"
         onclick={() => session.run((tree, ctx) => removeTag(tree, ctx, id, tag))}

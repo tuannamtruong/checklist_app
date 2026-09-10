@@ -180,6 +180,35 @@
   --color-ink-faint: color-mix(in oklab, var(--ink-pick) 50%, var(--color-surface));
 }
 
+/* A-9. What one of `src/core/tag-colour.ts`'s twelve tints looks like. The
+   module hands over a number — which twelfth of the wheel this tag hashed to —
+   and everything about the colour is decided here, for §10.1's reason: nothing
+   in TypeScript computes a colour, and a chip that named one would be the bug.
+
+   One rule serves every theme, because the three properties are *steps from the
+   hue toward the palette's own ink and surface* rather than three colours. On a
+   light palette that mixes toward near-black text on a pale tint; on a dark one
+   toward near-white text on a dim tint; and a tag keeps its hue in both. It is
+   the same trick X-35's picked colours use, and the reason neither of them
+   costs a per-theme block.
+
+   Unlayered, so it wins over the utility classes the chip also carries. */
+.tag-chip {
+  --tag-hue: hsl(calc(var(--tag-tint, 0) * 30deg) 62% 48%);
+  border-color: color-mix(in oklab, var(--tag-hue) 52%, var(--color-line));
+  color: color-mix(in oklab, var(--tag-hue) 80%, var(--color-ink));
+  background-color: color-mix(in oklab, var(--tag-hue) 14%, var(--color-surface));
+}
+
+/* A-4's chosen tag on `#/tags`: the same hue, turned up. Selection was the
+   accent on every chip until the tints existed, which said "chosen" by taking
+   the tag's own colour away from it. */
+.tag-chip-chosen {
+  border-color: color-mix(in oklab, var(--tag-hue) 95%, var(--color-line));
+  color: color-mix(in oklab, var(--tag-hue) 92%, var(--color-ink));
+  background-color: color-mix(in oklab, var(--tag-hue) 32%, var(--color-surface));
+}
+
 /* X-35. The swatch beside a picker wears the role it sets, so it is the colour
    the app is actually in whether or not anything has been picked — one element
    rather than a value kept in step with one. It is painted through sRGB rather

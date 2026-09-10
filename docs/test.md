@@ -205,6 +205,13 @@ the measurement landed on the selected line rather than at the origin is a real 
 The run selects a word, asserts the controls sit inside the field's box and level with the line, uses them, and asserts
 they go when the selection does.
 
+A-9's tag colours split the same way as everything else here: `tag-colour.test.ts` asserts what the hash promises — a
+tint for every name, the same one every time, and more than one tint across a handful of ordinary tags — and it asserts
+the *seam*, that `app.css` still holds the rule the number feeds. The browser owns the rest, because a colour is a
+computed style: the run reads two tags' computed colour on the Tags page and asserts they differ, and reads one tag's
+tint on its row in the tree and on the page and asserts they match, which is the whole of "derived from the name and
+stored nowhere".
+
 B-8's code box is checked in the browser for a reason the parser cannot reach: it is the one thing on the rendered half
 that is also a control, and B-3 keeps a transparent field over that half. The run makes a box from the control, asserts
 the fences landed around what was then typed, selects a run inside a line and asserts the same control wrote backticks

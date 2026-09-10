@@ -351,6 +351,7 @@ a date, and a date wants a calendar rather than a field.
 | A-5 | Which tags are chosen is device-local and never reaches a file | ✅ | The route — `#/tags/<tag>,<tag>` — which is a fragment and reaches no server either, F-5's argument applied to a tag. It sat in `src/app/view-state.svelte.ts` beside the collapse state until M11; nothing about it is stored now, which is a stronger version of the same promise — [§2.3 What is never in the Sync Folder](#23-what-is-never-in-the-sync-folder) |
 | A-6 | A row created while a filter is on carries that filter's tags | ✗ **Withdrawn** | It existed because a filtered tree could create a row it then hid. Nothing filters the tree since M11, so there is no filter to inherit and nothing to vanish from — [§4.2 Finding rows by tag](#42-finding-rows-by-tag). Tagging at creation is A-8's instead, and is typed rather than inherited |
 | A-7 | Every tag in the tree is listed on a page of its own, and choosing one lists the rows carrying it | ✅ | `src/ui/TagsPage.svelte` at `#/tags` and `#/tags/<tag>,<tag>`, a nav entry between Search and Done. It derives everything and stores nothing — `tagsInTree` and `taggedRows` are two scans of the materialised tree, exactly as F-4's search is. It is the **only** place in the application a tag narrows anything — [§4.2 Finding rows by tag](#42-finding-rows-by-tag) |
+| A-9 | Every tag draws in a colour of its own, derived from the tag's name and stored nowhere | ✅ | `tagTint` in `src/core/tag-colour.ts` hashes the name to one of twelve tints; `.tag-chip` in `src/app.css` is what a tint *looks* like, so no component and no TypeScript names a colour — [§10.1 Themes](#101-themes). `src/ui/TagChips.svelte`, `src/ui/TagEditor.svelte` and `src/ui/TagsPage.svelte` are the three views, and a tag is the same colour in all three because all three ask the same function |
 | A-8 | A `#tag` prefix on the add line tags the row it makes: `#errand #town Buy milk` is a row called "Buy milk" carrying both | ✅ | `parseTagged` in `src/core/tags.ts`, called by `src/ui/QuickAdd.svelte` — leading tokens only, so a `#` further along the line stays part of the title. Every line of a K-9 paste is read on its own, which is why `createLastChildren` takes each row's tags rather than the block's. `tags.test.ts`, `edit.test.ts`, `scripts/ui-smoke.mjs` |
 
 **Tags are typed in front of the title — A-8.** `#errand #town Buy milk` on the add line is one row called "Buy milk"
@@ -365,6 +366,15 @@ It is the same grammar on every line of a K-9 paste, read per line rather than p
 brings its own prefix, and no two lines need agree. `parseTagged` is in `src/core/tags.ts` with every other rule about
 what a tag is, so the add line decides where a row goes and never what a tag looks like, and what it returns goes
 through `cleanTags` like anything else: case-folded, sorted, deduplicated, twelve to a row.
+
+**A tag's colour is a function of its name — A-9.** `errand` is the same colour on the row, in the tag editor and on
+`#/tags`, on this device and on the phone, after a reload and after a merge, because every one of them hashed the same
+six letters. Nothing is stored, nothing is chosen and nothing is merged: a colour per tag as a *field* would be a second
+value with a last-writer-wins rule and a conflict row, for a decoration. The hash picks one of twelve tints and
+`src/app.css` decides what a tint looks like, which is [§10.1 Themes](#101-themes)'s rule kept intact — the three
+properties it sets are steps from the tag's hue toward the palette's own `ink` and `surface`, so one rule works on a
+light theme and a dark one. Twelve tints and a hash means two tags can land on the same one; that is the price of
+storing nothing, and the tags still differ by their names, which is what a chip mostly says.
 
 **A tag is normalised on the way in, and the normal form is what is stored.** Case-folded, its inner whitespace
 collapsed, a leading `#` dropped, trimmed to 32 characters, and the set held sorted and deduplicated —
@@ -402,10 +412,10 @@ list with no explanation. The rules are gone with the mode. `#/tags` answers ins
 of them: a list of matches carries the path rather than the ancestors, and nothing is hidden anywhere because nothing is
 being narrowed in place.
 
-**A tag on a row is a label.** The chips `src/ui/TagChips.svelte` draws say what the row carries and do nothing when
-tapped — they were the shortest way into the filter, and there is no filter. They are deliberately not links to
-`#/tags/<tag>` either: a row is dragged (T-14, T-16) and its title is typed, and a navigation in the middle of that is a
-place a thumb lands by accident.
+**A tag on a row is a label, in the tag's own colour (A-9).** The chips `src/ui/TagChips.svelte` draws say what the row
+carries and do nothing when tapped — they were the shortest way into the filter, and there is no filter. They are
+deliberately not links to `#/tags/<tag>` either: a row is dragged (T-14, T-16) and its title is typed, and a navigation
+in the middle of that is a place a thumb lands by accident.
 
 **Which tags are chosen is the route — A-5.** `#/tags/errand,town`, one path segment with each tag encoded on its own,
 for the reason F-5 gives for the search query: the fragment reaches no server, so a list of rows is linkable, survives a
@@ -965,6 +975,13 @@ the page — was `ink` at 20% until the dark theme existed, and under a dark pal
 what it is meant to dim. It is a token of its own because "darken whatever is behind this" is a role, and no arithmetic
 on `ink` expresses it in both directions. `color-scheme` is the same argument for the things CSS does not own: a
 scrollbar, a caret and a form control's default read the browser's own setting, so the dark palette declares it.
+
+**A-9's tag colours are the one thing on screen that is not a role, and they are still not a colour in TypeScript.** A
+tag has no *meaning* a palette could name — there are as many tags as the person types — so `src/core/tag-colour.ts`
+hashes the name to one of twelve tints and hands over a number. `.tag-chip` in `src/app.css` is what says what a tint
+looks like, and it says it as three steps from that hue toward this palette's own `ink`, `line` and `surface`: the same
+mix that keeps X-35's picked colours legible on six palettes keeps a tag legible on them, which is why twelve tints cost
+no per-theme block and no fifteenth token.
 
 **A theme never changes a layout, a size or a font.** Switching one repaints and moves nothing, so it cannot become a
 second UI to test — [test.md §3.5 UI](test.md#35-ui) drives one theme for behaviour and checks the rest for contrast

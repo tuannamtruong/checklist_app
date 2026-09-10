@@ -13,6 +13,7 @@
   // Nothing is indexed and nothing is stored: `tagsInTree` and `taggedRows` are
   // two scans of the materialised tree, exactly as §6's search is (F-4).
   import { taggedRows, tagsInTree } from '../core/filter';
+  import { tagTint } from '../core/tag-colour';
   import type { Session } from '../app/Session.svelte';
   import { nodeHref, tagsHref } from '../app/router.svelte';
   import KindIcon from './KindIcon.svelte';
@@ -43,20 +44,21 @@
          is a navigation and Back walks the choices backwards. -->
     <div class="flex flex-wrap items-center gap-1.5" data-testid="tag-catalog">
       {#each catalog as row (row.tag)}
+        <!-- A-9. Chosen is the tag's own colour turned up rather than the
+             accent: saying "chosen" by replacing the tint would take the tag's
+             colour away exactly when it is being pointed at. -->
         <a
           href={tagsHref(withoutOrWith(row.tag))}
-          class="rounded-full border px-2 py-0.5 text-xs"
-          class:border-accent={chosen.has(row.tag)}
-          class:bg-accent-soft={chosen.has(row.tag)}
-          class:text-accent={chosen.has(row.tag)}
-          class:border-line={!chosen.has(row.tag)}
-          class:text-ink-muted={!chosen.has(row.tag)}
+          class="tag-chip rounded-full border px-2 py-0.5 text-xs"
+          class:tag-chip-chosen={chosen.has(row.tag)}
+          class:font-medium={chosen.has(row.tag)}
+          style="--tag-tint: {tagTint(row.tag)}"
           aria-current={chosen.has(row.tag) ? "true" : undefined}
           data-testid="tag-entry"
           data-tag={row.tag}
         >
           {row.tag}
-          <span class="text-ink-faint" data-testid="tag-count">{row.count}</span>
+          <span class="opacity-70" data-testid="tag-count">{row.count}</span>
         </a>
       {/each}
     </div>
