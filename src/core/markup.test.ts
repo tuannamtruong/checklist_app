@@ -17,13 +17,12 @@ function shape(blocks: readonly Block[]): string[] {
   return blocks.map(
     (block) =>
       `${block.kind}${block.list ? `(${block.list.indent}${block.list.marker})` : ''}: ${block.spans
-        .map((span) =>
-          span.bold
-            ? `[${span.text}]`
-            : span.code
-              ? `<${span.text}>`
-              : span.text,
-        )
+        .map((span) => {
+          // B-11: the two marks nest, so the shape nests too — `<[x]>` is a
+          // bold run inside code, and `[x]` is a bold run outside it.
+          const marked = span.bold ? `[${span.text}]` : span.text;
+          return span.code ? `<${marked}>` : marked;
+        })
         .join('')}`,
   );
 }
@@ -198,16 +197,41 @@ describe('code — B-8, B-9', () => {
     ]);
   });
 
-  it('reads an inline run, and takes no other mark inside it — B-9', () => {
+  it('reads an inline run, and takes bold and no other mark inside it — B-9, B-11', () => {
     expect(shape(parseBody('comes up with one `docker compose up`.'))).toEqual([
       'paragraph: comes up with one <docker compose up>.',
     ]);
-    expect(shape(parseBody('`**x**`'))).toEqual(['paragraph: <**x**>']);
+    // The backtick is read first, so the run is found before the asterisks in
+    // it are — and then the run is read for bold like anything else.
+    expect(shape(parseBody('`**x**`'))).toEqual(['paragraph: <[x]>']);
+    expect(shape(parseBody('`# not a heading`'))).toEqual([
+      'paragraph: <# not a heading>',
+    ]);
   });
 
   it('leaves an unmatched or empty backtick as the character it is', () => {
     expect(shape(parseBody('one ` tick'))).toEqual(['paragraph: one ` tick']);
     expect(shape(parseBody('``'))).toEqual(['paragraph: ``']);
+  });
+
+  it('reads bold inside a box, a line at a time — B-11', () => {
+    expect(shape(parseBody('```\nplain\n**this one**\n```'))).toEqual([
+      'code: <plain\n><[this one]>',
+    ]);
+    // A pair cannot reach across a line break, so a lone `**` is two
+    // characters and the line below it is untouched.
+    expect(shape(parseBody('```\n**open\nclose**\n```'))).toEqual([
+      'code: <**open\nclose**>',
+    ]);
+    // And every other mark in there is still a character.
+    expect(shape(parseBody('```\n# comment\n- flag\n```'))).toEqual([
+      'code: <# comment\n- flag>',
+    ]);
+  });
+
+  it('leaves a box carrying no bold as the one span it always was — B-11', () => {
+    const [block] = parseBody('```\nnpm run dev\nnpm test\n```');
+    expect(block?.spans.length).toBe(1);
   });
 
   it('matches search on the code, not on the fences — B-5', () => {
@@ -217,6 +241,10 @@ describe('code — B-8, B-9', () => {
     expect(plainText('one `docker compose up`.')).toBe(
       'one docker compose up.',
     );
+    // B-11. The bold marks come off inside code exactly as they do outside it,
+    // or F-1 would stop matching a line because it was pointed at.
+    expect(plainText('```\nrun **this**\n```')).toBe('run this');
+    expect(plainText('a `**bold**` run')).toBe('a bold run');
   });
 });
 

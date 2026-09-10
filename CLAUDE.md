@@ -201,8 +201,9 @@ characters already reach every keyboard. `listEnter` returns a *splice* rather t
 with `insertText`: a marker the app wrote is then undone by the field's own `Ctrl-Z`, and the caret is placed explicitly
 afterwards because Chromium leaves it one short on an empty insert.
 
-**A fenced block is the one construct that spans lines, and the one place the other marks are characters** — `**` inside
-it is two asterisks, which is most of why it exists. An unclosed fence stays literal, for the reason an unmatched `**`
+**A fenced block is the one construct that spans lines, and every mark but bold is a character inside it** — `# ` is a
+comment and `- ` is a flag, but `**` is bold (B-11), read a line at a time, because the reason a long box is on screen
+is usually one line in it. `boldRuns` is what both code paths call, so an inline run reads the same way. An unclosed fence stays literal, for the reason an unmatched `**`
 does. It draws as a box headed `Code` with a Copy button, and that button is the one positioned thing inside B-3's
 `aria-hidden` rendered half carrying a `z-index`: without it the click lands in the transparent textarea lying over the
 box. It is `tabindex="-1"` because the text is in that field, which is what a screen reader reads. Placing that pair is

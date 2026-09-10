@@ -21,7 +21,7 @@ const BOLD = '**';
 /** B-8. A code block opens and closes with three backticks on a line of their own. */
 const FENCE = '```';
 
-/** B-9. Inline code is one backtick each side, within one line. */
+/** B-9. Inline code is one backtick each side, within one line. It reads `**` inside it — B-11. */
 const CODE = '`';
 
 /**
@@ -37,7 +37,10 @@ export type BlockKind = 'heading1' | 'heading2' | 'paragraph' | 'code' | 'bullet
 export interface Span {
   text: string;
   bold: boolean;
-  /** B-9. A run of inline code, which carries no other mark inside it. */
+  /**
+   * B-9. A run of code — inline, or a line of B-8's box. `bold` is the one
+   * other mark it can carry (B-11); every other mark is a character in here.
+   */
   code: boolean;
 }
 
@@ -77,17 +80,12 @@ export function parseBody(body: string): Block[] {
     // case is the ordinary one.
     const close = opensFence(line) ? closingFence(lines, at + 1) : -1;
     if (close !== -1) {
-      // The content is taken raw: code is the one place where `**` and `#` are
-      // characters rather than marks, which is most of the point of having it.
+      // B-11. Every mark in here is a character except `**`: a `#` is a comment
+      // and a `- ` is a flag, but the reason a long box is on screen is usually
+      // one line in it, and bold is how that line is pointed at.
       blocks.push({
         kind: 'code',
-        spans: [
-          {
-            text: lines.slice(at + 1, close).join('\n'),
-            bold: false,
-            code: true,
-          },
-        ],
+        spans: fencedSpans(lines.slice(at + 1, close)),
       });
       at = close + 1;
       continue;
@@ -140,8 +138,10 @@ function lineBlock(line: string): Block {
  * An unmatched `**` is four literal characters rather than an error: a body is
  * text a person is halfway through typing, and a line that reformats itself the
  * moment a second asterisk lands is a line that fights the typing. A backtick
- * is read first and its content is taken whole, so `` `**x**` `` is the four
- * characters it says and not a bold run — B-9.
+ * is read first and the run it opens is found before any asterisk in it is —
+ * which is what keeps a `**` *outside* the run from reaching into it — and the
+ * run is then read for bold like anything else, so `` `**x**` `` is a bold `x`
+ * in code (B-9, B-11).
  */
 function spansOf(line: string): Span[] {
   const spans: Span[] = [];
@@ -159,11 +159,7 @@ function spansOf(line: string): Span[] {
       // does a run of three, which is a fence that wandered into a line.
       if (close > at + CODE.length) {
         flush();
-        spans.push({
-          text: line.slice(at + CODE.length, close),
-          bold: false,
-          code: true,
-        });
+        spans.push(...boldRuns(line.slice(at + CODE.length, close), true));
         at = close + CODE.length;
         continue;
       }
@@ -183,6 +179,76 @@ function spansOf(line: string): Span[] {
       }
     }
     plain += line[at];
+    at += 1;
+  }
+  flush();
+  return spans;
+}
+
+/**
+ * B-11. The bold runs of a fenced block, read a line at a time.
+ *
+ * Per line because every other mark in this parser is per line, and because a
+ * pair that could reach across a line break would let something typed at the
+ * bottom of a box turn the top of it bold. The newlines are spans of their own,
+ * so `plainText` still joins the block back into the text that was typed.
+ *
+ * An empty block is one empty span rather than none: the box is drawn from the
+ * spans, and a block with nothing in it is still a block.
+ */
+function fencedSpans(lines: readonly string[]): Span[] {
+  const spans: Span[] = [];
+  // Two plain runs in a row are one run: the line breaks are what would
+  // otherwise cut a box carrying no bold at all into a span per line, and a
+  // block that reads the same way it did before B-11 is a block nothing else
+  // has to learn about.
+  const push = (text: string, bold: boolean): void => {
+    const last = spans[spans.length - 1];
+    if (last !== undefined && !last.bold && !bold) last.text += text;
+    else spans.push({ text, bold, code: true });
+  };
+  lines.forEach((line, at) => {
+    if (at > 0) push('\n', false);
+    for (const run of boldRuns(line, true)) push(run.text, run.bold);
+  });
+  return spans.length === 0 ? [{ text: '', bold: false, code: true }] : spans;
+}
+
+/**
+ * B-11. The `**` runs of one piece of text, with `code` carried onto every span
+ * it makes — the rule an inline run and a line of B-8's box share, so bold is
+ * the same two characters inside code as outside it.
+ *
+ * `spansOf` scans a *paragraph* with its own loop rather than calling this,
+ * because there the two marks interleave: the backtick is read first, so a bold
+ * pair that opens before a code run and closes after it keeps the run inside
+ * itself. Here there is no backtick left to read — the run has already been
+ * found — so a single pass over the text is the whole rule.
+ *
+ * An unmatched `**` is two literal characters rather than an error, for the
+ * reason `spansOf` gives: a body is text somebody is halfway through typing.
+ */
+function boldRuns(text: string, code: boolean): Span[] {
+  const spans: Span[] = [];
+  let plain = '';
+  let at = 0;
+  const flush = (): void => {
+    if (plain !== '') spans.push({ text: plain, bold: false, code });
+    plain = '';
+  };
+
+  while (at < text.length) {
+    if (text.startsWith(BOLD, at)) {
+      const close = text.indexOf(BOLD, at + BOLD.length);
+      // `****` closes immediately and marks nothing, so it stays literal.
+      if (close > at + BOLD.length) {
+        flush();
+        spans.push({ text: text.slice(at + BOLD.length, close), bold: true, code });
+        at = close + BOLD.length;
+        continue;
+      }
+    }
+    plain += text[at];
     at += 1;
   }
   flush();

@@ -302,6 +302,35 @@
 
   const headingLabel = $derived(level === 0 ? 'H' : level === 1 ? 'H1' : 'H2');
 
+  /**
+   * B-11. The spans of one line, with a run of code held together.
+   *
+   * `**` inside a backtick pair cuts the run into a span per mark, and a `<code>`
+   * per span would draw `` `npm **test**` `` as two pills with a gap where the
+   * space is. The marks are inside *one* run, so the run is one element and the
+   * bold sits inside it — which is also what makes the parser's shape a detail
+   * of the parser rather than something the DOM copies. Everything else is a
+   * run of one, so the plain and bold branches read a single span.
+   */
+  function grouped(spans: readonly Span[]): { code: boolean; spans: Span[] }[] {
+    const runs: { code: boolean; spans: Span[] }[] = [];
+    for (const span of spans) {
+      const last = runs[runs.length - 1];
+      if (last !== undefined && last.code && span.code) last.spans.push(span);
+      else runs.push({ code: span.code, spans: [span] });
+    }
+    return runs;
+  }
+
+  /**
+   * B-8, B-11. What Copy puts on the clipboard: the box as it is *drawn*, which
+   * is every span's text and none of the `**` between them. A block is one span
+   * only while nothing in it is bold, so the join is the whole of it.
+   */
+  function textOf(spans: readonly Span[]): string {
+    return spans.map((span) => span.text).join('');
+  }
+
   /** B-10. A tab is a bigger step than a space, which is what a person typing one means. */
   function indentOf(indent: string): string {
     const steps = [...indent].reduce((total, one) => total + (one === '\t' ? 4 : 1), 0);
@@ -311,11 +340,26 @@
 
 <!-- The bold, code and plain runs of one line. One snippet rather than the same
      three branches under every block kind — and written tight, because a line
-     break between two spans is a space the body never had. -->
-{#snippet runs(spans: readonly Span[])}{#each spans as span, i (i)}{#if span.code}<code
+     break between two spans is a space the body never had.
+
+     B-11: a code span carries `bold` like any other, so the two are nested
+     rather than exclusive — `<strong>` inside the `<code>`, which is the way
+     round that keeps the monospace. `grouped` is what keeps one backtick pair
+     one element while its marks cut it into several spans. -->
+{#snippet runs(spans: readonly Span[])}{#each grouped(spans) as run, i (i)}{#if run.code}<code
         class="rounded bg-surface-sunken px-1 py-0.5 font-mono text-[0.9em] text-ink"
-        >{span.text}</code
-      >{:else if span.bold}<strong class="font-semibold">{span.text}</strong>{:else}{span.text}{/if}{/each}{/snippet}
+        >{@render codeRuns(run.spans)}</code
+      >{:else if run.spans[0]?.bold}<strong class="font-semibold">{run.spans[0].text}</strong
+      >{:else}{run.spans[0]?.text}{/if}{/each}{/snippet}
+
+<!-- B-11's bold runs, inside a `<code>` somebody else opened: B-8's box is one
+     element around the whole block, and `runs` above opens one around each
+     backtick pair. Written tight for the reason above, and doubly so here —
+     the box is a `<pre>`, where a line break in the markup is a line break in
+     the code. -->
+{#snippet codeRuns(spans: readonly Span[])}{#each spans as span, i (i)}{#if span.bold}<strong
+        class="font-semibold">{span.text}</strong
+      >{:else}{span.text}{/if}{/each}{/snippet}
 
 <!-- B-4. The controls are always here rather than only while the caret is in
      the field: a phone has no Ctrl key, so this row is the only way to reach
@@ -410,14 +454,14 @@
                 tabindex="-1"
                 data-testid="code-copy"
                 onmousedown={keepCaret}
-                onclick={() => void copyCode(index, block.spans[0]?.text ?? '')}
+                onclick={() => void copyCode(index, textOf(block.spans))}
               >
                 {copied === index ? 'Copied' : '⧉ Copy'}
               </button>
             </div>
             <pre
               class="overflow-x-auto px-3 pt-1 pb-3 font-mono text-xs leading-relaxed text-ink"><code
-                >{block.spans[0]?.text ?? ''}</code
+                >{@render codeRuns(block.spans)}</code
               ></pre>
           </div>
         {:else if block.kind === 'heading1'}
