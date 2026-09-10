@@ -47,9 +47,14 @@ function run(command, args, options = {}) {
   });
 }
 
-export async function buildIfNeeded({ force = false } = {}) {
+/**
+ * `minify: false` is for `scripts/perf.mjs` and nothing else: a CPU profile of
+ * the minified bundle names every hot function `ko`, and a profile that cannot
+ * name what is slow is a profile nobody can act on.
+ */
+export async function buildIfNeeded({ force = false, minify = true } = {}) {
   if (!force && existsSync(join(ROOT_DIR, 'dist', 'index.html'))) return;
-  await run('npx', ['vite', 'build']);
+  await run('npx', ['vite', 'build', ...(minify ? [] : ['--minify', 'false'])]);
 }
 
 async function waitForServer(url, timeoutMs = 30_000) {

@@ -5,7 +5,7 @@
 #
 # `make help` lists the rest.
 
-.PHONY: help install dev build preview test check verify seed ui-smoke docs clean \
+.PHONY: help install dev build preview test check verify seed ui-smoke perf docs clean \
         stop port-check win-port-note win-port-stop windows apk apk-clean
 .DEFAULT_GOAL := help
 
@@ -35,6 +35,7 @@ help:
 	  "  make verify        - check + test + ui-smoke + docs, in that order" \
 	  "  make seed          - the app in a window with a small tree in it" \
 	  "  make ui-smoke      - the built app in Chromium; shots -> ui-smoke/" \
+	  "  make perf          - long tasks on a big tree; ARGS='--rows 3000 --profile'" \
 	  "  make docs          - docs reflowed to 120 columns (--check)" \
 	  "" \
 	  "  packaging - architecture.md §7; both take dist/ as input, output -> bundles/" \
@@ -125,6 +126,11 @@ seed: port-check
 
 ui-smoke: port-check
 	NODE_PATH=$(PLAYWRIGHT_MODULES) npm run ui-smoke
+
+# Deliberately not part of `verify`: it seeds a tree far larger than anyone's
+# and takes a minute to say so. It is what you run when something feels slow.
+perf: port-check
+	NODE_PATH=$(PLAYWRIGHT_MODULES) npm run perf $(ARGS)
 
 docs:
 	npm run docs:check

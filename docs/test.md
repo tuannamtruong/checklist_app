@@ -117,7 +117,7 @@ suite; each adapter is exercised only by the test that happens to use it, which 
 `local-folder` against a fake `Storage`, `android-folder` against a stubbed bridge, and `http-folder` against a loopback
 server the test starts and stops itself. Two are not in it, for different reasons. `fsaa-folder` needs a directory
 handle, which needs a picker and a real user gesture, so no headless run can hold one — it is on
-[§3.6 Platform](#36-platform)'s checklist instead. `node-folder` has no production caller at all. The partial-write
+[§3.7 Platform](#37-platform)'s checklist instead. `node-folder` has no production caller at all. The partial-write
 clause is the one the suite cannot assert from inside a page either: a writer cannot observe its own write being
 partial, and the property belongs to the provider's client — S-8.
 
@@ -238,7 +238,7 @@ M5 adds the sync folder section, and what the smoke run can assert about it is n
 sidebar each name the unsynced fallback in their own words, and a shell that cannot open a folder offers no button for
 it
 ([requirements.md §10.2 The sync folder, on the settings screen](requirements.md#102-the-sync-folder-on-the-settings-screen)).
-The buttons themselves are [§3.6 Platform](#36-platform)'s — a file manager opening is an event that happens outside the
+The buttons themselves are [§3.7 Platform](#37-platform)'s — a file manager opening is an event that happens outside the
 browser, and the run that could see it is the one on a real phone and a real desktop.
 
 M8's split is a browser check almost entirely, because every claim it makes is about what is on screen at a given width.
@@ -308,7 +308,25 @@ A UI test needs a folder that is not a real one. The prototype's `?uitest` mode 
 disk and no network; production wants the same escape hatch and the same rule that it is reachable only by explicit
 opt-in.
 
-### 3.6 Platform
+### 3.6 Speed
+
+`scripts/perf.mjs` is the fifth layer and the only one that measures rather than asserts. It seeds a tree far larger
+than a person's — `--rows`, 800 by default — and then watches `longtask` while the app is used: the first paint, a
+keystroke in a row title, a keystroke in a note body, an idle sync cycle, and a scroll. A task over 50ms is a frame
+nobody got, so the entry type *is* the definition of choppy, and each phase is printed with the budget it was read
+against.
+
+`--profile` is the half that makes a number actionable. It samples the CPU around each phase and prints self time per
+function — and it builds the bundle unminified for exactly that reason, since a profile of the minified bundle names
+every hot function `ko`. That is what found the fold: `applyOp` spread the whole node map once per op, so a 3000-row
+tree spent two seconds of every startup copying a map nobody had seen yet, and the same cost again on every cycle that
+merged. `foldOps` builds one map instead, and the number went from 2053ms of self time to absent.
+
+It is deliberately not part of `make verify`. It seeds a tree nobody has, it takes a minute, and its output is a
+measurement to read rather than a claim to check — a budget that fails on a loaded machine and passes on an idle one is
+not a test, it is a flake with an opinion.
+
+### 3.7 Platform
 
 Not automatable on this machine, so it is a written checklist rather than a script: the Android SAF grant surviving a
 restart and an app update, a cold offline launch from the home-screen icon, a deep link surviving that cold launch
@@ -377,9 +395,10 @@ npm run check         # svelte-check, in strict TypeScript
 npm run ui-smoke      # builds, serves dist/ on 38531, drives Chromium, screenshots to ui-smoke/
 npm run seed          # the same app with a small tree in it, in a window, to look at
 npm run make-icons    # re-render the PWA PNGs from public/icons/*.svg
+npm run perf          # long tasks on a big tree — `--rows 3000 --profile` to see where they went
 ```
 
-The two bundles are built rather than tested, and what they produce is on [§3.6 Platform](#36-platform)'s checklist
+The two bundles are built rather than tested, and what they produce is on [§3.7 Platform](#37-platform)'s checklist
 rather than in any script:
 
 ```bash

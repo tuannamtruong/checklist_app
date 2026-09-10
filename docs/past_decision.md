@@ -653,7 +653,7 @@ else has read it, and how to point it somewhere else — X-15, X-16 and X-18.
 ### 16.2 What reopens it
 
 Evidence that the client not running is a recurring failure rather than a rare one, which is
-[test.md §3.6 Platform](test.md#36-platform)'s to produce and has never been run. Even then the launcher is one answer
+[test.md §3.7 Platform](test.md#37-platform)'s to produce and has never been run. Even then the launcher is one answer
 of several: the sidebar already warns when this device reaches no folder, and a line saying how long ago a peer's file
 last changed would name the same failure without starting anything.
 
