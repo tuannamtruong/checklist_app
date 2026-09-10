@@ -930,6 +930,7 @@ to empty, and a dismissal is only for a row the user is content to leave as it l
 | X-33 | The keyboard reference lives on the settings screen, and nowhere else | ✅ | `KEY_HELP` in `src/ui/keyboard.ts`, rendered by `src/ui/SettingsPage.svelte` beside the bindings it describes; `keyboard.test.ts` fails if the two drift. It is the same kind of thing as everything else X-12 gathered — a fact about how *this* device is driven — and a reference read once does not belong under a control opened ten times a day — [§3.1 Keyboard (desktop)](#31-keyboard-desktop) |
 | X-34 | The row `⋮` menu carries a row's edits and nothing else: no keys printed beside them, no caret hints under them, and none of the four reorderings a drag already does | ✅ | `menu` on each `RowAction` in `src/ui/actions.ts`, filtered by `menuActions` and rendered by `src/ui/RowMenu.svelte`. Indent, outdent and the two nudges stay defined there because `src/ui/keyboard.ts` resolves a key through the same list — they left the menu, not the app. `actions.test.ts`, `scripts/ui-smoke.mjs` |
 | X-35 | Two of the theme's fourteen tokens are also a free choice on this device: the **theme colour**, which is the accent, and the **text colour**, which is the ink. Either is found in the system's colour picker or typed as a hex code, either is cleared back to whatever the chosen theme says, and both sit on top of any of the six themes rather than replacing one | ✅ | `src/core/colour.ts` is the parser and `src/app/theme-colour.svelte.ts` puts a pick on the document root as `--accent-pick`/`--ink-pick`; `src/app.css` holds what a pick *means*, deriving `accent-soft`, `ink-muted` and `ink-faint` by mixing the picked colour into the theme's own surface, so one colour still reads in a dark room. Device-local and applied before the first paint, for X-14's reasons — [§10.1 Themes](#101-themes). `colour.test.ts`, `scripts/ui-smoke.mjs` |
+| X-36 | Below `lg` the sheet's way out is a **back arrow in its top left corner** rather than a ✕ on its right: a sheet laid over the list is somewhere the reader went, and on a phone the way back out of somewhere is the arrow in that corner. Above `lg` the pane is a column beside the list and keeps the ✕, which is what closes a panel rather than what leaves a page | ✅ | `src/ui/NotePane.svelte` — one control in the pane's header row, first below the breakpoint and last above it, with the glyph swapped at the same breakpoint. What it *does* is untouched: a route's pane still leaves the route and a caret's still clears the caret — X-30 |
 
 **A phone's top bar holds the add group rather than the application's name — X-27.** The bar existed to carry a `☰` and
 said `Checklist` beside it, which is a thing to read once on an application with one tree in it: every screen it
@@ -1205,6 +1206,14 @@ note, and neither goes anywhere near the caret to say so.
 **Above `lg` only.** Below it the pane is X-22's sheet over the list, and a sheet raised by putting a caret in a title
 would cover the row being typed into with the phone's keyboard under it. The icon still opens the sheet there, because a
 tap on a link is somewhere the reader asked to go.
+
+**The way out of the sheet is the corner a phone keeps it in — X-36.** Above `lg` the pane is a column standing beside
+the list and the ✕ on its right is what closes a panel. Below it the same pane is a sheet laid over the list, which is
+not a panel beside anything: it is a place the reader went, the list is behind it rather than next to it, and every
+application on the phone puts the way back out of a place in the top left corner. So the one control moves there and
+becomes `←` at the width where the pane becomes a sheet. It is one button either way — the same aria label, the same two
+behaviours X-30 already gave it — because a second control would be a second thing to keep in step with how the pane was
+opened.
 
 **The pane is an editor, and only that — X-31.** It opened as the note's page redrawn in a column: a path, the title and
 its flag, the tags, the body, then the add line and the note's own children under it. Three of those five were the

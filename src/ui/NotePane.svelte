@@ -43,7 +43,7 @@
     id: NodeId;
     /** X-30. Whether the caret raised this pane rather than the route. */
     fromCaret?: boolean;
-    /** What ✕ does when there is no route to leave — §10.3. */
+    /** What the close control does when there is no route to leave — §10.3. */
     onclose?: () => void;
   } = $props();
 
@@ -58,6 +58,14 @@
   const closeHref = $derived(list === ROOT ? '#/' : nodeHref(list));
 
   /**
+   * X-36. Ordered by the breakpoint rather than by the markup: the header row
+   * draws this first, which is the sheet's top left corner, and `lg:order-last`
+   * puts it back on the right of the column where a ✕ belongs.
+   */
+  const CLOSE =
+    'row-control relative z-20 shrink-0 rounded px-2 py-1 text-lg leading-none text-ink-faint hover:text-ink lg:order-last lg:text-base';
+
+  /**
    * X-22, and below `lg` only: above it the pane is a column and there is
    * nothing to expand. Reset per note — a peek is a gesture, so the next note
    * opens at its own peek rather than inheriting this one's — §10.3.
@@ -68,6 +76,14 @@
     expanded = false;
   });
 </script>
+
+<!-- X-36. `←` at the sheet's width and `✕` at the column's: one element per
+     glyph rather than one string chosen in TypeScript, because which of the two
+     is drawn is the breakpoint's question and the breakpoint is CSS's. -->
+{#snippet closeGlyph()}<span class="lg:hidden" aria-hidden="true">←</span><span
+    class="hidden lg:inline"
+    aria-hidden="true">✕</span
+  >{/snippet}
 
 <!-- Below `lg` a sheet on the bottom edge, above it a column that stays put
      while the list beside it scrolls. `max-h-[60dvh]` over an auto height is the
@@ -113,31 +129,33 @@
        the note's own row on the left — K-10's group in the place X-27 already
        puts it on a phone. -->
   <div class="flex shrink-0 items-center gap-2 px-4 py-2">
-    <QuickAdd {session} {focus} parent={id} />
-    <!-- Above the peek's tap layer: everything on a peeked sheet means "open
+    <!-- X-36. The one control, in the corner the width it is drawn at keeps it
+         in: first and `←` on the sheet, where the list is behind the note and
+         the way out of somewhere is the top left corner, and last and `✕` in
+         the column, where the list is beside it and this closes a panel. One
+         button rather than two, so how the pane was opened stays the only
+         thing about it that varies — X-30.
+
+         Above the peek's tap layer: everything on a peeked sheet means "open
          this" except the one control that means the opposite — §10.3. -->
     {#if fromCaret}
       <!-- X-30. Nothing to navigate away from: the pane is the caret's, so
            closing it is putting the caret down. -->
       <button
         type="button"
-        class="row-control relative z-20 shrink-0 rounded px-2 py-1 text-ink-faint hover:text-ink"
+        class={CLOSE}
         aria-label="Close the note"
         data-testid="note-close"
         onclick={() => onclose?.()}
       >
-        ✕
+        {@render closeGlyph()}
       </button>
     {:else}
-      <a
-        href={closeHref}
-        class="row-control relative z-20 shrink-0 rounded px-2 py-1 text-ink-faint hover:text-ink"
-        aria-label="Close the note"
-        data-testid="note-close"
-      >
-        ✕
+      <a href={closeHref} class={CLOSE} aria-label="Close the note" data-testid="note-close">
+        {@render closeGlyph()}
       </a>
     {/if}
+    <QuickAdd {session} {focus} parent={id} />
   </div>
 
   <div
