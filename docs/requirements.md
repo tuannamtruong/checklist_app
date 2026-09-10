@@ -932,6 +932,7 @@ to empty, and a dismissal is only for a row the user is content to leave as it l
 | X-35 | Two of the theme's fourteen tokens are also a free choice on this device: the **theme colour**, which is the accent, and the **text colour**, which is the ink. Either is found in the system's colour picker or typed as a hex code, either is cleared back to whatever the chosen theme says, and both sit on top of any of the six themes rather than replacing one | ✅ | `src/core/colour.ts` is the parser and `src/app/theme-colour.svelte.ts` puts a pick on the document root as `--accent-pick`/`--ink-pick`; `src/app.css` holds what a pick *means*, deriving `accent-soft`, `ink-muted` and `ink-faint` by mixing the picked colour into the theme's own surface, so one colour still reads in a dark room. Device-local and applied before the first paint, for X-14's reasons — [§10.1 Themes](#101-themes). `colour.test.ts`, `scripts/ui-smoke.mjs` |
 | X-36 | Below `lg` the sheet's way out is a **back arrow in its top left corner** rather than a ✕ on its right: a sheet laid over the list is somewhere the reader went, and on a phone the way back out of somewhere is the arrow in that corner. Above `lg` the pane is a column beside the list and keeps the ✕, which is what closes a panel rather than what leaves a page | ✅ | `src/ui/NotePane.svelte` — one control in the pane's header row, first below the breakpoint and last above it, with the glyph swapped at the same breakpoint. What it *does* is untouched: a route's pane still leaves the route and a caret's still clears the caret — X-30 |
 | X-37 | A peeked sheet is a **preview**: the body's three format controls are not drawn on it, a `Preview` tag stands where they were, and opening the sheet fully brings them back. Above `lg` the pane is never peeked, so the controls are always there | ✅ | `src/ui/NoteBody.svelte` takes `preview`, which `src/ui/NotePane.svelte` passes for as long as the sheet is peeked; which of the two is drawn is a `lg:` class over that one flag rather than anything measured, so the column above the breakpoint keeps its controls whatever the sheet below it would have done — X-22, B-4 |
+| X-38 | The sheet is dragged as well as tapped: a swipe **up** on the peek opens it fully, and a swipe **down** on the open sheet puts it back to the peek | ✅ | `src/ui/NotePane.svelte` over pointer events, for the reason T-14 and X-20's grip use them: `dragstart` never fires on touch and this is a phone's gesture. What a travel *means* is `sheetSwipe` in `src/ui/sheet.ts`, unit-tested there rather than read off the markup; the animation is a transition on the two heights the state already changed, so nothing is measured. The grip is a button as well, so the collapse the swipe does is reachable without a pointer |
 
 **A phone's top bar holds the add group rather than the application's name — X-27.** The bar existed to carry a `☰` and
 said `Checklist` beside it, which is a thing to read once on an application with one tree in it: every screen it
@@ -1223,6 +1224,14 @@ one third of the sheet that is on screen. So the peek draws a `Preview` tag in t
 sheet is rather than offering an edit it will refuse, and opening it fully is what brings the controls back. It is one
 flag and a `lg:` class, never a measurement: the pane above the breakpoint is a column that is never peeked, so it keeps
 its controls whatever the sheet below it is doing.
+
+**And the sheet is dragged — X-38.** X-22 gave the peek a tap and gave the open sheet nothing at all: it went back by
+closing the note altogether, which is a different thing to want. So a swipe up on the peek opens it and a swipe down on
+the open sheet puts it back — pointer events over `dragstart`, exactly as T-14 and X-20's grip already argue, because a
+phone is where this gesture lives. `sheetSwipe` is the whole of what a travel means, in a file a unit test can ask; the
+view owns nothing but where the pointer went, and a drag long enough to be one is a drag the tap layer must not also
+answer. The grip is a button rather than a decorated div for X-20's reason — it is the one control the swipe down
+duplicates, and a gesture no key can reach is a gesture some readers do not have.
 
 **The pane is an editor, and only that — X-31.** It opened as the note's page redrawn in a column: a path, the title and
 its flag, the tags, the body, then the add line and the note's own children under it. Three of those five were the

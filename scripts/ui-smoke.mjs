@@ -2154,6 +2154,27 @@ async function main() {
       await page.locator('[data-testid="tree"] [data-testid="row"]').first().isVisible(),
     );
 
+    // X-36. Which corner the way out is in, at the width where the pane is a
+    // sheet: first in the header row and drawn as an arrow, rather than last
+    // and drawn as a ✕. Both are one control, so this reads the one element.
+    const close = page.locator('[data-testid="note-close"]');
+    const closeBox = await close.boundingBox();
+    const addBox = await page.locator('[data-testid="note-pane"] [data-testid="add-row"]').boundingBox();
+    check(
+      'the sheet\'s way out is the arrow in its top left corner — X-36',
+      closeBox.x < addBox.x && (await close.innerText()).includes('←'),
+      `at x=${Math.round(closeBox.x)} against the add line at ${Math.round(addBox.x)}, reading ${JSON.stringify(await close.innerText())}`,
+    );
+
+    // X-37. A peek cannot be typed into — the tap layer above it swallows every
+    // tap — so the row that carries B-4's three controls carries the word for
+    // what the reader is looking at instead.
+    check(
+      'a peeked sheet says Preview and draws no format controls — X-37',
+      (await sheet.locator('[data-testid="note-preview-tag"]').isVisible()) &&
+        !(await sheet.locator('[data-testid="note-controls"]').isVisible()),
+    );
+
     // The tap that opens it, and the thing it must not do on the way: B-3 keeps
     // a transparent textarea over the rendered body, so a bare tap would put a
     // caret and a keyboard into text the reader can see 60% of.
@@ -2172,6 +2193,47 @@ async function main() {
         (await sheet.locator('[data-testid="note-body"]').isVisible()),
     );
     await page.screenshot({ path: join(shots, 'phone-note-open.png') });
+    check(
+      'and an opened one has the controls back and no tag — X-37',
+      (await sheet.locator('[data-testid="note-controls"]').isVisible()) &&
+        (await sheet.locator('[data-testid="note-preview-tag"]').count()) === 0,
+    );
+
+    // X-38. The other way in and the only way back: the grip takes a swipe down
+    // and the peek's own layer takes a swipe up, both over pointer events —
+    // which is why a mouse drives them here exactly as a finger would.
+    const grip = await page.locator('[data-testid="sheet-grip"]').boundingBox();
+    await swipe(page, grip.x + grip.width / 2, grip.y + grip.height / 2, 120);
+    await page.waitForTimeout(300);
+    const swipedDown = await sheet.boundingBox();
+    check(
+      'a swipe down the grip puts an open sheet back to its peek — X-38',
+      Math.round(swipedDown.height) === Math.round(peeked.height),
+      `${Math.round(swipedDown.height)}px against the peek's ${Math.round(peeked.height)}px`,
+    );
+    await swipe(page, 195, swipedDown.y + 40, -120);
+    await page.waitForTimeout(300);
+    const swipedUp = await sheet.boundingBox();
+    check(
+      'and a swipe up the peek opens it, exactly as the tap did — X-38',
+      Math.round(swipedUp.height) === 844,
+      `${Math.round(swipedUp.height)}px`,
+    );
+    // A drag is not the tap it ends on. The peek's layer answers both, so a
+    // swipe *down* on it — which means nothing, since a peek has no down —
+    // must not arrive at the tap that would open it.
+    await swipe(page, grip.x + grip.width / 2, grip.y + grip.height / 2, 120);
+    await page.waitForTimeout(300);
+    const back = await sheet.boundingBox();
+    await swipe(page, 195, back.y + 40, 120);
+    await page.waitForTimeout(300);
+    check(
+      'and a swipe down the peek does not fall through to the tap that opens it — X-38',
+      Math.round((await sheet.boundingBox()).height) === Math.round(peeked.height),
+      `${Math.round((await sheet.boundingBox()).height)}px`,
+    );
+    await swipe(page, 195, (await sheet.boundingBox()).y + 40, -120);
+    await page.waitForTimeout(300);
 
     // The other half of the rule, which is what makes it a rule rather than a
     // fixed height: a body too long to fit stops at the cap.
@@ -2541,6 +2603,18 @@ async function titlesOf(page) {
   return page
     .locator('[data-testid="row"] [data-testid="title"]')
     .evaluateAll((inputs) => inputs.map((input) => input.value));
+}
+
+/**
+ * X-38. One pointer drag, in steps rather than in one jump: the sheet reads
+ * `pointerdown`, `pointermove` and `pointerup`, and a single move would tell it
+ * the pointer had never travelled.
+ */
+async function swipe(page, x, y, dy) {
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  for (const part of [0.25, 0.5, 0.75, 1]) await page.mouse.move(x, y + dy * part);
+  await page.mouse.up();
 }
 
 async function rowByTitle(page, title) {

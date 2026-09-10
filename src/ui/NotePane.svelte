@@ -28,6 +28,7 @@
   import TagEditor from './TagEditor.svelte';
   import WidthGrip from './WidthGrip.svelte';
   import { nodeHref } from '../app/router.svelte';
+  import { sheetSwipe } from './sheet';
 
   let {
     session,
@@ -66,6 +67,13 @@
     'row-control relative z-20 shrink-0 rounded px-2 py-1 text-lg leading-none text-ink-faint hover:text-ink lg:order-last lg:text-base';
 
   /**
+   * X-38. How far the pointer may travel and still have been a tap. Smaller
+   * than `SWIPE_PX` on purpose: a drag too short to move the sheet is still a
+   * drag, and must not fall through to the tap that opens it.
+   */
+  const TAP_SLOP = 6;
+
+  /**
    * X-22, and below `lg` only: above it the pane is a column and there is
    * nothing to expand. Reset per note — a peek is a gesture, so the next note
    * opens at its own peek rather than inheriting this one's — §10.3.
@@ -75,6 +83,48 @@
     id;
     expanded = false;
   });
+
+  /**
+   * X-38. Where the drag began, and whether it went far enough to be a drag at
+   * all — the second is what keeps the peek's tap layer from answering a swipe
+   * the swipe already answered.
+   */
+  let fromY: number | null = null;
+  let dragged = $state(false);
+
+  function down(event: PointerEvent): void {
+    const el = event.currentTarget as HTMLElement;
+    fromY = event.clientY;
+    dragged = false;
+    el.setPointerCapture(event.pointerId);
+  }
+
+  function move(event: PointerEvent): void {
+    if (fromY === null) return;
+    if (Math.abs(event.clientY - fromY) >= TAP_SLOP) dragged = true;
+  }
+
+  function up(event: PointerEvent): void {
+    const el = event.currentTarget as HTMLElement;
+    if (el.hasPointerCapture(event.pointerId)) el.releasePointerCapture(event.pointerId);
+    if (fromY === null) return;
+    const verdict = sheetSwipe(event.clientY - fromY, expanded);
+    fromY = null;
+    if (verdict !== null) expanded = verdict === 'expand';
+  }
+
+  /**
+   * X-22's tap, with X-38's drag taken out of it: the layer covers the whole
+   * peek, so the pointer that just swiped up ends on it too, and a tap is what
+   * is left when the pointer did not travel.
+   */
+  function tap(): void {
+    if (dragged) {
+      dragged = false;
+      return;
+    }
+    expanded = true;
+  }
 </script>
 
 <!-- X-36. `←` at the sheet's width and `✕` at the column's: one element per
@@ -118,8 +168,27 @@
     onwidth={(px) => view.setNotePaneWidth(px)}
   />
   <!-- The grip says the sheet has somewhere to go, and says nothing at all on a
-       desktop, where the pane is already as open as it gets. -->
-  <div class="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-line lg:hidden" aria-hidden="true"></div>
+       desktop, where the pane is already as open as it gets.
+
+       X-38 made it the gesture as well as the sign of one: a swipe down here
+       puts an open sheet back to its peek. It is a button rather than a
+       decorated div for X-20's reason — the swipe it duplicates is a gesture
+       no key can reach, and this is the key. While the sheet is peeked it is
+       under X-22's tap layer and does nothing at all, which is right: down is
+       the only direction it has, and a peek has no down. -->
+  <button
+    type="button"
+    class="flex shrink-0 touch-none justify-center py-2 lg:hidden"
+    aria-label="Collapse the note"
+    data-testid="sheet-grip"
+    onpointerdown={down}
+    onpointermove={move}
+    onpointerup={up}
+    onpointercancel={up}
+    onclick={() => (expanded = false)}
+  >
+    <span class="block h-1 w-10 rounded-full bg-line"></span>
+  </button>
 
   <!-- X-31. The top row is K-8's add line, in the place the breadcrumbs held
        until the pane stopped being the note's page: the left column is the
@@ -182,14 +251,22 @@
   <!-- X-22. One transparent layer over the whole peeked sheet, so a tap on the
        body, the title or the add line all mean "open it". Without it the tap
        would land in B-3's always-mounted textarea and the phone would put a
-       caret and a keyboard into text the reader can see 60% of — §10.3. -->
+       caret and a keyboard into text the reader can see 60% of — §10.3.
+
+       X-38 gives it the swipe up as well, and for the same reason it exists:
+       the layer is what the finger is on, so a gesture anywhere on the peek is
+       a gesture here. -->
   {#if !expanded}
     <button
       type="button"
-      class="absolute inset-0 z-10 lg:hidden"
+      class="absolute inset-0 z-10 touch-none lg:hidden"
       aria-label="Open the note"
       data-testid="note-expand"
-      onclick={() => (expanded = true)}
+      onpointerdown={down}
+      onpointermove={move}
+      onpointerup={up}
+      onpointercancel={up}
+      onclick={tap}
     ></button>
   {/if}
 </aside>
