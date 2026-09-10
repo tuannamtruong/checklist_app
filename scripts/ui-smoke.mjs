@@ -1441,6 +1441,37 @@ async function main() {
       (await page.evaluate(() => navigator.clipboard.readText())) === 'npm run dev',
       await page.locator('[data-testid="code-copy"]').innerText(),
     );
+    // --- B-10: a list is typed, and Enter is what carries it ---------------
+    await codeField.click();
+    await page.keyboard.press('Control+End');
+    await page.keyboard.type('\n- Socks\nBoots\n');
+    check(
+      'Enter carries a bullet onto the next line — B-10',
+      (await codeField.inputValue()).endsWith('- Socks\n- Boots\n- '),
+      (await codeField.inputValue()).split('\n').slice(-3).join(' / '),
+    );
+    await page.keyboard.press('Enter');
+    check(
+      'and Enter on an item with nothing in it ends the list — B-10',
+      (await codeField.inputValue()).endsWith('- Socks\n- Boots\n'),
+      (await codeField.inputValue()).split('\n').slice(-3).join(' / '),
+    );
+    await page.keyboard.type('1. Ferry ticket\nPassport');
+    check(
+      'a numbered list counts up from the number that was typed — B-10',
+      (await codeField.inputValue()).endsWith('1. Ferry ticket\n2. Passport'),
+      (await codeField.inputValue()).split('\n').at(-1),
+    );
+
+    await page.locator('[data-testid="page-title"]').first().click();
+    await page.waitForSelector('[data-testid="note-rendered"]');
+    check(
+      'and the markers are drawn rather than left on screen — B-10',
+      (await noteView.innerText()).replace(/\s+/g, ' ').includes('• Socks • Boots 1. Ferry ticket'),
+      (await noteView.innerText()).replace(/\s+/g, ' '),
+    );
+    await page.screenshot({ path: join(shots, 'note-lists.png'), fullPage: true });
+
     // The body is one JSON string in the op, so a newline in it is `\n` in the
     // file — the run of code is what is looked for rather than the fences.
     await landed(page, 'npm run dev');

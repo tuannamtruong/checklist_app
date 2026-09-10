@@ -194,6 +194,13 @@ becomes `` `inline` ``, a caret or a selection crossing a line break becomes a f
 box takes the fences off. They sit in a row above the field, and **selecting a run of text raises the same controls
 beside the selection** (B-7).
 
+**A list is typed and Enter is the whole of it (B-10).** `- ` or `1. ` opens one; Enter carries the marker onto the next
+line and counts the numbers up, and Enter on an item with nothing in it takes the marker off, which is the way out.
+Nothing renumbers — the number drawn is the number in the string — and there is no control for it, because two typed
+characters already reach every keyboard. `listEnter` returns a *splice* rather than a body so `NoteBody` can type it in
+with `insertText`: a marker the app wrote is then undone by the field's own `Ctrl-Z`, and the caret is placed explicitly
+afterwards because Chromium leaves it one short on an empty insert.
+
 **A fenced block is the one construct that spans lines, and the one place the other marks are characters** — `**` inside
 it is two asterisks, which is most of why it exists. An unclosed fence stays literal, for the reason an unmatched `**`
 does. It draws as a box headed `Code` with a Copy button, and that button is the one positioned thing inside B-3's

@@ -16,12 +16,15 @@
   import { onMount, tick } from 'svelte';
   import {
     headingAt,
+    listEnter,
     nextHeading,
     parseBody,
     setHeading,
+    spliced,
     toggleBold,
     toggleCode,
     type Span,
+    type Splice,
   } from '../core/markup';
   import type { NodeId } from '../core/types';
   import type { Session } from '../app/Session.svelte';
@@ -251,7 +254,42 @@
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'b') {
       event.preventDefault();
       bold();
+      return;
     }
+    // B-10. Enter on a list item carries the marker on, and Enter on an item
+    // with nothing in it takes it off. `listEnter` answers null for every other
+    // Enter there is, which is the browser's.
+    if (event.key === 'Enter' && !event.shiftKey && !event.ctrlKey && !event.metaKey && field) {
+      const splice = listEnter(draft, field.selectionStart, field.selectionEnd);
+      if (splice === null) return;
+      event.preventDefault();
+      typeInto(splice);
+    }
+  }
+
+  /**
+   * B-10. The marker is *typed* into the field rather than assigned to it:
+   * `insertText` goes through the browser's own editing stack, so `Ctrl-Z`
+   * takes back a marker the app wrote exactly as it takes back a typed one —
+   * which is the rule B-4's controls follow for the same reason.
+   */
+  function typeInto(splice: Splice): void {
+    if (!field) return;
+    field.setSelectionRange(splice.from, splice.to);
+    if (document.execCommand('insertText', false, splice.insert)) {
+      // Where the caret goes is said rather than left to the browser: an empty
+      // insert — which is how the list *ends* — leaves Chromium's caret one
+      // short, in front of the newline the line above it ends with, so the next
+      // thing typed lands back on the item that was just closed.
+      const at = splice.from + splice.insert.length;
+      field.setSelectionRange(at, at);
+      draft = field.value;
+      onInput();
+      readSelection();
+      return;
+    }
+    // A browser that refuses it still gets the marker, and pays one undo step.
+    void apply(spliced(draft, splice));
   }
 
   /**
@@ -263,6 +301,12 @@
   }
 
   const headingLabel = $derived(level === 0 ? 'H' : level === 1 ? 'H1' : 'H2');
+
+  /** B-10. A tab is a bigger step than a space, which is what a person typing one means. */
+  function indentOf(indent: string): string {
+    const steps = [...indent].reduce((total, one) => total + (one === '\t' ? 4 : 1), 0);
+    return `${steps * 0.5}rem`;
+  }
 </script>
 
 <!-- The bold, code and plain runs of one line. One snippet rather than the same
@@ -382,6 +426,15 @@
           <h4 class="mt-2 mb-1 text-sm font-semibold text-ink-muted first:mt-0">
             {@render runs(block.spans)}
           </h4>
+        {:else if block.list}
+          <!-- B-10. One row per line, like every other block: the marker is
+               drawn rather than typed out, and the indent is the one in the
+               string, so what is on screen is what the field holds. -->
+          <p class="flex gap-2" style="padding-left: {indentOf(block.list.indent)}">
+            <span class="shrink-0 tabular-nums text-ink-muted select-none"
+              >{block.kind === 'bullet' ? '•' : block.list.marker}</span
+            ><span>{@render runs(block.spans)}</span>
+          </p>
         {:else}
           <p>{#if block.spans.length > 0}{@render runs(block.spans)}{:else}&nbsp;{/if}</p>
         {/if}

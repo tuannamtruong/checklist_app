@@ -426,7 +426,7 @@ over.
 
 | ID | Requirement | State | Where |
 | --- | --- | --- | --- |
-| B-1 | A note body carries **bold**, two levels of heading and code, and no other formatting | ✅ | `src/core/markup.ts` — the one place a mark is spelled, beside `tags.ts` and `paste.ts`; `markup.test.ts` |
+| B-1 | A note body carries **bold**, two levels of heading, code and list items, and no other formatting | ✅ | `src/core/markup.ts` — the one place a mark is spelled, beside `tags.ts` and `paste.ts`; `markup.test.ts` |
 | B-2 | The marks are Markdown's — `**bold**`, `# ` and `## ` — and they are stored in `body` itself | ✅ | Nothing changed in `Node`, the op, the merge, the conflict rows or compaction: `body` is a string before and after |
 | B-3 | The body is edited as text and read as rendered: the marks are visible while the caret is in it, the formatting when it is not | ✅ | `src/ui/NoteBody.svelte`. One textarea, never unmounted — transparent over the rendered blocks when the caret is elsewhere, so the click that reaches it is the click that focuses it |
 | B-4 | `Ctrl-B` wraps the selection, and two on-screen controls do the same: bold, and a heading that cycles heading, subheading, none | ✅ | `toggleBold`, `setHeading` and `nextHeading` in `src/core/markup.ts`, driven by `src/ui/NoteBody.svelte`. A phone has no Ctrl key, which is [§3.1 Keyboard (desktop)](#31-keyboard-desktop)'s rule applied to a body rather than to a row |
@@ -434,6 +434,7 @@ over.
 | B-5 | Search matches the body without its marks, and shows the snippet without them | ✅ | `src/core/search.ts` over `plainText()` from `markup.ts` — F-1 is a substring match, and it must not break because `**` sits in the middle of a word; `search.test.ts` |
 | B-6 | The renderer emits structure, never HTML | ✅ | `parseBody` returns blocks and spans; the component renders them, so Svelte's own escaping is what reaches the DOM and a pasted `<script>` is text |
 | B-8 | A body carries a block of code: three backticks on a line of their own, opening and closing. It draws as a box, headed `Code`, with a button that copies it | ✅ | `parseBody`'s one multi-line construct and `toggleCode` in `src/core/markup.ts`, drawn by `src/ui/NoteBody.svelte`. No language: a word after the opening fence is read and drawn with nothing, so a pasted ` ```js ` block is code rather than three literal characters |
+| B-10 | A line that opens `- ` or `1. ` is a list item, drawn with its marker. Enter carries the marker onto the next line and counts the numbers up; Enter on an item with nothing in it takes the marker off and the list ends | ✅ | `LIST` and `listEnter` in `src/core/markup.ts`, typed into the field by `src/ui/NoteBody.svelte`. Nothing renumbers: what is drawn is the number in the string, which is what B-3 promises |
 | B-9 | And a run of code inside a line: one backtick each side | ✅ | `spansOf` in `src/core/markup.ts`, which reads a backtick before an asterisk — code is the one place where `**` is two characters. The same control writes it: `toggleCode` reads the selection to decide which of the two marks it means |
 
 **The marks live in the body, and that is the whole design.** `body` stays a string, so every rule already written about
@@ -484,8 +485,22 @@ exactly the characters a person could have typed, so the field's own undo revers
 keep in step. A button must not take the focus while it does that, or the blur would commit the body and move the caret
 out of the text the button is about to edit.
 
-**Three controls for five marks.** The heading cycles — none, heading, subheading, and round again, with the button
-showing which one the line carries — which is the shape A-2's priority flag already has,
+**Three controls for seven marks, and B-10 has none of them.** A list is *typed* — `- ` or `1. ` are two characters
+anywhere there is a keyboard, which is the reach a control exists to give — and what a control would have to add is a
+mode. Enter is the whole feature: it carries the marker on so the second item costs nothing, and it takes the marker off
+on an item with nothing in it, which is the way out that stops a list being something the field is stuck in.
+
+**Nothing renumbers.** `3.` after `1.` is what the person typed and what is drawn, because B-3 says the rendered half is
+the string and not a tidied version of it — a list that renumbers itself while it is being typed is a list arguing with
+the typing, and the field's own undo would have nothing to take back.
+
+**The marker is typed into the field, not assigned to it.** `insertText` goes through the browser's own editing stack,
+so `Ctrl-Z` takes back a marker the app wrote exactly as it takes back one a person wrote — the rule B-4's controls
+follow, arrived at from the other direction. Where the caret lands is said explicitly rather than left to the browser:
+an empty insert, which is how a list *ends*, puts Chromium's caret one short of where the edit left off.
+
+**Three controls for the other five marks.** The heading cycles — none, heading, subheading, and round again, with the
+button showing which one the line carries — which is the shape A-2's priority flag already has,
 [§4.1 Tags and priority](#41-tags-and-priority), and the argument is the same one: a button per level teaches nothing
 that one button naming the level does not. `</>` is the same argument applied to code: it writes an inline run when a
 run inside one line is selected, a box when it is a caret or a selection crossing a line break, and it takes the fences

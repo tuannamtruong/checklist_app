@@ -24,7 +24,15 @@ const FENCE = '```';
 /** B-9. Inline code is one backtick each side, within one line. */
 const CODE = '`';
 
-export type BlockKind = 'heading1' | 'heading2' | 'paragraph' | 'code';
+/**
+ * B-10. A list item: `- ` or `3. `, after whatever indent it carries. The space
+ * is required for the reason a heading's is — `-5C` is a temperature, not a
+ * bullet — and the number is read as typed rather than renumbered, because B-3
+ * renders what is in the string and nothing else.
+ */
+const LIST = /^([ \t]*)(-|\d{1,9}\.) (.*)$/;
+
+export type BlockKind = 'heading1' | 'heading2' | 'paragraph' | 'code' | 'bullet' | 'number';
 
 export interface Span {
   text: string;
@@ -36,6 +44,8 @@ export interface Span {
 export interface Block {
   kind: BlockKind;
   spans: readonly Span[];
+  /** B-10. A list item's own marker — `-`, or the number as typed — and its indent. */
+  list?: { marker: string; indent: string };
 }
 
 /** A line of the body, and where it sits in the string. */
@@ -111,6 +121,15 @@ function lineBlock(line: string): Block {
   }
   if (line.startsWith(HEADING_1)) {
     return { kind: 'heading1', spans: spansOf(line.slice(HEADING_1.length)) };
+  }
+  const item = LIST.exec(line);
+  if (item !== null) {
+    const [, indent, marker, rest] = item as unknown as [string, string, string, string];
+    return {
+      kind: marker === '-' ? 'bullet' : 'number',
+      spans: spansOf(rest),
+      list: { marker, indent },
+    };
   }
   return { kind: 'paragraph', spans: spansOf(line) };
 }
@@ -441,4 +460,62 @@ function lineAt(lines: readonly Line[], caret: number): number {
     if (caret <= lines[at]!.to) return at;
   }
   return lines.length - 1;
+}
+
+/** A replacement of one range by one string — what B-10's Enter is, before the field applies it. */
+export interface Splice {
+  from: number;
+  to: number;
+  insert: string;
+}
+
+/**
+ * B-10. What Enter means on a list item, and `null` when it means what Enter
+ * always meant — requirements.md §4.3.
+ *
+ * A list is typed rather than switched on: `- ` or `1. ` opens one, and Enter
+ * carries the marker onto the next line so the second item costs nothing.
+ * **Enter on an item with nothing in it ends the list** — the marker comes off
+ * and the line is an ordinary empty one — which is the way out that stops a
+ * list being a mode the field is stuck in.
+ *
+ * It is a splice rather than a whole body so the caller can type it into the
+ * field: a marker inserted by `insertText` is undone by the field's own
+ * `Ctrl-Z`, exactly as a typed one is.
+ */
+export function listEnter(text: string, start: number, end: number): Splice | null {
+  // A selection Enter replaces what is selected, which is the browser's own
+  // rule and not a list question.
+  if (start !== end) return null;
+  const lines = lineRanges(text);
+  // Inside a fenced block Enter is Enter: a `- ` in code is two characters.
+  if (fenceAround(lines, start, end) !== null) return null;
+
+  const line = lines[lineAt(lines, start)]!;
+  const item = LIST.exec(line.text);
+  if (item === null) return null;
+  const [, indent, marker, rest] = item as unknown as [string, string, string, string];
+
+  // Before the end of the marker the caret is not "on the item" yet, and
+  // carrying the marker there would write it in front of itself.
+  if (start < line.from + indent.length + marker.length + 1) return null;
+
+  if (rest.trim() === '') return { from: line.from, to: line.to, insert: '' };
+  return { from: start, to: start, insert: `\n${indent}${nextMarker(marker)}` };
+}
+
+/** The marker the next item carries: the same bullet, or the next number. */
+function nextMarker(marker: string): string {
+  if (marker === '-') return '- ';
+  return `${Number(marker.slice(0, -1)) + 1}. `;
+}
+
+/** The splice applied, for a field that cannot be typed into — and for the tests. */
+export function spliced(text: string, splice: Splice): Edited {
+  const at = splice.from + splice.insert.length;
+  return {
+    text: text.slice(0, splice.from) + splice.insert + text.slice(splice.to),
+    start: at,
+    end: at,
+  };
 }

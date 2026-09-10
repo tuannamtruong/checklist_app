@@ -347,11 +347,12 @@ time with four characters around it. Under B it shows a paragraph of tags, and u
 
 ### 12.2 It reopened, and A answered again
 
-A body wanted code, which is the first of the three things named here as the reopening condition. The answer was not the
-editor this section expected: it was two more marks in the same subset — B-8's fenced block and B-9's inline run,
-[requirements.md §4.3 Marks in a note body](requirements.md#43-marks-in-a-note-body) — because the argument that chose A
-is about the payload, and a third mark costs the payload exactly what the first two did, which is nothing. A build that
-predates them shows three backticks around a command, which is a command with six characters near it.
+A body wanted code and a list, which are two of the three things named here as the reopening condition. The answer was
+not the editor this section expected: it was four more marks in the same subset — B-8's fenced block, B-9's inline run
+and B-10's two list markers, [requirements.md §4.3 Marks in a note body](requirements.md#43-marks-in-a-note-body) —
+because the argument that chose A is about the payload, and a third mark costs the payload exactly what the first two
+did, which is nothing. A build that predates them shows three backticks around a command, which is a command with six
+characters near it.
 
 What that argument does *not* answer is the caret. Every mark here is written by an edit to the text and read back by a
 parser, so a control is typing and the field's own undo reverses it; the moment a body wants something that cannot be
@@ -360,8 +361,11 @@ not its text — A stops being cheap and the thing to reach for is B, with the c
 
 ### 12.3 What is still refused
 
-A link, an image, a table, and anything that needs a second field. The measurement that would justify B remains the one
-this section always named: bodies long enough that the person is writing *in* the app rather than *about* the rows.
+A link, an image, a table, and anything that needs a second field. A bullet in a note body was refused once on the
+grounds that the application already has lists — that is the tree, T-1 — and the answer held until the notes got long
+enough to have steps in them. It is still true of anything that wants to be *ticked*, moved or found: a step that
+matters is a row, and B-10 is for the ones that do not. The measurement that would justify B remains the one this
+section always named: bodies long enough that the person is writing *in* the app rather than *about* the rows.
 
 ---
 

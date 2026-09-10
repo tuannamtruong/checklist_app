@@ -211,6 +211,11 @@ the fences landed around what was then typed, selects a run inside a line and as
 instead, and then clicks Copy and reads the clipboard back — which is what says the button is above the field rather
 than under it. `markup.test.ts` owns everything else about the two marks, including the fence that never closed.
 
+B-10 splits the same way. `markup.test.ts` owns what a marker means, what Enter means on an item and what it means on an
+empty one, and the browser owns the one thing that is not a function of the string: the marker is *typed* into the field
+with `insertText` so the field's own undo can take it back, and only a real field has an undo stack. The run types two
+items, presses Enter on the empty third, and asserts the marker came off rather than the list carrying on.
+
 K-9 is a browser check for a reason a unit test cannot get at: the split itself is `paste.test.ts`'s, but the event that
 carries a clipboard into an input only exists in a browser. The smoke run dispatches one over the quick-add line with
 something already typed in it, and asserts the three things the rule promises — a row per line, in the pasted order, the

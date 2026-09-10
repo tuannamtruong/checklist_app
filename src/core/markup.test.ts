@@ -4,7 +4,9 @@ import {
   nextHeading,
   parseBody,
   plainText,
+  listEnter,
   setHeading,
+  spliced,
   toggleBold,
   toggleCode,
   type Block,
@@ -14,7 +16,7 @@ import {
 function shape(blocks: readonly Block[]): string[] {
   return blocks.map(
     (block) =>
-      `${block.kind}: ${block.spans
+      `${block.kind}${block.list ? `(${block.list.indent}${block.list.marker})` : ''}: ${block.spans
         .map((span) =>
           span.bold
             ? `[${span.text}]`
@@ -251,5 +253,68 @@ describe('toggleCode — B-8, B-9', () => {
     expect(toggleCode('```\nbb\n```', 1, 1).text).toBe(
       '```\n```\n```\nbb\n```',
     );
+  });
+});
+
+describe('lists — B-10', () => {
+  it('reads both markers, and only with the space', () => {
+    expect(shape(parseBody('- Socks\n2. Boots\n-5C outside\n1.no space'))).toEqual([
+      'bullet(-): Socks',
+      'number(2.): Boots',
+      'paragraph: -5C outside',
+      'paragraph: 1.no space',
+    ]);
+  });
+
+  it('keeps the indent, so a typed sub-list is one', () => {
+    expect(shape(parseBody('- Socks\n  - Thick ones'))).toEqual([
+      'bullet(-): Socks',
+      'bullet(  -): Thick ones',
+    ]);
+  });
+
+  it('reads the other marks inside an item, and none in a heading of one', () => {
+    expect(shape(parseBody('- **Thick** socks\n# - not a bullet'))).toEqual([
+      'bullet(-): [Thick] socks',
+      'heading1: - not a bullet',
+    ]);
+  });
+
+  it('matches search on the item, not on the marker — B-5', () => {
+    expect(plainText('- Socks\n3. Boots')).toBe('Socks\nBoots');
+  });
+
+  it('carries the marker onto the next line, and counts', () => {
+    const bullet = listEnter('- Socks', 7, 7);
+    expect(bullet && spliced('- Socks', bullet).text).toBe('- Socks\n- ');
+    const numbered = listEnter('3. Boots', 8, 8);
+    expect(numbered && spliced('3. Boots', numbered).text).toBe('3. Boots\n4. ');
+  });
+
+  it('keeps the indent the item had', () => {
+    const nested = listEnter('- Socks\n  - Thick', 17, 17);
+    expect(nested && spliced('- Socks\n  - Thick', nested).text).toBe('- Socks\n  - Thick\n  - ');
+  });
+
+  it('splits the item when the caret is inside it', () => {
+    const split = listEnter('- Socks and boots', 8, 8);
+    expect(split && spliced('- Socks and boots', split).text).toBe('- Socks \n- and boots');
+  });
+
+  it('ends the list on Enter with nothing in the item — B-10', () => {
+    const done = listEnter('- Socks\n- ', 10, 10);
+    expect(done && spliced('- Socks\n- ', done)).toEqual({
+      text: '- Socks\n',
+      start: 8,
+      end: 8,
+    });
+  });
+
+  it('leaves Enter alone where a list is not what it means', () => {
+    // Not a list at all, a selection, before the marker, and inside a fence.
+    expect(listEnter('Socks', 5, 5)).toBe(null);
+    expect(listEnter('- Socks', 3, 7)).toBe(null);
+    expect(listEnter('- Socks', 1, 1)).toBe(null);
+    expect(listEnter('```\n- Socks\n```', 11, 11)).toBe(null);
   });
 });
