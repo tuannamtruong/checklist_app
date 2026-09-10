@@ -197,12 +197,14 @@ async function main() {
         await page.waitForTimeout(1500);
       })) && passed;
 
-    // --- the sync cycle, which is S-19's +5s after an edit ------------------
-    // Every peer file read, every op re-folded, the tree resolved again. It is
-    // on a timer, so it is the one hitch that arrives while nothing is being
-    // done at all — which is what "sometimes" means.
+    // --- the sync cycles, which are S-19's +5s, +15s and +60s after an edit -
+    // Every peer file read, every op re-folded, the tree resolved again. They
+    // are on a timer, so they are the hitches that arrive while nothing is
+    // being done at all — which is what "sometimes" means. Long enough to catch
+    // the second one as well as the first, because a cost paid once per edit
+    // and a cost paid once per cycle look identical over a single cycle.
     passed =
-      (await phase('an idle sync cycle', 50, () => page.waitForTimeout(7000))) && passed;
+      (await phase('two idle sync cycles', 50, () => page.waitForTimeout(20_000))) && passed;
 
     // --- scrolling the list ------------------------------------------------
     await page.goto(BASE_URL);

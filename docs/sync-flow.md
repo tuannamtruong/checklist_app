@@ -388,6 +388,13 @@ The trigger is [§4.6 The decision](#46-the-decision)'s, unchanged: **total log 
 count × serialised tree bytes.** Both numbers are already in hand at the end of a cycle — the files were just read, and
 the tree was just folded — so measuring it costs nothing and predicting it is unnecessary.
 
+Measuring it *again* is what costs something: the right-hand side is a serialisation of the whole tree, and S-19's
+cadence runs three cycles after a single edit. So the condition is asked once per answer rather than once per cycle —
+the store replaces the node map whenever anything changes, so the same map and the same byte count are the same answer,
+and `Session.maybeCompact` returns without serialising anything. It also answers "no" off a floor per node before it
+serialises at all, which is the case just after a compaction, when the log is smaller than the tree can possibly be.
+Neither changes the condition; both are the same condition asked more cheaply.
+
 Every device evaluates the same condition against roughly the same numbers, so they compact at roughly the same time,
 each on its own file, with no message passing. A device that is offline compacts when it next runs. A device that never
 runs again never compacts, and its file stays the size it was — the accepted limit in

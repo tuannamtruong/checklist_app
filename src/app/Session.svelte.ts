@@ -33,6 +33,9 @@ export class Session {
   /** Bumped whenever the op set changes, so what derives from ops can re-derive. */
   private revision = $state(0);
 
+  /** What `maybeCompact` last weighed, so a cycle that changed nothing weighs nothing. */
+  private weighed: { nodes: NodeMap; bytes: number } | null = null;
+
   /** The last storage failure, for the shell to show rather than swallow. */
   problem = $state<string | null>(null);
   /**
@@ -210,6 +213,15 @@ export class Session {
    */
   private maybeCompact(): void {
     const bytes = this.log.byteLength + this.folderSync.peerBytes;
+    // Asked once per answer rather than once per cycle. The trigger weighs the
+    // log against a *serialised* tree, and S-19 runs a cycle at +5s, +15s and
+    // +60s after one edit: the second and third would serialise the same tree
+    // to reach the same conclusion, which on a large tree is tens of
+    // milliseconds of a main thread that is otherwise idle. The map's identity
+    // is the whole test — the store replaces it whenever anything changes, so
+    // the same object is the same answer.
+    if (this.weighed?.nodes === this.nodeMap && this.weighed.bytes === bytes) return;
+    this.weighed = { nodes: this.nodeMap, bytes };
     if (!compactionDue(bytes, this.peers + 1, this.nodeMap)) return;
     if (this.log.compact()) this.revision++;
   }

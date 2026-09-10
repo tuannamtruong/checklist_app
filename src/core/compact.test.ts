@@ -237,6 +237,18 @@ describe('the trigger — sync-flow.md §4.8.3', () => {
   it('does not fire before there is a device to fire for', () => {
     expect(compactionDue(1_000_000, 0, nodes)).toBe(false);
   });
+
+  // The trigger answers "no" off a floor per node rather than off a
+  // serialisation, so the floor has to stay under what the emptiest row this
+  // application can hold actually costs. It is measured here rather than
+  // asserted in a comment: a field added to `Node` moves this number, and the
+  // day it moves under 120 the shortcut starts answering "no" to a compaction
+  // that was due.
+  it('keeps its floor under what one node really serialises to', () => {
+    const one = Object.values(nodes)[0];
+    const bytes = JSON.stringify({ n_1: one }).length;
+    expect(bytes).toBeGreaterThan(120);
+  });
 });
 
 describe('a superseded day — G-2', () => {

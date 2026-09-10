@@ -168,6 +168,21 @@ export function treeBytes(nodes: NodeMap): number {
 }
 
 /**
+ * A floor under what one node costs serialised, and deliberately far under it:
+ * a node carries seventeen field names before it carries a single character of
+ * anybody's title, which is a little over 250 bytes for the emptiest row this
+ * application can hold. `compact.test.ts` measures that row and fails if this
+ * number ever stops being a floor.
+ *
+ * It exists so the trigger can answer "no" without serialising anything. The
+ * fold hands `compactionDue` the whole tree on every sync cycle, and
+ * `JSON.stringify` over a few thousand rows is tens of milliseconds of a main
+ * thread that is otherwise idle — a hitch on a timer, which is the worst kind
+ * to find, because nothing the reader did caused it.
+ */
+const MIN_NODE_BYTES = 120;
+
+/**
  * sync-flow.md §4.6's trigger, unchanged: compact when the folder's logs cost
  * more than one materialised tree per device would. Both numbers are in hand at
  * the end of a cycle — the files were just read and the tree was just folded —
@@ -178,5 +193,10 @@ export function treeBytes(nodes: NodeMap): number {
  */
 export function compactionDue(logBytes: number, deviceCount: number, nodes: NodeMap): boolean {
   if (deviceCount === 0) return false;
+  // The same comparison against a floor first. A log smaller than the smallest
+  // the tree could possibly serialise to is not due, and answering that costs
+  // one pass over the keys rather than one serialisation of the values.
+  const floor = Object.keys(nodes).length * MIN_NODE_BYTES;
+  if (logBytes <= deviceCount * floor) return false;
   return logBytes > deviceCount * treeBytes(nodes);
 }
