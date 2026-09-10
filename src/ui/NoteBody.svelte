@@ -14,7 +14,15 @@
   // way through, and a rich field would hand the caret to the browser, which is
   // the one thing K-7 and X-10 need to keep — requirements.md §4.3.
   import { onMount, tick } from 'svelte';
-  import { headingAt, nextHeading, parseBody, setHeading, toggleBold } from '../core/markup';
+  import {
+    headingAt,
+    nextHeading,
+    parseBody,
+    setHeading,
+    toggleBold,
+    toggleCode,
+    type Span,
+  } from '../core/markup';
   import type { NodeId } from '../core/types';
   import type { Session } from '../app/Session.svelte';
   import { textRect } from './text-rect';
@@ -42,6 +50,8 @@
   const floor = $derived(compact ? 'min-h-32' : 'min-h-64');
 
   const STORE_DEBOUNCE_MS = 1_000;
+  /** How long the Copy button says it copied. */
+  const COPIED_MS = 1_500;
   const EMIT_AFTER_MS = 60_000;
   /** Between the top of the selected line and the controls above it. */
   const GAP = 8;
@@ -57,6 +67,9 @@
   let rendered = $state<HTMLDivElement | null>(null);
   let debounce: ReturnType<typeof setTimeout> | null = null;
   let longEdit: ReturnType<typeof setTimeout> | null = null;
+
+  /** Which code block last said "Copied", so one button answers rather than all of them. */
+  let copied = $state<number | null>(null);
 
   // B-7. Where the selection is, and where on screen its first line begins.
   let start = $state(0);
@@ -200,6 +213,34 @@
     void apply(toggleBold(draft, field.selectionStart, field.selectionEnd));
   }
 
+  /**
+   * B-8, B-9. One control for both code marks: `toggleCode` reads the selection
+   * to decide which one, so a word becomes `` `code` `` and a caret becomes a
+   * box — requirements.md §4.3.
+   */
+  function code(): void {
+    if (!field) return;
+    void apply(toggleCode(draft, field.selectionStart, field.selectionEnd));
+  }
+
+  /**
+   * B-8. The one thing on the rendered half that is not a second drawing of the
+   * text: a block of code is copied rather than read, and selecting it in the
+   * field beneath means dragging over a box drawn on top of it.
+   */
+  async function copyCode(index: number, text: string): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(text);
+      copied = index;
+      setTimeout(() => {
+        if (copied === index) copied = null;
+      }, COPIED_MS);
+    } catch {
+      // A clipboard the browser refuses is a button that does nothing rather
+      // than an error over a note: the text is still in the field below it.
+    }
+  }
+
   /** One control, three states — `nextHeading` is the cycle, A-2's flag the precedent. */
   function heading(): void {
     if (!field) return;
@@ -224,10 +265,18 @@
   const headingLabel = $derived(level === 0 ? 'H' : level === 1 ? 'H1' : 'H2');
 </script>
 
+<!-- The bold, code and plain runs of one line. One snippet rather than the same
+     three branches under every block kind — and written tight, because a line
+     break between two spans is a space the body never had. -->
+{#snippet runs(spans: readonly Span[])}{#each spans as span, i (i)}{#if span.code}<code
+        class="rounded bg-surface-sunken px-1 py-0.5 font-mono text-[0.9em] text-ink"
+        >{span.text}</code
+      >{:else if span.bold}<strong class="font-semibold">{span.text}</strong>{:else}{span.text}{/if}{/each}{/snippet}
+
 <!-- B-4. The controls are always here rather than only while the caret is in
      the field: a phone has no Ctrl key, so this row is the only way to reach
      them with nothing selected — requirements.md §3.1 applied to a body rather
-     than to a row. B-7's pair is the same two controls, at the selection. -->
+     than to a row. B-7's pair is these same controls, at the selection. -->
 <div class="mb-2 flex gap-1" data-testid="note-controls">
   <button
     type="button"
@@ -253,6 +302,19 @@
     onclick={heading}
   >
     {headingLabel}
+  </button>
+  <!-- B-8, B-9. One control for two marks: what it writes is decided by what is
+       selected, which is `toggleCode`'s rule and not this button's. -->
+  <button
+    type="button"
+    class="row-control rounded border border-line px-2 py-1 font-mono text-xs text-ink-muted hover:border-accent hover:text-accent"
+    aria-label="Code"
+    title="Code — a run inside a line, or a box of its own"
+    data-testid="mark-code"
+    onmousedown={keepCaret}
+    onclick={code}
+  >
+    {'</>'}
   </button>
 </div>
 
@@ -285,22 +347,43 @@
       data-testid="note-rendered"
     >
       {#each blocks as block, index (index)}
-        {#if block.kind === 'heading1'}
-          <h3 class="mt-3 mb-1 text-base font-semibold first:mt-0">
-            {#each block.spans as span, i (i)}{#if span.bold}<strong>{span.text}</strong
-                >{:else}{span.text}{/if}{/each}
-          </h3>
+        {#if block.kind === 'code'}
+          <!-- B-8. The one thing here that is not a second drawing of the text:
+               a block of code is copied rather than read. The button is
+               `tabindex="-1"` inside this `aria-hidden` half, because the text
+               itself is in the field beneath — which is what a screen reader
+               reads and where Ctrl-C already works — and it is lifted over that
+               field, which otherwise takes every click in this box. -->
+          <div
+            class="my-2 overflow-hidden rounded-lg border border-line bg-surface-sunken"
+            data-testid="code-block"
+          >
+            <div class="flex items-center justify-between gap-2 px-3 pt-2 text-xs text-ink-faint">
+              <span>Code</span>
+              <button
+                type="button"
+                class="relative z-20 rounded px-1.5 py-0.5 hover:text-accent"
+                tabindex="-1"
+                data-testid="code-copy"
+                onmousedown={keepCaret}
+                onclick={() => void copyCode(index, block.spans[0]?.text ?? '')}
+              >
+                {copied === index ? 'Copied' : '⧉ Copy'}
+              </button>
+            </div>
+            <pre
+              class="overflow-x-auto px-3 pt-1 pb-3 font-mono text-xs leading-relaxed text-ink"><code
+                >{block.spans[0]?.text ?? ''}</code
+              ></pre>
+          </div>
+        {:else if block.kind === 'heading1'}
+          <h3 class="mt-3 mb-1 text-base font-semibold first:mt-0">{@render runs(block.spans)}</h3>
         {:else if block.kind === 'heading2'}
           <h4 class="mt-2 mb-1 text-sm font-semibold text-ink-muted first:mt-0">
-            {#each block.spans as span, i (i)}{#if span.bold}<strong>{span.text}</strong
-                >{:else}{span.text}{/if}{/each}
+            {@render runs(block.spans)}
           </h4>
         {:else}
-          <p>
-            {#each block.spans as span, i (i)}{#if span.bold}<strong class="font-semibold"
-                  >{span.text}</strong
-                >{:else}{span.text}{/if}{:else}&nbsp;{/each}
-          </p>
+          <p>{#if block.spans.length > 0}{@render runs(block.spans)}{:else}&nbsp;{/if}</p>
         {/if}
       {/each}
     </div>
@@ -333,7 +416,7 @@
 </div>
 
 <!-- B-7. Selected text is a question about those words, so the answer is beside
-     them rather than at the top of the page — and it is the same two controls,
+     them rather than at the top of the page — and it is the same controls,
      because a second vocabulary for one edit is a second thing to learn. -->
 {#if at}
   <div
@@ -362,6 +445,16 @@
       onclick={heading}
     >
       {headingLabel}
+    </button>
+    <button
+      type="button"
+      class="row-control rounded px-2 py-1 font-mono text-xs text-ink hover:bg-surface-sunken hover:text-accent"
+      aria-label="Code"
+      data-testid="selection-code"
+      onmousedown={keepCaret}
+      onclick={code}
+    >
+      {'</>'}
     </button>
   </div>
 {/if}

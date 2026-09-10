@@ -320,10 +320,10 @@ view is for.
 
 ## 12. Formatting in a note body
 
-**Proposed rather than taken** —
-[requirements.md §4.3 Bold and headings in a note body](requirements.md#43-bold-and-headings-in-a-note-body) is B-1 to
-B-6, written and not built. A note body (K-3) is the only long text in the application, and it has no way to say that a
-line is a heading or that a word matters. The question is what the body *is* once it can.
+**Taken** — [requirements.md §4.3 Marks in a note body](requirements.md#43-marks-in-a-note-body) is B-1 to B-10, built.
+A note body (K-3) is the only long text in the application, and it had no way to say that a line is a heading, that a
+word matters, or that a run of characters is a command to be typed exactly. The question is what the body *is* once it
+can.
 
 ### 12.1 The options
 
@@ -345,11 +345,23 @@ text a person can retype and unpleasant for structure they cannot see.
 The fallback is the tiebreak between A and the rest. A device that has not been updated shows `**07:40**`, which is a
 time with four characters around it. Under B it shows a paragraph of tags, and under C it shows JSON.
 
-### 12.2 What reopens it
+### 12.2 It reopened, and A answered again
 
-A body that wants a list, a link or code — which is a note-taking application rather than a checklist with notes
-attached. The thing to reach for then is a real editor and the cost is the caret model, so the measurement that would
-justify it is bodies long enough that the person is writing *in* the app rather than *about* the rows.
+A body wanted code, which is the first of the three things named here as the reopening condition. The answer was not the
+editor this section expected: it was two more marks in the same subset — B-8's fenced block and B-9's inline run,
+[requirements.md §4.3 Marks in a note body](requirements.md#43-marks-in-a-note-body) — because the argument that chose A
+is about the payload, and a third mark costs the payload exactly what the first two did, which is nothing. A build that
+predates them shows three backticks around a command, which is a command with six characters near it.
+
+What that argument does *not* answer is the caret. Every mark here is written by an edit to the text and read back by a
+parser, so a control is typing and the field's own undo reverses it; the moment a body wants something that cannot be
+spelled as characters a person could have typed — an image, a table with dragged column widths, a link whose target is
+not its text — A stops being cheap and the thing to reach for is B, with the caret model as the price.
+
+### 12.3 What is still refused
+
+A link, an image, a table, and anything that needs a second field. The measurement that would justify B remains the one
+this section always named: bodies long enough that the person is writing *in* the app rather than *about* the rows.
 
 ---
 

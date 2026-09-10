@@ -141,8 +141,8 @@ lower this device's top counter, or every peer reads the file as a partial downl
 
 Never in a file, always `localStorage`: the device id, collapse state, which sidebar rows are open, the drawer's state,
 the sidebar's and the note pane's widths, which folder this device chose, which cloud app it belongs to, the chosen
-theme and the two colours picked over it, how large the sidebar's type is, and dismissed conflict rows. The File System Access handle is
-the exception, and only because it is an object: IndexedDB.
+theme and the two colours picked over it, how large the sidebar's type is, and dismissed conflict rows. The File System
+Access handle is the exception, and only because it is an object: IndexedDB.
 
 ### Component catalog
 
@@ -181,18 +181,27 @@ committed, and a note body updates the store on a 1 s debounce but only becomes 
 
 ### The note body
 
-`body` is a string and stays one (B-2). Bold and two heading levels are Markdown marks *inside* it — `**bold**`, `# `,
-`## ` — so the merge, the conflict rows and compaction never learned that a body can be formatted, and a build that
-predates M7 shows the marks as characters rather than as noise. `src/core/markup.ts` is the only module that spells a
-mark: `parseBody` returns blocks and spans (never HTML — B-6), `plainText` is what search matches and snippets show
-(B-5), and `toggleBold`/`setHeading` are the two controls, which write marks a person could have typed and are therefore
-undone by the field's own undo.
+`body` is a string and stays one (B-2). Bold, two heading levels and code are Markdown marks *inside* it — `**bold**`,
+`# `, `## `, three backticks on a line of their own, one backtick inside a line — so the merge, the conflict rows and
+compaction never learned that a body can be formatted, and a build that predates M7 shows the marks as characters rather
+than as noise. `src/core/markup.ts` is the only module that spells a mark: `parseBody` returns blocks and spans (never
+HTML — B-6), `plainText` is what search matches and snippets show (B-5), and `toggleBold`/`setHeading`/`toggleCode` are
+the three controls, which write marks a person could have typed and are therefore undone by the field's own undo.
 
-Two controls, never four: bold, and a heading that cycles none, heading, subheading — the shape A-2's priority flag
-already has. They sit in a row above the field, and **selecting a run of text raises the same pair beside the
-selection** (B-7). Placing that pair is the one hard part: a textarea has no range geometry, so `src/ui/text-rect.ts`
-lays the text out again in a mirror wearing the field's metrics and measures the run there, and `selectionchange` on the
-document is what raises the controls — a field fires nothing of its own when a drag ends outside it.
+Three controls, never five: bold; a heading that cycles none, heading, subheading — the shape A-2's priority flag
+already has; and one `</>` whose mark is decided by the selection rather than by a second button — a run inside one line
+becomes `` `inline` ``, a caret or a selection crossing a line break becomes a fenced box, and a caret already inside a
+box takes the fences off. They sit in a row above the field, and **selecting a run of text raises the same controls
+beside the selection** (B-7).
+
+**A fenced block is the one construct that spans lines, and the one place the other marks are characters** — `**` inside
+it is two asterisks, which is most of why it exists. An unclosed fence stays literal, for the reason an unmatched `**`
+does. It draws as a box headed `Code` with a Copy button, and that button is the one positioned thing inside B-3's
+`aria-hidden` rendered half carrying a `z-index`: without it the click lands in the transparent textarea lying over the
+box. It is `tabindex="-1"` because the text is in that field, which is what a screen reader reads. Placing that pair is
+the one hard part: a textarea has no range geometry, so `src/ui/text-rect.ts` lays the text out again in a mirror
+wearing the field's metrics and measures the run there, and `selectionchange` on the document is what raises the
+controls — a field fires nothing of its own when a drag ends outside it.
 
 `src/ui/NoteBody.svelte` holds one textarea that is never unmounted. When the caret is elsewhere it lies transparent
 over the rendered blocks, so the click that reaches it is the click that focuses it; swapping two elements would drop
@@ -268,10 +277,11 @@ past_decision.md §11.
 `src/ui/SidebarLinks.svelte` renders the **top-level** folders and notes and, under each, its immediate folder and note
 children — two levels, and it does not recurse (T-10). Every entry carries the tree's own `⋮` menu on its right (T-18),
 the same component over the same `actions.ts` list, so nothing can drift into a sidebar-only set of actions; the two
-editors a nav entry has nowhere to draw come up disabled, which is the rule `RowActionContext` already had. The second level is behind a disclosure and **starts closed**
-(T-17): `sidebarOpen` in `src/app/view-state.svelte.ts` holds the *open* ids, so a device that never opens one sees the
-column M6 shipped. It is deliberately not T-8's collapse set — the nav and the page are two drawings and neither moves
-the other. Deeper than that is the tree view's, which is what draws the nesting.
+editors a nav entry has nowhere to draw come up disabled, which is the rule `RowActionContext` already had. The second
+level is behind a disclosure and **starts closed** (T-17): `sidebarOpen` in `src/app/view-state.svelte.ts` holds the
+*open* ids, so a device that never opens one sees the column M6 shipped. It is deliberately not T-8's collapse set — the
+nav and the page are two drawings and neither moves the other. Deeper than that is the tree view's, which is what draws
+the nesting.
 
 ### Today and Tomorrow
 

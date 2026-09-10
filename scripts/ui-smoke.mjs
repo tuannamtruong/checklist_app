@@ -64,7 +64,12 @@ async function main() {
   const server = await startPreview();
   const { chromium } = playwright();
   const browser = await chromium.launch({ headless: !headed });
-  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  // The clipboard is granted for one check: B-8's Copy button on a code block,
+  // which is the only thing in the application that writes to it.
+  const context = await browser.newContext({
+    viewport: { width: 1280, height: 900 },
+    permissions: ['clipboard-read', 'clipboard-write'],
+  });
   await seedInto(context);
 
   const consoleErrors = [];
@@ -1387,6 +1392,61 @@ async function main() {
       afterReload.join('|') === 'Milk|Coffee beans',
       afterReload.join('|'),
     );
+    // --- B-8, B-9: code, as a box and inside a line ----------------------
+    // The box is the one thing on the rendered half that is not a second
+    // drawing of the text, so it is checked as a control: it has to be clicked
+    // through the transparent field B-3 keeps over it.
+    await page.goto(`${BASE_URL}#/n/n_seed0012`);
+    await page.waitForSelector('[data-testid="note-body"]');
+    const codeField = page.locator('[data-testid="note-body"]');
+    await codeField.click();
+    await page.keyboard.press('Control+End');
+    await page.keyboard.type('\nRun:\n');
+    await page.locator('[data-testid="mark-code"]').click();
+    await page.keyboard.type('npm run dev');
+    check(
+      'the code control opens a box on an empty line and leaves the caret in it — B-8',
+      (await codeField.inputValue()).endsWith('Run:\n```\nnpm run dev\n```'),
+      (await codeField.inputValue()).split('\n').slice(-3).join(' / '),
+    );
+
+    await page.keyboard.press('Control+End');
+    await page.keyboard.type('\nThe short one is docker up.');
+    const line = (await codeField.inputValue()).length;
+    await codeField.evaluate((el, at) => el.setSelectionRange(at - 10, at - 1), line);
+    await page.locator('[data-testid="selection-code"]').waitFor({ state: 'visible' });
+    await page.locator('[data-testid="selection-code"]').click();
+    check(
+      'and a run inside one line becomes inline code instead — B-9',
+      (await codeField.inputValue()).endsWith('The short one is `docker up`.'),
+      (await codeField.inputValue()).split('\n').at(-1),
+    );
+
+    await page.locator('[data-testid="page-title"]').first().click();
+    await page.waitForSelector('[data-testid="note-rendered"]');
+    const noteView = page.locator('[data-testid="note-rendered"]');
+    check(
+      'a fenced block draws as one box and an inline run as one word — B-8, B-9',
+      (await page.locator('[data-testid="code-block"]').count()) === 1 &&
+        (await noteView.locator('code').count()) === 2 &&
+        !(await noteView.innerText()).includes('`'),
+      (await noteView.innerText()).replace(/\s+/g, ' '),
+    );
+    await page.screenshot({ path: join(shots, 'note-code.png'), fullPage: true });
+
+    // The click has to reach a button that sits under B-3's transparent field.
+    await page.locator('[data-testid="code-copy"]').click();
+    check(
+      'and Copy puts the block on the clipboard through the field over it — B-8',
+      (await page.evaluate(() => navigator.clipboard.readText())) === 'npm run dev',
+      await page.locator('[data-testid="code-copy"]').innerText(),
+    );
+    // The body is one JSON string in the op, so a newline in it is `\n` in the
+    // file — the run of code is what is looked for rather than the fences.
+    await landed(page, 'npm run dev');
+
+    await page.goto(BASE_URL);
+    await page.waitForSelector('[data-testid="tree"]');
     await page.locator('[data-testid="done-link"]').click();
     await page.waitForSelector('[data-testid="done-page"]');
     check(

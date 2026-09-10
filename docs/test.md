@@ -200,10 +200,16 @@ with the marks in it.
 
 B-7 is checked as geometry, which is unusual here and is the point: a textarea has no range geometry, so the controls
 are placed by laying the text out a second time in a mirror element
-([requirements.md §4.3 Bold and headings in a note body](requirements.md#43-bold-and-headings-in-a-note-body)), and the
-only thing that can say the measurement landed on the selected line rather than at the origin is a real browser
-measuring the rendered result. The run selects a word, asserts the controls sit inside the field's box and level with
-the line, uses them, and asserts they go when the selection does.
+([requirements.md §4.3 Marks in a note body](requirements.md#43-marks-in-a-note-body)), and the only thing that can say
+the measurement landed on the selected line rather than at the origin is a real browser measuring the rendered result.
+The run selects a word, asserts the controls sit inside the field's box and level with the line, uses them, and asserts
+they go when the selection does.
+
+B-8's code box is checked in the browser for a reason the parser cannot reach: it is the one thing on the rendered half
+that is also a control, and B-3 keeps a transparent field over that half. The run makes a box from the control, asserts
+the fences landed around what was then typed, selects a run inside a line and asserts the same control wrote backticks
+instead, and then clicks Copy and reads the clipboard back — which is what says the button is above the field rather
+than under it. `markup.test.ts` owns everything else about the two marks, including the fence that never closed.
 
 K-9 is a browser check for a reason a unit test cannot get at: the split itself is `paste.test.ts`'s, but the event that
 carries a clipboard into an input only exists in a browser. The smoke run dispatches one over the quick-add line with

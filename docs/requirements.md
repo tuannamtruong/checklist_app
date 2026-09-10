@@ -416,23 +416,25 @@ so nothing about it is stored, which is a stronger version of the promise A-5 wa
 **Search and the Done view are untouched, and always were.** Search (F-4) scans every row by name and the Done view
 (T-12) lists what has left the tree; a tag narrowing either would be a second answer to a question asked somewhere else.
 
-### 4.3 Bold and headings in a note body
+### 4.3 Marks in a note body
 
 A note's body (K-3) is the one place in the application with more than a line of text in it, and it was the only place
-where "this line is a heading" and "this word matters" could not be said — everything else here is a row, and a row has
-a kind, a flag and tags to say what it is.
+where "this line is a heading", "this word matters" and "this is a command, type it exactly" could not be said —
+everything else here is a row, and a row has a kind, a flag and tags to say what it is.
 [past_decision.md §12 Formatting in a note body](past_decision.md#12-formatting-in-a-note-body) is what this was chosen
 over.
 
 | ID | Requirement | State | Where |
 | --- | --- | --- | --- |
-| B-1 | A note body carries **bold** and two levels of heading, and no other formatting | ✅ | `src/core/markup.ts` — the one place a mark is spelled, beside `tags.ts` and `paste.ts`; `markup.test.ts` |
+| B-1 | A note body carries **bold**, two levels of heading and code, and no other formatting | ✅ | `src/core/markup.ts` — the one place a mark is spelled, beside `tags.ts` and `paste.ts`; `markup.test.ts` |
 | B-2 | The marks are Markdown's — `**bold**`, `# ` and `## ` — and they are stored in `body` itself | ✅ | Nothing changed in `Node`, the op, the merge, the conflict rows or compaction: `body` is a string before and after |
 | B-3 | The body is edited as text and read as rendered: the marks are visible while the caret is in it, the formatting when it is not | ✅ | `src/ui/NoteBody.svelte`. One textarea, never unmounted — transparent over the rendered blocks when the caret is elsewhere, so the click that reaches it is the click that focuses it |
 | B-4 | `Ctrl-B` wraps the selection, and two on-screen controls do the same: bold, and a heading that cycles heading, subheading, none | ✅ | `toggleBold`, `setHeading` and `nextHeading` in `src/core/markup.ts`, driven by `src/ui/NoteBody.svelte`. A phone has no Ctrl key, which is [§3.1 Keyboard (desktop)](#31-keyboard-desktop)'s rule applied to a body rather than to a row |
 | B-7 | Selecting a run of text raises those same two controls beside the selection | ✅ | `src/ui/NoteBody.svelte` over `document`'s `selectionchange`; `src/ui/text-rect.ts` measures where the run sits. A heading applies to every line the selection touches — `setHeading` takes a range, and a caret is a range of no width |
 | B-5 | Search matches the body without its marks, and shows the snippet without them | ✅ | `src/core/search.ts` over `plainText()` from `markup.ts` — F-1 is a substring match, and it must not break because `**` sits in the middle of a word; `search.test.ts` |
 | B-6 | The renderer emits structure, never HTML | ✅ | `parseBody` returns blocks and spans; the component renders them, so Svelte's own escaping is what reaches the DOM and a pasted `<script>` is text |
+| B-8 | A body carries a block of code: three backticks on a line of their own, opening and closing. It draws as a box, headed `Code`, with a button that copies it | ✅ | `parseBody`'s one multi-line construct and `toggleCode` in `src/core/markup.ts`, drawn by `src/ui/NoteBody.svelte`. No language: a word after the opening fence is read and drawn with nothing, so a pasted ` ```js ` block is code rather than three literal characters |
+| B-9 | And a run of code inside a line: one backtick each side | ✅ | `spansOf` in `src/core/markup.ts`, which reads a backtick before an asterisk — code is the one place where `**` is two characters. The same control writes it: `toggleCode` reads the selection to decide which of the two marks it means |
 
 **The marks live in the body, and that is the whole design.** `body` stays a string, so every rule already written about
 it still holds without a word changed: one field, last-writer-wins, a conflict row when two devices raced (C-4), a whole
@@ -440,10 +442,28 @@ body per op on blur or after 60 s (S-20), and a superseded one dropped by compac
 shows `**07:40**` — four characters of noise around a legible time, which is the entire argument for Markdown over an
 HTML body or a JSON document: the fallback is readable, on the phone that has not been updated and in the file itself.
 
-**Three marks, and the absence of the rest is the design too.** No italics, links, code, quotes or bullet lists. The
-application already has lists — that is the tree, T-1, and a bullet in a note body is a checklist that cannot be ticked,
-moved or found. A link between rows is what search and the sidebar are for. Every mark added is one more thing to
-escape, to render, to teach and to strip before matching, so the list grows only when a note actually wants one.
+**The list of marks grows only when a note actually wants one, and code is the case that wanted one.**
+[past_decision.md §12 Formatting in a note body](past_decision.md#12-formatting-in-a-note-body) named a body wanting
+code or a list as the two things that would reopen the question, and B-8 to B-10 are that reopening — answered by
+extending the subset rather than by the editor §12 refused, because the argument that chose Markdown is about the
+payload and the payload has not changed. Still no italics, links or quotes: every mark is one more thing to escape, to
+render, to teach and to strip before matching.
+
+**Code is the one place where the other marks are characters.** `**` inside a fenced block or between two backticks is
+two asterisks, which is most of the point of having it — a note that explains a command has to be able to show the
+command. `spansOf` therefore reads a backtick before an asterisk, and a fenced block's content is taken whole and never
+parsed at all.
+
+**A fence that has not closed is three literal characters**, for the reason an unmatched `**` is two: the body is being
+typed, and a line that swallows the rest of the note the moment the third backtick lands is a line that fights the
+typing. The control writes both fences at once, so the closed case is the ordinary one.
+
+**The box is the one thing on the rendered half that is not a second drawing of the text.** Code is copied rather than
+read, so B-8's box carries a Copy button — and B-3 keeps a transparent field over that half, so the button is lifted
+over the field (it is the one positioned thing in there with a `z-index`) or the click would land in the textarea
+beneath it. It stays `tabindex="-1"` inside the `aria-hidden` half: the text itself is in the field, which is what
+assistive technology reads and where `Ctrl-C` already works, and a second tab stop for a copy of it would be a second
+announcement of one value.
 
 **A heading needs the space: `# ` opens a heading, `#town` does not.** A leading hash with no space is how a person
 writes a tag (`src/core/tags.ts` drops it), and a body line beginning `#errand` has to stay the word it is.
@@ -464,14 +484,17 @@ exactly the characters a person could have typed, so the field's own undo revers
 keep in step. A button must not take the focus while it does that, or the blur would commit the body and move the caret
 out of the text the button is about to edit.
 
-**Two controls, not four: the heading cycles.** None, heading, subheading, and round again, with the button showing
-which one the line carries. That is the shape A-2's priority flag already has —
-[§4.1 Tags and priority](#41-tags-and-priority) — and the argument is the same one: a button per level teaches nothing
-that one button naming the level does not, and the levels are worth a control rather than a menu.
+**Three controls for five marks.** The heading cycles — none, heading, subheading, and round again, with the button
+showing which one the line carries — which is the shape A-2's priority flag already has,
+[§4.1 Tags and priority](#41-tags-and-priority), and the argument is the same one: a button per level teaches nothing
+that one button naming the level does not. `</>` is the same argument applied to code: it writes an inline run when a
+run inside one line is selected, a box when it is a caret or a selection crossing a line break, and it takes the fences
+off again from inside a box. Which of the two marks is meant is a question about the selection, so the selection answers
+it rather than a fourth button.
 
-**B-7 puts that pair where the words are.** Selected text is a question about those words, so the answer belongs beside
-them rather than at the top of the page — and it is the *same* two controls, because a second vocabulary for one edit is
-a second thing to learn. The row above the field stays, and is not redundant: it is the only reach when nothing is
+**B-7 puts those controls where the words are.** Selected text is a question about those words, so the answer belongs
+beside them rather than at the top of the page — and it is the *same* controls, because a second vocabulary for one edit
+is a second thing to learn. The row above the field stays, and is not redundant: it is the only reach when nothing is
 selected, which is the ordinary way to make the line the caret is on a heading, and it is what teaches that the marks
 exist at all.
 
@@ -1252,7 +1275,7 @@ every possible destination is a second navigation to build and to test, and the 
 
 | M6 | Fewer things | **Closed.** A milestone that mostly removed: the fourth kind (K-1, `list` folded into `folder` at the decoder), the second control for a kind change ([K-6, withdrawn](#4-item-kinds-and-attributes)), and the sidebar's copy of the whole tree (T-10, one level then; T-17 later gave it a second level that starts closed). The one thing it added is K-9, a pasted paragraph becoming one row per line, which is the quick-add line answering a question it already had the machinery for. Nothing here changed the payload, the merge or the folder |
 
-| M7 | Formatting in a note body | **Closed.** B-1 to B-6 — [§4.3 Bold and headings in a note body](#43-bold-and-headings-in-a-note-body) — bold and two heading levels, as Markdown marks inside the body string. The one milestone so far that adds a feature and changes nothing about the payload: `body` was a string before it and is a string after, so the merge, the conflict rows and compaction never learned that a body can be formatted |
+| M7 | Formatting in a note body | **Closed.** B-1 to B-6 — [§4.3 Marks in a note body](#43-marks-in-a-note-body) — bold and two heading levels, as Markdown marks inside the body string. The one milestone so far that adds a feature and changes nothing about the payload: `body` was a string before it and is a string after, so the merge, the conflict rows and compaction never learned that a body can be formatted |
 | M8 | A note beside the list | **Closed.** X-21 to X-24 — [§10.3 A note beside the list](#103-a-note-beside-the-list) — a note opens beside the nearest list above it at `lg` and as a 60%-tall sheet over it below, a page's column is left-aligned so nothing moves when it does, and the divider between the two columns is dragged. Like M7 it adds a feature and changes nothing about the payload: no route, no op, no field. The one thing it stores is X-24's width, and that is device-local like every other width here. It is one composition change in `src/ui/App.svelte`, one new view, and one grip that the sidebar now shares |
 
 | M9 | Today and Tomorrow | **Closed.** G-1 to G-7 — [§4.4 Today and Tomorrow](#44-today-and-tomorrow) — two lists that are not the tree, and the first milestone since M6 to touch the payload: one parent that is not a node and one field, `day`. What it did *not* add is a write nobody made — the rollover is a date comparison at read time, so nothing happens at midnight on any device. It also carried T-17's second level in the sidebar and X-28's shorter corner, both of which are what made room for two more nav entries |
