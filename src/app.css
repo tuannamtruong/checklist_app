@@ -360,3 +360,13 @@ body {
 .width-grip {
   touch-action: none;
 }
+
+/* X-38. What lets the sheet's own height be *transitioned* at all: `height`
+   walks between the peek's content height and the open sheet's viewport height
+   only where the browser is allowed to interpolate the `auto` keyword. A
+   browser that is not simply arrives at the other height, which is exactly what
+   the sheet did before there was a transition — so the gesture is the feature
+   and the motion is what it looks like where it can be drawn. */
+.sheet-height {
+  interpolate-size: allow-keywords;
+}

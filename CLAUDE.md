@@ -245,6 +245,15 @@ anywhere (X-22). A peeked sheet is covered by one transparent button that swallo
 tap would land in B-3's always-mounted textarea. Expansion is one boolean in the pane, reset when the note changes — a
 gesture, not a setting.
 
+**On that sheet the pane wears the phone's clothes.** The way out is `←` in the top left corner rather than `✕` on the
+right (X-36) — one control, ordered and lettered by the breakpoint, doing exactly what X-30 already gave it. The peek
+draws a `Preview` tag where `NoteBody`'s three format controls sit, because a sheet whose every tap is swallowed cannot
+be typed into (X-37). And the sheet is dragged as well as tapped: a swipe up on the peek opens it, a swipe down on the
+grip puts it back, and it slides between the two rather than jumping (X-38). `sheetSwipe` in `src/ui/sheet.ts` is what a
+travel means and the only part a unit test can see; the open sheet is a `height` of the viewport rather than a `top: 0`,
+so the two states are two values of one property, and `.sheet-height` in `src/app.css` is the one declaration that lets
+a transition cross the peek's `auto`. A browser without it arrives in one frame, which is what the sheet did before.
+
 **The pane is an editor and nothing else — X-31.** The title, the tags, the body, and K-8's add line as the top row
 where `Breadcrumbs` used to be. No path — the column on the left *is* the note's path, in rows. No list of the note's
 own children — that same column draws them, nested under the note's own row, and drawing them here put the same rows on

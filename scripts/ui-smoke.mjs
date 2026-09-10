@@ -2234,6 +2234,33 @@ async function main() {
     );
     await swipe(page, 195, (await sheet.boundingBox()).y + 40, -120);
     await page.waitForTimeout(300);
+    // And it *slides*: the collapse is sampled every frame, and one frame in
+    // between the two heights is the whole claim. Sampling rather than reading
+    // one height at a guessed instant, because the guess is what would be flaky.
+    const frames = await page.evaluate(async () => {
+      const pane = document.querySelector('[data-testid="note-pane"]');
+      const grip = document.querySelector('[data-testid="sheet-grip"]');
+      const seen = [];
+      const from = performance.now();
+      grip.click();
+      await new Promise((done) => {
+        const tick = () => {
+          seen.push(Math.round(pane.getBoundingClientRect().height));
+          if (performance.now() - from < 400) requestAnimationFrame(tick);
+          else done();
+        };
+        requestAnimationFrame(tick);
+      });
+      return seen;
+    });
+    const between = frames.filter((h) => h > Math.round(peeked.height) + 8 && h < 836);
+    check(
+      'and the sheet slides between the two heights rather than jumping — X-38',
+      between.length > 0 && frames[frames.length - 1] === Math.round(peeked.height),
+      `${between.length} frames in between, ending at ${frames[frames.length - 1]}px`,
+    );
+    await swipe(page, 195, (await sheet.boundingBox()).y + 40, -120);
+    await page.waitForTimeout(300);
 
     // The other half of the rule, which is what makes it a rule rather than a
     // fixed height: a body too long to fit stops at the cap.

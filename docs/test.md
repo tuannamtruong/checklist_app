@@ -271,7 +271,10 @@ lost them. X-38 is driven as a real drag: `pointerdown`, three moves and `pointe
 pointer had never travelled. A swipe down the grip returns the open sheet to exactly the peek's own height, a swipe up
 the peek reaches the same 844 the tap does, and a swipe *down* the peek leaves it peeked — the last one is the check
 that the drag did not fall through to X-22's tap layer, which is the one interaction the two features share.
-`sheet.test.ts` holds what a travel means, so the browser is only asked what the sheet did with it.
+`sheet.test.ts` holds what a travel means, so the browser is only asked what the sheet did with it. The motion is the
+fourth: the collapse is sampled once a frame for 400ms and the claim is that one sample landed between the two heights,
+which is a check that does not depend on guessing when to look — reading one height at a fixed instant is what would
+have been flaky.
 
 X-30 is two halves and the unit half carries most of it. `panes.test.ts` is a table over the one derivation — which note
 the pane draws and which list is beside it, given a route and the note the caret is in — and `focus.svelte.test.ts` is

@@ -139,12 +139,20 @@
      while the list beside it scrolls. `max-h-[60dvh]` over an auto height is the
      whole of X-22's sizing rule: a note short enough to fit is shown whole and a
      long one is cut at 60%, with nothing measured and nothing to re-measure when
-     a peer's edit changes the body under it (X-10). -->
+     a peer's edit changes the body under it (X-10).
+
+     X-38's motion is that same rule given a duration. The open sheet is a
+     `height` of the viewport rather than a `top: 0`, so the two states are two
+     values of one property and the transition has something to walk between —
+     the peek's is still its content's, which is why `.sheet-height` is there to
+     let the keyword interpolate. Above `lg` the pane is a column and there is
+     no state to animate, which is what `lg:transition-none` says. -->
 <aside
   class="fixed inset-x-0 bottom-0 z-20 {fromCaret ? 'hidden lg:flex' : 'flex'} flex-col rounded-t-2xl border-t border-line bg-surface-raised shadow-lg
          lg:sticky lg:inset-auto lg:top-0 lg:z-auto lg:h-dvh lg:w-[var(--note-width)] lg:shrink-0
          lg:rounded-none lg:border-t-0 lg:border-l lg:shadow-none
-         {expanded ? 'top-0 max-h-none' : 'max-h-[60dvh]'} lg:top-0 lg:max-h-none"
+         sheet-height transition-[height,max-height] duration-200 ease-out motion-reduce:transition-none lg:transition-none
+         {expanded ? 'h-dvh max-h-dvh' : 'max-h-[60dvh]'} lg:top-0 lg:max-h-none"
   style="--note-width: {view.notePaneWidth}px"
   aria-label="Note"
   data-testid="note-pane"
