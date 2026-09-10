@@ -194,7 +194,13 @@
 
    Unlayered, so it wins over the utility classes the chip also carries. */
 .tag-chip {
-  --tag-hue: hsl(calc(var(--tag-tint, 0) * 30deg) 62% 48%);
+  /* A-9. Sixteen even steps of an `oklch` wheel rather than of an `hsl` one:
+     `hsl` at one saturation and one lightness spends half its circle on red
+     through green and draws its blues far darker than its yellows, so a
+     handful of tags read as three colours. `oklch` holds the lightness and the
+     chroma steady by perception, which is what puts a teal and a purple on the
+     same footing as a red — requirements.md §4.1. */
+  --tag-hue: oklch(0.63 0.15 calc(var(--tag-tint, 0) * 22.5deg));
   border-color: color-mix(in oklab, var(--tag-hue) 52%, var(--color-line));
   color: color-mix(in oklab, var(--tag-hue) 80%, var(--color-ink));
   background-color: color-mix(in oklab, var(--tag-hue) 14%, var(--color-surface));

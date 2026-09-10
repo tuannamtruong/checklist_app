@@ -71,7 +71,10 @@
       <div class="flex flex-wrap items-center gap-2 px-1">
         <!-- The bar above the tree used to say this. Every selected tag must be
              on the row, and the page says AND rather than letting the reader
-             infer it from a result they cannot see — §4.2. -->
+             infer it from a result they cannot see — §4.2. It is also the whole
+             of the empty state: "0 rows with errand and town" is the answer,
+             and a second sentence under the empty list restating it is a line
+             read once and skipped past on every visit after it. -->
         <p class="text-xs text-ink-faint" data-testid="tags-summary">
           {rows.length} row{rows.length === 1 ? '' : 's'} with {tags.join(' and ')}
         </p>
@@ -105,10 +108,6 @@
                 {pathLabelOf(session.tree, row.id, row.path, Date.now())}
               </span>
             </a>
-          </li>
-        {:else}
-          <li class="px-2 py-3 text-sm text-ink-muted" data-testid="tags-none">
-            Nothing carries {tags.join(' and ')}.
           </li>
         {/each}
       </ul>

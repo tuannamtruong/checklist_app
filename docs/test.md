@@ -206,11 +206,17 @@ The run selects a word, asserts the controls sit inside the field's box and leve
 they go when the selection does.
 
 A-9's tag colours split the same way as everything else here: `tag-colour.test.ts` asserts what the hash promises — a
-tint for every name, the same one every time, and more than one tint across a handful of ordinary tags — and it asserts
-the *seam*, that `app.css` still holds the rule the number feeds. The browser owns the rest, because a colour is a
-computed style: the run reads two tags' computed colour on the Tags page and asserts they differ, and reads one tag's
-tint on its row in the tree and on the page and asserts they match, which is the whole of "derived from the name and
-stored nowhere".
+tint for every name, the same one every time, more than one tint across a handful of ordinary tags, and *every* one of
+the sixteen across a page of them, which is the test that fails if the avalanche step in `tagTint` is taken out — and it
+asserts the *seam*, that `app.css` still holds the rule the number feeds, in the step size the catalog names. The
+browser owns the rest, because a colour is a computed style: the run reads two tags' computed colour on the Tags page
+and asserts they differ, and reads one tag's tint on its row in the tree and on the page and asserts they match, which
+is the whole of "derived from the name and stored nowhere".
+
+B-11 splits at the same seam. `markup.test.ts` owns what a `**` means inside code — a pair per line, an unmatched one
+left as characters, a box carrying no bold still one span — and the browser owns the two things that are not functions
+of the string: bold drawn as bold inside the box rather than as four characters, and an inline run staying *one* element
+while its marks cut it into several spans.
 
 B-8's code box is checked in the browser for a reason the parser cannot reach: it is the one thing on the rendered half
 that is also a control, and B-3 keeps a transparent field over that half. The run makes a box from the control, asserts

@@ -1,4 +1,4 @@
-// A-9. Which of the twelve tints a tag draws in — requirements.md §4.1.
+// A-9. Which of the sixteen tints a tag draws in — requirements.md §4.1.
 //
 // The colour is a function of the tag's own name, so it is the same on every
 // device, in every view and after every reload without anything being stored,
@@ -9,12 +9,16 @@
 // **This returns a number, never a colour.** `src/app.css` is what decides what
 // the twelve tints look like, exactly as it decides what `accent` looks like —
 // a component that named a colour would be the bug, and so would this
-// (§10.1 Themes). The number is a hue bucket: one of twelve steps around the
-// wheel, which is far enough apart to tell two chips apart at a glance and few
-// enough that the same tint means the same tag rather than a near-miss.
+// (§10.1 Themes). The number is a hue bucket: one of sixteen steps around an
+// `oklch` wheel, which is far enough apart to tell two chips apart at a glance
+// and few enough that the same tint means the same tag rather than a near-miss.
+// The steps are even *by perception* rather than by `hsl` degree, which is what
+// makes a blue, a teal and a purple as likely and as strong as a red — half an
+// `hsl` wheel at one saturation is red through green, so an even sixteenth of
+// it was not an even sixteenth of what anybody saw.
 
-/** Twelve steps of 30°, which is what `.tag-chip` in `src/app.css` multiplies by. */
-export const TAG_TINTS = 12;
+/** Sixteen steps of 22.5°, which is what `.tag-chip` in `src/app.css` multiplies by. */
+export const TAG_TINTS = 16;
 
 /**
  * The tint for a tag, from the tag itself.
@@ -36,7 +40,16 @@ export function tagTint(tag: string): number {
     // range, and `Math.imul` keeps it a 32-bit multiply on every engine.
     hash = Math.imul(hash, 0x01000193);
   }
+  // The remainder reads the low bits, and an FNV-1a's low bits are the ones it
+  // mixes worst: eight ordinary tags landed on four tints, which is what "they
+  // are all red or green" looked like from the outside. One avalanche step —
+  // xor-shift, multiply, xor-shift, the finaliser shape — scatters the whole
+  // word down into them before the bucket is taken. It is still a pure function
+  // of the name, which is the only property A-9 needs of it.
+  hash ^= hash >>> 15;
+  hash = Math.imul(hash, 0x2545f491);
+  hash ^= hash >>> 13;
   // `>>> 0` first: the hash is a signed 32-bit integer by now, and a negative
-  // remainder would be a thirteenth tint that no CSS rule declares.
+  // remainder would be a seventeenth tint that no CSS rule declares.
   return (hash >>> 0) % TAG_TINTS;
 }

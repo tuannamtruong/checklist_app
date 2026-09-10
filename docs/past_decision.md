@@ -354,6 +354,12 @@ because the argument that chose A is about the payload, and a third mark costs t
 did, which is nothing. A build that predates them shows three backticks around a command, which is a command with six
 characters near it.
 
+B-11 is the same answer a third time, and the smallest of the three: `**` reads inside code now. It was refused when B-8
+and B-9 were written, on the grounds that a box of code exists so that a command can be shown as the characters it is —
+but the thing a long box is usually being shown for is one line in it, and there was no way to point at that line. A
+pair per line is what the parser already does with every other mark, so nothing about the payload, the merge or the
+fallback changed: a build that predates it shows two asterisks in a box, next to the line they were pointing at.
+
 What that argument does *not* answer is the caret. Every mark here is written by an edit to the text and read back by a
 parser, so a control is typing and the field's own undo reverses it; the moment a body wants something that cannot be
 spelled as characters a person could have typed — an image, a table with dragged column widths, a link whose target is

@@ -351,8 +351,9 @@ a date, and a date wants a calendar rather than a field.
 | A-5 | Which tags are chosen is device-local and never reaches a file | ✅ | The route — `#/tags/<tag>,<tag>` — which is a fragment and reaches no server either, F-5's argument applied to a tag. It sat in `src/app/view-state.svelte.ts` beside the collapse state until M11; nothing about it is stored now, which is a stronger version of the same promise — [§2.3 What is never in the Sync Folder](#23-what-is-never-in-the-sync-folder) |
 | A-6 | A row created while a filter is on carries that filter's tags | ✗ **Withdrawn** | It existed because a filtered tree could create a row it then hid. Nothing filters the tree since M11, so there is no filter to inherit and nothing to vanish from — [§4.2 Finding rows by tag](#42-finding-rows-by-tag). Tagging at creation is A-8's instead, and is typed rather than inherited |
 | A-7 | Every tag in the tree is listed on a page of its own, and choosing one lists the rows carrying it | ✅ | `src/ui/TagsPage.svelte` at `#/tags` and `#/tags/<tag>,<tag>`, a nav entry between Search and Done. It derives everything and stores nothing — `tagsInTree` and `taggedRows` are two scans of the materialised tree, exactly as F-4's search is. It is the **only** place in the application a tag narrows anything — [§4.2 Finding rows by tag](#42-finding-rows-by-tag) |
-| A-9 | Every tag draws in a colour of its own, derived from the tag's name and stored nowhere | ✅ | `tagTint` in `src/core/tag-colour.ts` hashes the name to one of twelve tints; `.tag-chip` in `src/app.css` is what a tint *looks* like, so no component and no TypeScript names a colour — [§10.1 Themes](#101-themes). `src/ui/TagChips.svelte`, `src/ui/TagEditor.svelte` and `src/ui/TagsPage.svelte` are the three views, and a tag is the same colour in all three because all three ask the same function |
+| A-9 | Every tag draws in a colour of its own, derived from the tag's name and stored nowhere | ✅ | `tagTint` in `src/core/tag-colour.ts` hashes the name to one of sixteen tints; `.tag-chip` in `src/app.css` is what a tint *looks* like — sixteen even steps of an `oklch` wheel, so a blue, a teal and a purple carry the weight a red does — and no component and no TypeScript names a colour — [§10.1 Themes](#101-themes). `src/ui/TagChips.svelte`, `src/ui/TagEditor.svelte` and `src/ui/TagsPage.svelte` are the three views, and a tag is the same colour in all three because all three ask the same function |
 | A-8 | A `#tag` prefix on the add line tags the row it makes: `#errand #town Buy milk` is a row called "Buy milk" carrying both | ✅ | `parseTagged` in `src/core/tags.ts`, called by `src/ui/QuickAdd.svelte` — leading tokens only, so a `#` further along the line stays part of the title. Every line of a K-9 paste is read on its own, which is why `createLastChildren` takes each row's tags rather than the block's. `tags.test.ts`, `edit.test.ts`, `scripts/ui-smoke.mjs` |
+| A-10 | A tag on a row opens the page for that tag | ✅ | `src/ui/TagChips.svelte` links each chip to `tagsHref([tag])` — one tag, not the chosen set, so a chip is always the same journey — [§4.2 Finding rows by tag](#42-finding-rows-by-tag) |
 
 **Tags are typed in front of the title — A-8.** `#errand #town Buy milk` on the add line is one row called "Buy milk"
 carrying two tags, which is how a row gets tagged as it is made now that A-6's filter is gone: typed by the reader
@@ -370,11 +371,19 @@ through `cleanTags` like anything else: case-folded, sorted, deduplicated, twelv
 **A tag's colour is a function of its name — A-9.** `errand` is the same colour on the row, in the tag editor and on
 `#/tags`, on this device and on the phone, after a reload and after a merge, because every one of them hashed the same
 six letters. Nothing is stored, nothing is chosen and nothing is merged: a colour per tag as a *field* would be a second
-value with a last-writer-wins rule and a conflict row, for a decoration. The hash picks one of twelve tints and
+value with a last-writer-wins rule and a conflict row, for a decoration. The hash picks one of sixteen tints and
 `src/app.css` decides what a tint looks like, which is [§10.1 Themes](#101-themes)'s rule kept intact — the three
 properties it sets are steps from the tag's hue toward the palette's own `ink` and `surface`, so one rule works on a
-light theme and a dark one. Twelve tints and a hash means two tags can land on the same one; that is the price of
+light theme and a dark one. Sixteen tints and a hash means two tags can land on the same one; that is the price of
 storing nothing, and the tags still differ by their names, which is what a chip mostly says.
+
+**The sixteen are even steps of an `oklch` wheel, and the hash is scattered before it picks one.** Both halves of that
+answer the same complaint: a handful of tags that all came out red, green or yellow. Half of an `hsl` wheel at one
+saturation *is* red through green, so an even sixteenth of it is not an even sixteenth of what a person sees, and a
+purple or a teal only turns up if a tag happens to land in the quarter that holds it; `oklch` spaces the hues by
+perception instead, at one lightness and one chroma, so every step is as strong as every other. The hash is FNV-1a, and
+the low bits of an FNV-1a are the poorly mixed ones — exactly the bits a remainder reads. One avalanche step before the
+remainder is what makes eight ordinary tags land on eight tints rather than on four.
 
 **A tag is normalised on the way in, and the normal form is what is stored.** Case-folded, its inner whitespace
 collapsed, a leading `#` dropped, trimmed to 32 characters, and the set held sorted and deduplicated —
@@ -412,10 +421,22 @@ list with no explanation. The rules are gone with the mode. `#/tags` answers ins
 of them: a list of matches carries the path rather than the ancestors, and nothing is hidden anywhere because nothing is
 being narrowed in place.
 
-**A tag on a row is a label, in the tag's own colour (A-9).** The chips `src/ui/TagChips.svelte` draws say what the row
-carries and do nothing when tapped — they were the shortest way into the filter, and there is no filter. They are
-deliberately not links to `#/tags/<tag>` either: a row is dragged (T-14, T-16) and its title is typed, and a navigation
-in the middle of that is a place a thumb lands by accident.
+**A tag on a row is the way to that tag's page — A-10.** The chips `src/ui/TagChips.svelte` draws are links to
+`#/tags/<tag>`: seeing `errand` on a row and wanting the rest of `errand` is one question, and the chip is where the
+reader already is when they ask it. They were labels that did nothing when tapped until M11, on the grounds that a row
+is dragged (T-14, T-16) and its title is typed, so a navigation in the middle of that is a place a thumb lands by
+accident — a chip is a small target beside a large one, and the risk was real. What settled it is that the *cost* of
+landing on one is a page that says where every row with that tag is, and Back. Nothing is destroyed and nothing is
+edited, so the accident is a glance rather than a repair.
+
+**A chip carries one tag rather than adding to the chosen set.** `#/tags/errand,town` is reachable from the page's own
+chips, which is where AND-ing belongs, [§4.2 Finding rows by tag](#42-finding-rows-by-tag) — a chip on a row that
+narrowed whatever was last chosen would mean two different things depending on a page the reader may not have visited.
+
+**A choice that matches nothing says so by counting.** The line above the list reads "0 rows with `errand` and `town`",
+and there is no second sentence under the empty list saying the same thing in words: the count is already the answer,
+and an empty state that restates it is a line read once and skipped past on every visit after it — F-6's rule about this
+page applied to its other end.
 
 **Which tags are chosen is the route — A-5.** `#/tags/errand,town`, one path segment with each tag encoded on its own,
 for the reason F-5 gives for the search query: the fragment reaches no server, so a list of rows is linkable, survives a
@@ -443,9 +464,10 @@ over.
 | B-7 | Selecting a run of text raises those same two controls beside the selection | ✅ | `src/ui/NoteBody.svelte` over `document`'s `selectionchange`; `src/ui/text-rect.ts` measures where the run sits. A heading applies to every line the selection touches — `setHeading` takes a range, and a caret is a range of no width |
 | B-5 | Search matches the body without its marks, and shows the snippet without them | ✅ | `src/core/search.ts` over `plainText()` from `markup.ts` — F-1 is a substring match, and it must not break because `**` sits in the middle of a word; `search.test.ts` |
 | B-6 | The renderer emits structure, never HTML | ✅ | `parseBody` returns blocks and spans; the component renders them, so Svelte's own escaping is what reaches the DOM and a pasted `<script>` is text |
-| B-8 | A body carries a block of code: three backticks on a line of their own, opening and closing. It draws as a box, headed `Code`, with a button that copies it | ✅ | `parseBody`'s one multi-line construct and `toggleCode` in `src/core/markup.ts`, drawn by `src/ui/NoteBody.svelte`. No language: a word after the opening fence is read and drawn with nothing, so a pasted ` ```js ` block is code rather than three literal characters |
+| B-8 | A body carries a block of code: three backticks on a line of their own, opening and closing. It draws as a box, headed `Code`, with a button that copies it | ✅ | `parseBody`'s one multi-line construct and `toggleCode` in `src/core/markup.ts`, drawn by `src/ui/NoteBody.svelte`. No language: a word after the opening fence is read and drawn with nothing, so a pasted ` ```js ` block is code rather than three literal characters. `**` inside the box is bold, read a line at a time — B-11 |
 | B-10 | A line that opens `- ` or `1. ` is a list item, drawn with its marker. Enter carries the marker onto the next line and counts the numbers up; Enter on an item with nothing in it takes the marker off and the list ends | ✅ | `LIST` and `listEnter` in `src/core/markup.ts`, typed into the field by `src/ui/NoteBody.svelte`. Nothing renumbers: what is drawn is the number in the string, which is what B-3 promises |
-| B-9 | And a run of code inside a line: one backtick each side | ✅ | `spansOf` in `src/core/markup.ts`, which reads a backtick before an asterisk — code is the one place where `**` is two characters. The same control writes it: `toggleCode` reads the selection to decide which of the two marks it means |
+| B-9 | And a run of code inside a line: one backtick each side | ✅ | `spansOf` in `src/core/markup.ts`, which reads a backtick before an asterisk, and then reads the run it found for `**` — B-11. The same control writes it: `toggleCode` reads the selection to decide which of the two marks it means |
+| B-11 | `**bold**` reads inside code, in the box and in an inline run | ✅ | `boldRuns` in `src/core/markup.ts`, called by both code paths, so a code span carries `bold` like any other span; `src/ui/NoteBody.svelte` draws it as `<strong>` inside the `<code>`. A pair per line, so a `**` with no partner on its own line is two characters |
 
 **The marks live in the body, and that is the whole design.** `body` stays a string, so every rule already written about
 it still holds without a word changed: one field, last-writer-wins, a conflict row when two devices raced (C-4), a whole
@@ -460,10 +482,19 @@ extending the subset rather than by the editor §12 refused, because the argumen
 payload and the payload has not changed. Still no italics, links or quotes: every mark is one more thing to escape, to
 render, to teach and to strip before matching.
 
-**Code is the one place where the other marks are characters.** `**` inside a fenced block or between two backticks is
-two asterisks, which is most of the point of having it — a note that explains a command has to be able to show the
-command. `spansOf` therefore reads a backtick before an asterisk, and a fenced block's content is taken whole and never
-parsed at all.
+**Code takes bold, and only bold — B-11.** `**` inside a fenced block or between two backticks marks a run the way it
+does anywhere else, so the line of a paste-in that matters can be picked out from the twenty around it, which is what a
+box of code is usually being shown *for*. Every other mark stays a character in there: `#` at the start of a line in a
+box is a comment and not a heading, `- ` is a flag and not a bullet, and a backtick inside a backtick pair is a
+backtick. `spansOf` still reads a backtick before an asterisk — the run is found first — and then reads the run it
+found, which is what makes `` `**x**` `` bold code rather than four literal characters.
+
+**Bold in a box is read a line at a time**, which is how every other mark in this parser is read. A `**` with no partner
+on its own line is two characters, so a shell line ending `$@ **` is the characters it is, and a block cannot be turned
+bold from halfway down by something typed at the bottom of it. The price is named rather than dodged: a snippet that
+wants a *literal* pair on one line — `f(**a, **b)` — draws that pair as bold, and the way to show it is the line without
+the second pair. That is the cost of the mark being the same two characters everywhere, which is what makes it
+learnable.
 
 **A fence that has not closed is three literal characters**, for the reason an unmatched `**` is two: the body is being
 typed, and a line that swallows the rest of the note the moment the third backtick lands is a line that fights the
@@ -978,10 +1009,10 @@ scrollbar, a caret and a form control's default read the browser's own setting, 
 
 **A-9's tag colours are the one thing on screen that is not a role, and they are still not a colour in TypeScript.** A
 tag has no *meaning* a palette could name — there are as many tags as the person types — so `src/core/tag-colour.ts`
-hashes the name to one of twelve tints and hands over a number. `.tag-chip` in `src/app.css` is what says what a tint
+hashes the name to one of sixteen tints and hands over a number. `.tag-chip` in `src/app.css` is what says what a tint
 looks like, and it says it as three steps from that hue toward this palette's own `ink`, `line` and `surface`: the same
-mix that keeps X-35's picked colours legible on six palettes keeps a tag legible on them, which is why twelve tints cost
-no per-theme block and no fifteenth token.
+mix that keeps X-35's picked colours legible on six palettes keeps a tag legible on them, which is why sixteen tints
+cost no per-theme block and no fifteenth token.
 
 **A theme never changes a layout, a size or a font.** Switching one repaints and moves nothing, so it cannot become a
 second UI to test — [test.md §3.5 UI](test.md#35-ui) drives one theme for behaviour and checks the rest for contrast

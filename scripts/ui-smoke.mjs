@@ -502,11 +502,26 @@ async function main() {
       .locator('[data-testid="tag-chip"][data-tag="town"]')
       .evaluate((el) => el.style.getPropertyValue('--tag-tint'));
     check(
-      'the chip is a label, not a filter: nothing on a row narrows anything — §4.2',
-      (await milkRow2.locator('[data-testid="tag-chip"] button').count()) === 0 &&
+      'the chip is a link to that one tag, and never a filter over the tree — A-10, §4.2',
+      (await milkRow2.locator('[data-testid="tag-chip"][data-tag="town"]').getAttribute('href')) ===
+        '#/tags/town' &&
         (await page.locator('[data-testid="tag-filter"]').count()) === 0 &&
         (await milkRow2.locator('button[data-testid="tag-chip"]').count()) === 0,
+      await milkRow2.locator('[data-testid="tag-chip"][data-tag="town"]').getAttribute('href'),
     );
+
+    // A-10. The whole journey, because the href above is only half of it: the
+    // chip on the row reaches the page for that tag, and Back is the way out.
+    await milkRow2.locator('[data-testid="tag-chip"][data-tag="town"]').click();
+    await page.waitForSelector('[data-testid="tagged-row"]');
+    check(
+      'and tapping it opens that tag on the Tags page — A-10',
+      page.url().endsWith('#/tags/town') &&
+        (await page.locator('[data-testid="tagged-row"]').count()) === 1,
+      `${page.url()} with ${await page.locator('[data-testid="tagged-row"]').count()} rows`,
+    );
+    await page.goBack();
+    await page.waitForSelector('[data-testid="tree"]');
 
     // Two more rows to tag, so the AND below has something to narrow.
     await quickAdd.fill('Errand run');
@@ -638,6 +653,23 @@ async function main() {
       'and the reload draws the same list, because nothing about it was stored — A-5',
       (await page.locator('[data-testid="tagged-row"]').count()) === 2,
     );
+
+    // §4.2. A choice matching nothing is answered by the count and by nothing
+    // else: the sentence under the empty list said the same thing twice.
+    const chosenUrl = page.url();
+    await page.goto(`${chosenUrl.split('#')[0]}#/tags/nobodyhasthis`);
+    await page.locator('[data-testid="tags-summary"]').waitFor();
+    check(
+      'a choice that matches nothing says so by counting, and adds no second sentence — §4.2',
+      (await page.locator('[data-testid="tags-summary"]').innerText()).includes(
+        '0 rows with nobodyhasthis',
+      ) &&
+        (await page.locator('[data-testid="tagged-row"]').count()) === 0 &&
+        (await page.locator('[data-testid="tags-none"]').count()) === 0,
+      await page.locator('[data-testid="tags-summary"]').innerText(),
+    );
+    await page.goto(chosenUrl);
+    await page.waitForSelector('[data-testid="tagged-row"]');
 
     const chosenRow = await page.locator('[data-testid="tagged-row"]').first().getAttribute('href');
     await page.locator('[data-testid="tagged-row"]').first().click();
@@ -1470,6 +1502,54 @@ async function main() {
       (await page.evaluate(() => navigator.clipboard.readText())) === 'npm run dev',
       await page.locator('[data-testid="code-copy"]').innerText(),
     );
+    // --- B-11: bold reads inside code too ----------------------------------
+    // The box holds `npm run dev`; the last three characters of it are what
+    // gets marked, which is the line-in-a-box case the mark exists for.
+    await codeField.click();
+    const boxed = (await codeField.inputValue()).indexOf('npm run dev');
+    await codeField.evaluate(
+      (el, at) => el.setSelectionRange(at + 8, at + 11),
+      boxed,
+    );
+    await page.locator('[data-testid="mark-bold"]').click();
+    check(
+      'bold is written inside a box as the two characters it is anywhere — B-11',
+      (await codeField.inputValue()).includes('npm run **dev**'),
+      (await codeField.inputValue()).split('\n').slice(-4).join(' / '),
+    );
+
+    await page.locator('[data-testid="page-title"]').first().click();
+    await page.waitForSelector('[data-testid="note-rendered"]');
+    const box = page.locator('[data-testid="code-block"]').first();
+    check(
+      'and it draws as bold in the box rather than as four characters — B-11',
+      (await box.locator('strong').count()) === 1 &&
+        (await box.locator('strong').innerText()).trim() === 'dev' &&
+        !(await box.innerText()).includes('*'),
+      (await box.innerText()).replace(/\s+/g, ' '),
+    );
+    await page.locator('[data-testid="code-copy"]').first().click();
+    check(
+      'and Copy takes the box as it is drawn, without the marks — B-8, B-11',
+      (await page.evaluate(() => navigator.clipboard.readText())) === 'npm run dev',
+      await page.evaluate(() => navigator.clipboard.readText()),
+    );
+
+    // An inline run is cut into spans by the marks in it, and it still has to
+    // draw as one pill: a `<code>` per span would put a gap where the space is.
+    await codeField.click();
+    await page.keyboard.press('Control+End');
+    await page.keyboard.type('\nand `npm **test**` inline.');
+    await page.locator('[data-testid="page-title"]').first().click();
+    await page.waitForSelector('[data-testid="note-rendered"]');
+    const inline = page.locator('[data-testid="note-rendered"] p code');
+    check(
+      'a marked inline run is one element with the bold inside it — B-9, B-11',
+      (await inline.filter({ has: page.locator('strong') }).count()) === 1 &&
+        (await inline.filter({ has: page.locator('strong') }).innerText()).trim() === 'npm test',
+      await inline.filter({ has: page.locator('strong') }).innerText(),
+    );
+
     // --- B-10: a list is typed, and Enter is what carries it ---------------
     await codeField.click();
     await page.keyboard.press('Control+End');

@@ -359,11 +359,12 @@ typed. `src/ui/QuickAdd.svelte` is the one caller, per line of a K-9 paste as we
 
 The tree itself is **not** filtered and `TagFilter.svelte` is gone. The bar cost five rules that each repaired a hole
 the one before it opened — hide the non-matching rows, add the ancestors back, override T-8's collapse state, and A-6 to
-stop a row vanishing as it was typed — for a mode a tree could be left in. `src/ui/TagChips.svelte` draws labels now,
-not buttons, and A-6 is withdrawn: tagging at creation is A-8's `#tag` on the add line.
+stop a row vanishing as it was typed — for a mode a tree could be left in. `src/ui/TagChips.svelte` draws a link to `#/tags/<tag>` per chip
+(A-10) — one tag rather than the chosen set — and A-6 is withdrawn: tagging at creation is A-8's `#tag` on the add line.
 
-**A tag's colour is the tag's own name (A-9).** `src/core/tag-colour.ts` hashes it to one of twelve tints and returns a
-*number*; `.tag-chip` in `src/app.css` is what a tint looks like, mixed from that hue toward the palette's own `ink`,
+**A tag's colour is the tag's own name (A-9).** `src/core/tag-colour.ts` hashes it to one of sixteen tints and returns a
+*number* — even steps of an `oklch` wheel, so a blue and a teal weigh what a red does, and the hash is avalanched
+before the remainder because FNV-1a's low bits are its worst ones; `.tag-chip` in `src/app.css` is what a tint looks like, mixed from that hue toward the palette's own `ink`,
 `line` and `surface` so one rule serves six themes. Nothing is stored, chosen or merged — a colour per tag as a field
 would be a second last-writer-wins value with a conflict row, for a decoration — and a tag is the same colour on the
 row, in `TagEditor` and on `#/tags` because all three call the same function. Chosen on `#/tags` is that same hue turned

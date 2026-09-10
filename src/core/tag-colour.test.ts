@@ -25,7 +25,20 @@ describe('tagTint — A-9', () => {
 
   it('spreads a handful of ordinary tags over more than one tint', () => {
     const tags = ['errand', 'town', 'work', 'home', 'urgent', 'later', 'ferry', 'kitchen'];
-    expect(new Set(tags.map(tagTint)).size).toBeGreaterThan(4);
+    expect(new Set(tags.map((tag) => tagTint(tag))).size).toBeGreaterThan(4);
+  });
+
+  // What "they are all red, green or yellow" was, from the inside: a remainder
+  // reads the low bits, and an FNV-1a mixes those worst. The avalanche step in
+  // `tagTint` is what this asserts — without it these words reach 11 of the 16.
+  it('reaches every tint over a page of ordinary tags', () => {
+    const tags = `errand town work home shop buy milk urgent later idea book read call email
+      phone family friend money bank car trip travel food cook clean garden pet dog cat kid
+      school study exam project code bug fix test doc note meeting plan review ship deploy`
+      .split(/\s+/)
+      .filter((tag) => tag !== '');
+    const used = new Set(tags.map((tag) => tagTint(tag)));
+    expect(used.size, [...used].sort((a, b) => a - b).join(',')).toBe(TAG_TINTS);
   });
 
   // §10.1: nothing in TypeScript computes a colour. The number above is a hue
@@ -33,5 +46,9 @@ describe('tagTint — A-9', () => {
   it('leaves the colour to the stylesheet', () => {
     expect(css).toContain('.tag-chip');
     expect(css).toContain('--tag-tint');
+    // A-9's steps are even by perception rather than by `hsl` degree, which is
+    // the half of "more than three colours" that is not the hash — §4.1.
+    expect(css).toContain('oklch');
+    expect(css).toContain(`calc(var(--tag-tint, 0) * ${360 / TAG_TINTS}deg)`);
   });
 });
