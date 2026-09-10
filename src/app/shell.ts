@@ -78,7 +78,7 @@ export function shellActions(source: FolderSource): ShellActions {
       return {
         openFolder: () => askHelper({ what: 'folder' }),
         changeFolder: null,
-        changeNote: 'the folder is the one this device was launched with — `--folder` on the launcher',
+        changeNote: null,
       };
     case 'fsaa':
       // A page holds a directory handle, not a window: there is no folder to

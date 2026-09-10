@@ -350,13 +350,7 @@
        which is exactly what the row menu's copy became. `keyboard.test.ts`
        fails if a key is bound and not taught here. -->
   <section class="flex flex-col gap-3" data-testid="settings-keyboard">
-    <div class="flex flex-col gap-0.5">
-      <h2 class="text-sm font-semibold">Keyboard</h2>
-      <p class="text-xs text-ink-faint">
-        On a row's title, in every list the app draws. A phone has none of these and needs none: the
-        row's ⋮ menu is where it reaches the edits themselves.
-      </p>
-    </div>
+    <h2 class="text-sm font-semibold">Keyboard</h2>
 
     <dl class="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1.5 text-sm" data-testid="key-help">
       {#each KEY_HELP as entry (entry.keys)}

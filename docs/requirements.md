@@ -220,10 +220,12 @@ menu renders.
 | `Escape` | Discard the in-progress title edit | ✅ the row's draft, never a written op |
 
 **The keys are written down in one place, and it is the settings screen — X-33.** `KEY_HELP` in `src/ui/keyboard.ts` is
-that list: every binding above in the words a person reads, beside the bindings themselves, so the reference cannot
-drift from what the keys do. `src/ui/keyboard.test.ts` fails if a key is bound and taught nowhere, or taught and bound
-nowhere. It used to be printed on every row's `⋮` menu instead, which put a reference a person reads once under a
-control they open ten times a day — [§10 Application shell, PWA, offline](#10-application-shell-pwa-offline).
+that list: every editing binding above in the words a person reads, beside the bindings themselves, so the reference
+cannot drift from what the keys do. `↑` / `↓` are the one omission: a caret moving between rows is what a keyboard
+already does in every field on the machine, and the screen is for what is particular to this app.
+`src/ui/keyboard.test.ts` fails if a key is bound and taught nowhere, or taught and bound nowhere. It used to be printed
+on every row's `⋮` menu instead, which put a reference a person reads once under a control they open ten times a day —
+[§10 Application shell, PWA, offline](#10-application-shell-pwa-offline).
 
 **The row `⋮` menu carries the edits, and four of these keys are not among them — X-34.** Indent, outdent and the two
 nudges only reorder the tree, and a finger already reorders it by dragging (T-14, T-16) — a menu entry beside that

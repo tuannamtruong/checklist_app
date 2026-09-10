@@ -52,7 +52,6 @@ export const KEY_HELP: readonly KeyHelp[] = [
   { keys: 'Shift-Tab', label: 'Outdent, out to the grandparent', action: 'outdent' },
   { keys: 'Alt-↑', label: 'Move up among the siblings', action: 'move-up' },
   { keys: 'Alt-↓', label: 'Move down among the siblings', action: 'move-down' },
-  { keys: '↑ / ↓', label: 'Move the caret between rows' },
   {
     keys: 'Backspace on an empty row',
     label: 'Delete it — refused if it has children',

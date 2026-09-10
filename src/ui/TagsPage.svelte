@@ -35,10 +35,7 @@
   <h1 class="text-2xl font-semibold" data-testid="page-title">Tags</h1>
 
   {#if catalog.length === 0}
-    <p class="px-1 text-sm text-ink-muted" data-testid="tags-empty">
-      No tags yet. A row is tagged from its ⋮ menu, or by typing <code>#tag</code> in front of the
-      title on the add line.
-    </p>
+    <p class="px-1 text-sm text-ink-muted" data-testid="tags-empty">No tags yet.</p>
   {:else}
     <!-- Links rather than buttons: the chosen set is the route, so choosing one
          is a navigation and Back walks the choices backwards. -->
