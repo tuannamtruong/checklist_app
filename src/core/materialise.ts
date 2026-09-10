@@ -6,7 +6,7 @@
 // correct without a stamp on every field: sort once, fold once, and the newest
 // write to a field is simply the last one applied.
 
-import { isRoot, type Node, type NodeMap, type Op } from './types';
+import { isRoot, type Node, type NodeId, type NodeMap, type Op } from './types';
 
 /**
  * The total order every device derives identically — sync-flow.md §4.6, rule 2.
@@ -46,22 +46,23 @@ function created(op: Extract<Op, { op: 'create' }>): Node {
 }
 
 /**
- * One op onto one tree, returning a new map. An op naming a node this replica
- * has never seen is dropped rather than half-applied: the create is in a file
- * that has not arrived, and the next fold — which sorts the create back in
- * front of this op — is what applies it.
+ * What one op makes of one node, or `undefined` for "this op changes nothing".
+ *
+ * The map is not its business, which is what lets `foldOps` build one map for
+ * a whole log and `applyOp` copy the map for one edit — the same rules, read
+ * once. An op naming a node this replica has never seen changes nothing rather
+ * than being half-applied: the create is in a file that has not arrived, and
+ * the next fold — which sorts the create back in front of this op — is what
+ * applies it.
  */
-export function applyOp(nodes: NodeMap, op: Op): NodeMap {
-  const existing = nodes[op.id];
-
+function nodeAfter(existing: Node | undefined, op: Op): Node | undefined {
   if (op.op === 'create') {
     // Idempotent, so replaying a log twice cannot clobber the sets that
     // followed the create — S-4.
-    if (existing) return nodes;
-    return { ...nodes, [op.id]: created(op) };
+    return existing ? undefined : created(op);
   }
 
-  if (!existing) return nodes;
+  if (!existing) return undefined;
 
   switch (op.op) {
     case 'set': {
@@ -86,41 +87,56 @@ export function applyOp(nodes: NodeMap, op: Op): NodeMap {
         // it back leaves the body in place, so the conversion is reversible.
         if (op.kind === 'note' && next.body === null) next.body = '';
       }
-      return { ...nodes, [op.id]: next };
+      return next;
     }
     case 'move':
       return {
-        ...nodes,
-        [op.id]: {
-          ...existing,
-          parent: op.parent,
-          parentSetAt: op.at,
-          parentSetBy: op.dev,
-          order: op.order,
-          orderBy: op.dev,
-        },
+        ...existing,
+        parent: op.parent,
+        parentSetAt: op.at,
+        parentSetBy: op.dev,
+        order: op.order,
+        orderBy: op.dev,
       };
     // `delete` and `restore` are the two writers of one field, so the total
     // order settles them against each other with no precedence between the ops
     // — sync-flow.md §4.9. `deletedAt` is that field's timestamp.
     case 'delete':
-      return {
-        ...nodes,
-        [op.id]: { ...existing, deleted: true, deletedAt: op.at },
-      };
+      return { ...existing, deleted: true, deletedAt: op.at };
     case 'restore':
-      return {
-        ...nodes,
-        [op.id]: { ...existing, deleted: false, deletedAt: null },
-      };
+      return { ...existing, deleted: false, deletedAt: null };
   }
 }
 
-/** Every op from every replica, folded into the tree they agree on. */
+/**
+ * One op onto one tree, returning a new map — the store's path, where a new map
+ * is the change being published and the op count is one edit's worth.
+ */
+export function applyOp(nodes: NodeMap, op: Op): NodeMap {
+  const next = nodeAfter(nodes[op.id], op);
+  return next === undefined ? nodes : { ...nodes, [op.id]: next };
+}
+
+/**
+ * Every op from every replica, folded into the tree they agree on.
+ *
+ * The map is built rather than copied per op, and that is a complexity class
+ * rather than a micro-optimisation: a spread per op is O(ops × nodes), which is
+ * a 3000-row tree spending two seconds of its startup copying a map nobody has
+ * seen yet — and paying it again on every cycle that merges. The map is this
+ * function's own until it returns, so nothing outside can observe the
+ * difference; `applyOp` above is the same rules for a caller that has a map
+ * already.
+ */
 export function foldOps(ops: readonly Op[]): NodeMap {
   const ordered = [...ops].sort(compareOps);
-  let nodes: NodeMap = {};
-  for (const op of ordered) nodes = applyOp(nodes, op);
+  // Mutable only in here: the type widens for the length of the fold and
+  // narrows again on the way out, which is what says the map is nobody else's.
+  const nodes: Record<NodeId, Node> = {};
+  for (const op of ordered) {
+    const next = nodeAfter(nodes[op.id], op);
+    if (next !== undefined) nodes[op.id] = next;
+  }
   return nodes;
 }
 
