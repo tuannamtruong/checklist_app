@@ -53,7 +53,7 @@ and never replays per read — [sync-flow.md §4.6 The decision](sync-flow.md#46
 | `title` | string | The row label, every kind |
 | `done` | boolean | Tasks only — K-2. Also the T-11 filter: a row carrying it leaves the normal view |
 | `doneAt` | timestamp or null | The `at` of the write that set `done`, as `deletedAt` is the tombstone's. T-12 orders the archive by it |
-| `body` | string or null | Notes only — K-3 |
+| `body` | string or null | A note's and a task's — K-3 and K-12. Null on a folder, which is the one kind with none |
 | `tags` | string set | A-1. Normalised, sorted and deduplicated by `src/core/tags.ts`; merges as one field |
 | `priority` | one of `none`, `low`, `medium`, `high` | A-2. `none` is a value, not an absent field |
 | `order` | base-62 string | Fractional index among siblings — T-2 |
@@ -242,9 +242,9 @@ reaches it. `KEY_BOUND_ACTIONS` stays the list of *row* actions, which is what m
 
 | ID | Requirement | State | Where |
 | --- | --- | --- | --- |
-| K-1 | A row is one of three kinds: `folder`, `note` or `task` | ✅ | `src/core/types.ts`. Only a task is checkable; a top-level `folder` or `note` is what T-10 shows in the sidebar. Kind drives rendering, never structure — any kind may own children. There were four until M6: `list` is read as `folder` by `src/core/op-log.ts`, so a file written before it went keeps folding to the same tree — `op-log.test.ts` |
+| K-1 | A row is one of three kinds: `folder`, `note` or `task` | ✅ | `src/core/types.ts`. Only a task is checkable and only a folder has no body of its own — K-12; a top-level `folder` or `note` is what T-10 shows in the sidebar. Kind drives rendering, never structure — any kind may own children. There were four until M6: `list` is read as `folder` by `src/core/op-log.ts`, so a file written before it went keeps folding to the same tree — `op-log.test.ts` |
 | K-2 | Tasks render a checkbox; folders and notes render a kind icon | ✅ | `src/ui/Row.svelte`, `src/ui/KindIcon.svelte` |
-| K-3 | A note has a long free-text body with its own editor | ✅ | `src/ui/NoteBody.svelte`, carried by `src/ui/NotePane.svelte` — beside the list above `lg` and over it below, per X-21 and X-22. It was a full page instead of the list until then, and the field itself did not change |
+| K-3 | A note has a long free-text body with its own editor | ✅ | `src/ui/NoteBody.svelte`, and since K-12 a task has the same one, carried by `src/ui/NotePane.svelte` — beside the list above `lg` and over it below, per X-21 and X-22. It was a full page instead of the list until then, and the field itself did not change |
 | K-4 | A note can still own checklist children (heading + items pattern) | ✅ | The ops are the same ops any parent takes — `edit.test.ts`. **Where they are drawn is the tree's**, not the note's own view: since X-31 the pane is the body alone, and the note's children are the rows nested under it in the list beside it, which draws the whole subtree |
 | K-5 | Any row can be converted to any kind after the fact ("Turn into") | ✅ | `turnInto` in `src/core/edit.ts`, in the row menu. Two devices converting one row differently resolve by `(at, device id)`, with a notice — [§9 Conflict presentation](#9-conflict-presentation) |
 | K-6 | ~~A note can be promoted to a checklist from its own page~~ | ✗ **Withdrawn** | Built in M1 and taken out again: it was a second control for the one op K-5 already offers, and the only one that changed a kind from outside the row menu. Nothing replaces it — `turnInto` is unchanged and the row menu still reaches every kind |
@@ -253,6 +253,7 @@ reaches it. `KEY_BOUND_ACTIONS` stays the list of *row* actions, which is what m
 | K-9 | A paste into that line carrying line breaks makes one row per line, all at the end of the list | ✅ | `src/core/paste.ts` is the only place the split is spelled, `createLastChildren` in `src/core/edit.ts` mints the keys, and `src/ui/QuickAdd.svelte` is the one caller. `paste.test.ts`, `edit.test.ts`, `scripts/ui-smoke.mjs` |
 | K-10 | The line and the two kind buttons are one group, at the top of the list rather than an input above it and buttons under it | ✅ | `src/ui/QuickAdd.svelte` draws all three and owns the one draft between them; `src/ui/NodePage.svelte` puts the group in the page header and `src/ui/NotePane.svelte` in the pane's top row — X-31. `src/ui/TreeView.svelte` draws rows and nothing else. Pinned there rather than scrolling with the list — X-26 |
 | K-11 | Whatever is typed in the line is the title of the row a kind button makes: a title and `+ Note` is one **note** carrying it, rather than a task and an untitled note | ✅ | `addKind` in `src/ui/QuickAdd.svelte` — the `createLastChild` the line already calls, with the kind named. An empty line still makes an untitled row and hands it the caret, which is what the button under the list always did. `scripts/ui-smoke.mjs` |
+| K-12 | A **task** carries a body too, and it is the note's: the same field, the same editor, the same marks | ✅ | `hasBody` in `src/core/types.ts` is the one place the two kinds are named and `src/core/materialise.ts` is its only caller — a `create` of either kind opens with `''`, and a `set kind` into either gives the row a body to open on without touching what is already there, so K-5 stays reversible. Nothing in the payload learned anything: `op-log.ts` has always written `body` as a field of a node rather than of a note, so a build that predates this folds a task's body, merges it, compacts it and simply does not draw it. Where it is drawn is X-21's pane, reached by X-39's chip or by X-30's caret — `materialise.test.ts`, `panes.test.ts` |
 
 **There were four kinds and there are three — `list` is gone.** A `list` and a `folder` differed by an icon and by
 nothing else: both were containers, both could hold any kind (K-4 and T-1 make that true of every kind), and neither was
@@ -270,6 +271,26 @@ peer still running the older build reads the `folder` this one writes, because `
 
 Notes are deliberately not checkable. `done` is still a field on every node, because K-5 keeps it across a "Turn into"
 so that turning back restores the tick — which is also why T-11's filter reads `done` rather than `kind === 'task'`.
+
+**A check item carries the same body — K-12.** A task is where the work is written down, and the thing most often wanted
+beside a task is a line about it: the address, the part number, the reason it was put off last week. That was a note
+*next to* the task before, which is a second row to keep in step with the first and one T-11 leaves behind on the list
+the moment the task is ticked. So a task carries a body, and it is the body a note has — the same `body` field, the same
+`set` op, the same `src/ui/NoteBody.svelte` with B-1 to B-11 in it, the same K-7 debounce and the same S-20 op timing. A
+second field would have been a second last-writer-wins value, a second conflict row, a second thing for `compact.ts` to
+supersede and a second editor to keep in step, for text that is text either way —
+[past_decision.md §21 A task's body](past_decision.md#21-a-tasks-body).
+
+**Only a folder has none.** A folder is a place rather than a thing and its page already draws what is inside it; a body
+there would be a note that is also a list, which is the distinction the three kinds exist to make. So `hasBody` names
+the other two, in `types.ts` beside `KINDS` itself, and every layer that has to ask — the fold, the pane derivation, the
+caret — asks it there rather than spelling the pair a fourth time.
+
+**What did not change is everything under the field.** A body was never a note's in the payload: `set body` names an id
+and a string, the merge resolves it by `(at, device id)` like any other field, `conflicts.ts` offers the value that lost
+and `compact.ts` drops a superseded one. That is why K-12 is a `hasBody` and four call sites rather than a migration —
+and why a peer still on the older build loses nothing, since it keeps folding the field it has always folded and starts
+drawing it the day it is upgraded.
 
 **K-6 was withdrawn, and what it cost was a second answer to a settled question.** "Promote to checklist" sat on a
 note's own page and wrote `turnInto`, which is exactly what the row menu's "Turn into" writes one level up — so one op
@@ -915,7 +936,7 @@ to empty, and a dismissal is only for a row the user is content to leave as it l
 | X-18 | A device on the browser-only fallback takes the folder its own launcher is holding, rather than keeping an answer it gave before there was one | ✅ | `chooseFolder` in `src/app/folder-choice.ts`: the two shells that hand a folder in unasked are asked before a stored `local` is honoured, and nothing is written when one is taken — [architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter). `folder-choice.test.ts`; a real Firefox is [test.md §3.7 Platform](test.md#37-platform) check 3b. Without it, "local storage" is a one-way door on the one browser the helper exists for |
 | X-19 | The sidebar's type is a fifth larger than the page beside it | ✅ | `.sidebar-text` and `.sidebar-note` in `src/app.css`, read by `src/ui/Shell.svelte` and `src/ui/SidebarLinks.svelte`. One rule rather than a size named per component, and unlayered so it wins over the `text-sm` it replaces — the icons scale with it so the column keeps its proportions |
 | X-20 | The sidebar's width is dragged by its right edge, and the width is this device's own | ✅ | `src/ui/WidthGrip.svelte` over `sidebarWidth` in `src/app/view-state.svelte.ts`, bounded there rather than at the grip. Pointer events, for T-14's reason — a tablet is wide enough for the `md` layout and has no mouse. Above `md` only: below it the sidebar is a drawer over the page, where a width takes room from nothing. `view-state.svelte.test.ts`, `scripts/ui-smoke.mjs` |
-| X-21 | Above `lg`, a note opens **beside** the list it was opened from rather than instead of it, and the list beside it is the nearest ancestor that is **not** a note — a note nested under a note opens in the pane and leaves the left column where it was | ✅ | `src/ui/App.svelte` composes the two panes; the right one is `src/ui/NotePane.svelte` and the left is `src/ui/NodePage.svelte` on `listAbove` in `src/core/tree.ts`, which is T-6's resolved parent walked up past every note. One route still — [§10.3 A note beside the list](#103-a-note-beside-the-list) |
+| X-21 | Above `lg`, a row that has a body — a note, or a **task** since K-12 — opens **beside** the list it was opened from rather than instead of it, and the list beside it is the nearest ancestor with no body of its own; one of them nested under another opens in the pane and leaves the left column where it was | ✅ | `src/ui/App.svelte` composes the two panes; the right one is `src/ui/NotePane.svelte` and the left is `src/ui/NodePage.svelte` on `listAbove` in `src/core/tree.ts`, which is T-6's resolved parent walked up past every row `hasBody` answers for. One route still — [§10.3 A note beside the list](#103-a-note-beside-the-list) |
 | X-22 | Below `lg`, that same route lays the note **over** the list as a sheet, as tall as its own content and never taller than 60% of the viewport; a second tap anywhere on it opens it fully | ✅ | `src/ui/NotePane.svelte`. The height is a `max-height` over content height rather than a measurement, so "short enough shows all of it" is one CSS rule and no arithmetic. The peek is covered by one transparent layer, which is what keeps the tap out of the body's always-mounted textarea — B-3 |
 | X-23 | A page's column sits at the left edge of the page area rather than centred, whether or not a note is open | ✅ | `src/ui/NodePage.svelte`. A centred column would slide sideways the moment the note pane appeared, so every open and close would move the list the user is reading |
 | X-24 | The divider between the list and the note pane is dragged, and the width is this device's own | ✅ | `src/ui/WidthGrip.svelte` over `notePaneWidth` in `src/app/view-state.svelte.ts` — X-20's grip with the sign flipped, since the pane's edge is its left one. Above `lg` only: below it the pane is X-22's sheet and its width is the viewport's. `view-state.svelte.test.ts`, `scripts/ui-smoke.mjs` |
@@ -924,7 +945,7 @@ to empty, and a dismissal is only for a row the user is content to leave as it l
 | X-27 | On a phone the add group **is** the top bar: the bar that carried the application's name carries the line and its two buttons instead, and the name is gone | ✅ | `src/ui/Shell.svelte` takes the group as a snippet from `src/ui/App.svelte`, which fills it only on the routes that draw a list; `src/ui/NodePage.svelte`'s own header is `md` and up, so the group is drawn once at either width. The bar is `sticky` for X-26's reason — `scripts/ui-smoke.mjs` drives both widths |
 | X-28 | The link in the sidebar's top corner is named for the page it opens — `All` — rather than for the application, and the root is called that everywhere it is written to a person | ✅ | `src/ui/Shell.svelte` for the corner and `src/ui/NodePage.svelte` for the head of the page; `src/ui/Breadcrumbs.svelte`, `src/ui/DonePage.svelte`, `src/ui/SearchPage.svelte` and `src/core/log-view.ts` are the four places a path names the root, and they say the same word. It was `All lists` until the nav grew entries beside it — one word keeps the corner a corner. `log-view.test.ts`, `scripts/ui-smoke.mjs` |
 | X-29 | The sidebar scrolls in its own column: a page long enough to scroll moves the list and leaves the sidebar whole, and the sidebar scrolls itself when its own entries outgrow the window | ✅ | `src/ui/Shell.svelte` — the shell is one `h-dvh` row holding two scrollers rather than one document that scrolls entire. The nav has been `overflow-y-auto` since X-2 and never got the chance to use it; what it lacked was a column the height of the window rather than of the page — `scripts/ui-smoke.mjs` |
-| X-30 | Putting the caret in a **note** row's title raises that note in the pane, and the list beside it does not move: a caret is not a navigation, so the route, the history and the left column are exactly where the reader left them. A caret in a folder's or a task's title leaves the pane as it is; the ✕ and a navigation are what end it | ✅ | `src/ui/panes.ts` derives both panes from the route and `RowFocus.noteId`, which only a note's title ever writes, and `src/ui/App.svelte` composes them as it already did. Above `lg` only — below it the pane is X-22's sheet, and a sheet raised by typing would cover the row being typed. How the pane was opened changes exactly one thing, the ✕: a link out of the route, or a button that clears the caret's note — [§10.3 A note beside the list](#103-a-note-beside-the-list). `panes.test.ts`, `focus.svelte.test.ts`, `scripts/ui-smoke.mjs` |
+| X-30 | Putting the caret in the title of a row that has a body — a note or a task — raises that body in the pane, and the list beside it does not move: a caret is not a navigation, so the route, the history and the left column are exactly where the reader left them. A caret in a folder's title leaves the pane as it is; the ✕ and a navigation are what end it | ✅ | `src/ui/panes.ts` derives both panes from the route and `RowFocus.noteId`, which only a title `hasBody` answers for ever writes, and `src/ui/App.svelte` composes them as it already did. Above `lg` only — below it the pane is X-22's sheet, and a sheet raised by typing would cover the row being typed. How the pane was opened changes exactly one thing, the ✕: a link out of the route, or a button that clears the caret's note — [§10.3 A note beside the list](#103-a-note-beside-the-list). `panes.test.ts`, `focus.svelte.test.ts`, `scripts/ui-smoke.mjs` |
 | X-31 | The note pane is an editor and nothing else: the add line and its two kind buttons are its top row, the body takes whatever height is left under the title and scrolls inside itself when the note outgrows it, and neither a path above the note nor the note's own children are drawn in it | ✅ | `src/ui/NotePane.svelte` — `src/ui/QuickAdd.svelte` in the header row `src/ui/Breadcrumbs.svelte` used to hold, and `src/ui/NoteBody.svelte` given `fill`, which is the height the pane has instead of the `min-h` floor a page's body needs. Nothing is lost with the children: the list beside the pane draws the whole subtree, so they are on screen one level in under the note's own row, and a row added here appears there — K-4. `scripts/ui-smoke.mjs` |
 | X-32 | The `All` link in the sidebar's corner is a full-width target, exactly like the entries under it | ✅ | `src/ui/Shell.svelte` — the corner and G-7's two day lists and R-8's third are one column of full-width links with one padding, rather than a corner sized to its four letters with a row of links under it. The `✕` that closes the drawer sits beside it and is drawn below `md` only, which is the one width where the corner is not the whole row |
 | X-33 | The keyboard reference lives on the settings screen, and nowhere else | ✅ | `KEY_HELP` in `src/ui/keyboard.ts`, rendered by `src/ui/SettingsPage.svelte` beside the bindings it describes; `keyboard.test.ts` fails if the two drift. It is the same kind of thing as everything else X-12 gathered — a fact about how *this* device is driven — and a reference read once does not belong under a control opened ten times a day — [§3.1 Keyboard (desktop)](#31-keyboard-desktop) |
@@ -933,6 +954,7 @@ to empty, and a dismissal is only for a row the user is content to leave as it l
 | X-36 | Below `lg` the sheet's way out is a **back arrow in its top left corner** rather than a ✕ on its right: a sheet laid over the list is somewhere the reader went, and on a phone the way back out of somewhere is the arrow in that corner. Above `lg` the pane is a column beside the list and keeps the ✕, which is what closes a panel rather than what leaves a page | ✅ | `src/ui/NotePane.svelte` — one control in the pane's header row, first below the breakpoint and last above it, with the glyph swapped at the same breakpoint. What it *does* is untouched: a route's pane still leaves the route and a caret's still clears the caret — X-30 |
 | X-37 | A peeked sheet is a **preview**: the body's three format controls are not drawn on it, a `Preview` tag stands where they were, and opening the sheet fully brings them back. Above `lg` the pane is never peeked, so the controls are always there | ✅ | `src/ui/NoteBody.svelte` takes `preview`, which `src/ui/NotePane.svelte` passes for as long as the sheet is peeked; which of the two is drawn is a `lg:` class over that one flag rather than anything measured, so the column above the breakpoint keeps its controls whatever the sheet below it would have done — X-22, B-4 |
 | X-38 | The sheet is dragged as well as tapped: a swipe **up** on the peek opens it fully, and a swipe **down** on the open sheet puts it back to the peek. Neither end jumps: the sheet slides between the two heights | ✅ | `src/ui/NotePane.svelte` over pointer events, for the reason T-14 and X-20's grip use them: `dragstart` never fires on touch and this is a phone's gesture. What a travel *means* is `sheetSwipe` in `src/ui/sheet.ts`, unit-tested there rather than read off the markup; the animation is a transition on the two heights the state already changed, so nothing is measured. The grip is a button as well, so the collapse the swipe does is reachable without a pointer. The motion is a transition on the sheet's own `height`, which X-22 already writes twice — `.sheet-height` in `src/app.css` is the one line that lets a content height and the viewport's interpolate, and a browser that cannot arrives at the other height exactly as it did before |
+| X-39 | A task's body is reached from its own row by one link, drawn on every task: the checkbox holds the slot a folder's and a note's link sits in, so this one sits in the strip right of the title, beside A-1's tags and A-2's flag. It is one shade darker when there is text behind it | ✅ | `src/ui/BodyChip.svelte`, an `<a href="#/n/<id>">` and never a button — it navigates, so Back, a middle click and X-8's deep link all work without the component knowing they exist. It is the phone's only way in, since X-30's caret raises nothing below `lg`, and it is on every task rather than only where there is text, because a way in that appears once there is something behind it cannot be used to put the first thing behind it — [§10.3 A note beside the list](#103-a-note-beside-the-list). `scripts/ui-smoke.mjs` |
 
 **A phone's top bar holds the add group rather than the application's name — X-27.** The bar existed to carry a `☰` and
 said `Checklist` beside it, which is a thing to read once on an application with one tree in it: every screen it
@@ -1119,18 +1141,27 @@ reason there is no new route and no new state — the list on the left is a func
 pasted into another device opens the same two panes, and Back closes the note by leaving the route exactly as it always
 did.
 
-**Only a note splits.** A folder is a list, and a list beside a list is the same drawing twice, one of which is always
-the narrower — the argument T-10 already made against the sidebar carrying the whole tree. A task has no page to open.
-So the split exists exactly when the route's node has `kind === 'note'`, and every other route renders as it did.
+**A row with a body splits, and a folder does not.** A folder is a list, and a list beside a list is the same drawing
+twice, one of which is always the narrower — the argument T-10 already made against the sidebar carrying the whole tree.
+A note had the only body until K-12 gave a task one, and the pane draws exactly that: the split exists when the route's
+node has a body of its own, and a folder's route renders as it always did. `hasBody` in `src/core/types.ts` is the one
+place that pair of kinds is written down, so nothing here chooses a second time.
 
-**The left pane is the nearest ancestor that is *not* a note — X-21.** A note nested under a note is opened from the
-tree on the left, which draws it under the note it belongs to, and the pane is where it opens: the left column keeps the
-list it was already showing rather than becoming the parent note's page. Drawing the parent note there instead was the
-first reading and it was wrong twice over. It puts a second body on screen — a second editor, with its own K-7 debounce
-and its own caret, for a note nobody asked to edit — and it moves the list under the pointer on every step down, which
-is the jump X-23 exists to prevent. So walking down a chain of notes moves one pane, and the tree the chain hangs in
-stays exactly where it is. The nested note is still reachable and still highlighted on the left, because the tree draws
-the whole subtree rather than one level (T-10 is the sidebar's rule, not the tree's).
+**The pane is still called the note pane, and that is now a name rather than a rule.** It was built for the one kind
+that had a body and it draws the body of whichever kind has one, so `NotePane.svelte`, `RowFocus.noteId` and
+`Panes.noteId` keep the names they were given — renaming them would be a diff across the shell that changes no
+behaviour, which is exactly the kind of churn [past_decision.md](past_decision.md) exists to talk this project out of.
+Everywhere below, "the note" means the row whose body the pane is drawing.
+
+**The left pane is the nearest ancestor with no body of its own — X-21.** A note nested under a note — or under a task,
+or a task under either, since K-12 — is opened from the tree on the left, which draws it under the row it belongs to,
+and the pane is where it opens: the left column keeps the list it was already showing rather than becoming the parent
+row's page. Drawing the parent note there instead was the first reading and it was wrong twice over. It puts a second
+body on screen — a second editor, with its own K-7 debounce and its own caret, for a note nobody asked to edit — and it
+moves the list under the pointer on every step down, which is the jump X-23 exists to prevent. So walking down a chain
+of notes moves one pane, and the tree the chain hangs in stays exactly where it is. The nested note is still reachable
+and still highlighted on the left, because the tree draws the whole subtree rather than one level (T-10 is the sidebar's
+rule, not the tree's).
 
 **The divider between the two is dragged — X-24.** The pane is the second column with a share of the width worth arguing
 about, which is X-20's question asked a second time, and it gets X-20's answer: pointer events for T-14's reason, bounds
@@ -1185,12 +1216,16 @@ note under the caret is what they are touching rather than somewhere they are go
 the route does not move at all. The left column stays the list the route names, which is X-23's argument made a second
 time: the thing that appears is the pane, and nothing else on screen answers it.
 
-**The caret raises a note and nothing else lowers it.** A caret in a `folder`'s or a `task`'s title is not a caret in a
-note, so the pane stays exactly as it was: ticking a task beside an open note is not a request for the note to go, and a
-walk down a list with the arrow keys would otherwise flick the pane open and shut on every note it passed. `RowFocus`
-therefore carries two things — the row holding the caret, which the keyboard model already needed, and the note that
-caret is in, which only a note's title ever writes. The pane is that note, or the note the route names when no note has
-held the caret; one derivation over the two, with no stored pane and no second route, so
+**The caret raises a body and nothing else lowers it.** A caret in a `folder`'s title is not a caret in a body, so the
+pane stays exactly as it was — and since K-12 a folder is the only title that leaves it alone. What that changed is the
+walk: arrowing down a list used to pass rows the pane could not draw and now passes rows it can, so the pane follows the
+caret from row to row rather than flicking open and shut. That is the same rule read on a tree that is mostly tasks, and
+it is the right one — the pane is the body of the row the caret is in, and a row whose body is empty draws an empty
+editor rather than closing anything. Ticking a task is the one case worth saying out loud: T-11 takes the row away and
+hands the caret to the row below, so the pane moves down with it, which is where the reader now is. `RowFocus` therefore
+carries two things — the row holding the caret, which the keyboard model already needed, and the note that caret is in,
+which only a note's title ever writes. The pane is that note, or the note the route names when no note has held the
+caret; one derivation over the two, with no stored pane and no second route, so
 [past_decision.md §14.1 The options](past_decision.md#141-the-options)'s costs are not paid a second time.
 
 **The caret leaving the title is not the caret leaving the note.** The note is set when a title takes the caret and is
@@ -1201,13 +1236,25 @@ route to leave, and clearing it falls back to the route's note where there is on
 navigation is the reader choosing what is on screen: the route decides both panes again, so a note raised on the page
 being left does not follow them to the next one, and what is drawn after it is what a reload would draw.
 
-A note that stops being one closes the pane too, and that is the derivation rather than a rule of its own: a peer's
-delete (T-7) and a kind change from the row menu (K-5) both leave the caret pointing at something that is no longer a
-note, and neither goes anywhere near the caret to say so.
+A row that stops having a body closes the pane too, and that is the derivation rather than a rule of its own: a peer's
+delete (T-7) and a turn into a `folder` from the row menu (K-5) both leave the caret pointing at something the pane
+cannot draw, and neither goes anywhere near the caret to say so. A note turned into a task keeps the pane open on the
+same text, which is K-12 read at the other end — the body did not go anywhere, so neither does the editor over it.
 
 **Above `lg` only.** Below it the pane is X-22's sheet over the list, and a sheet raised by putting a caret in a title
-would cover the row being typed into with the phone's keyboard under it. The icon still opens the sheet there, because a
-tap on a link is somewhere the reader asked to go.
+would cover the row being typed into with the phone's keyboard under it. A link still opens the sheet there — the kind
+icon on a note, X-39's chip on a task — because a tap on a link is somewhere the reader asked to go.
+
+**A task's row has no icon to spare, so its link moves — X-39.** A folder's and a note's way in is the kind icon at the
+head of the row, which is a link. A task's head is the checkbox, and a checkbox means `done`: a second meaning on the
+one control a checklist is pressed for is the last place a new one belongs. So the link sits in the strip right of the
+title, where A-1's tags and R-7's period chip already sit, and it is drawn on **every** task rather than only on the
+ones with text in them — a way in that appears once there is something behind it cannot be used to put the first thing
+behind it, and on a phone there is nothing else: X-30's caret raises nothing below `lg`. What it costs is one faint
+glyph per row, in the weight the drag grip and the disclosure already have, and what it says is whether the body is
+empty: one shade darker when it is not, which is a colour rather than a second control. It is an `<a>` and never a
+button, so the route, Back, a middle click and X-8's deep link are the browser's rather than this component's, and
+T-16's long-press drag steps over it exactly as it steps over a tag chip.
 
 **The way out of the sheet is the corner a phone keeps it in — X-36.** Above `lg` the pane is a column standing beside
 the list and the ✕ on its right is what closes a panel. Below it the same pane is a sheet laid over the list, which is

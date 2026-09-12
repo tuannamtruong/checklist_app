@@ -66,6 +66,24 @@ export const KINDS: readonly Kind[] = ['folder', 'note', 'task'];
 export const SIDEBAR_KINDS: readonly Kind[] = ['folder', 'note'];
 
 /**
+ * K-12. The kinds that carry a body, which is every kind but `folder`.
+ *
+ * A folder is a place rather than a thing and its page already draws what is
+ * inside it, so a body there would be a note that is also a list — the one
+ * distinction three kinds exist to make. A note had the only body until a check
+ * item wanted one; the field, the op and the merge never knew whose it was, so
+ * what changed is this predicate and the four places that ask it: the fold
+ * (`core/materialise.ts`), the walk to the list above a body (`listAbove` in
+ * `core/tree.ts`), the pane derivation (`ui/panes.ts`) and the caret that
+ * raises it (`ui/focus.svelte.ts`). requirements.md §4.
+ */
+export const BODY_KINDS: readonly Kind[] = ['note', 'task'];
+
+export function hasBody(kind: Kind): boolean {
+  return BODY_KINDS.includes(kind);
+}
+
+/**
  * A-2. Four names rather than a number, because D-4 puts this in front of a
  * person: `high` is legible in a log line where `3` is a guess. `none` is a
  * value rather than an absent field, so clearing a flag can win a race against

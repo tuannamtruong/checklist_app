@@ -6,7 +6,7 @@
 // correct without a stamp on every field: sort once, fold once, and the newest
 // write to a field is simply the last one applied.
 
-import { isRoot, type Node, type NodeId, type NodeMap, type Op } from './types';
+import { hasBody, isRoot, type Node, type NodeId, type NodeMap, type Op } from './types';
 
 /**
  * The total order every device derives identically — sync-flow.md §4.6, rule 2.
@@ -29,7 +29,9 @@ function created(op: Extract<Op, { op: 'create' }>): Node {
     title: '',
     done: false,
     doneAt: null,
-    body: op.kind === 'note' ? '' : null,
+    // K-12. Both body-carrying kinds open with an empty one; a folder's stays
+    // null, which is what tells "has no body" from "has an empty body".
+    body: hasBody(op.kind) ? '' : null,
     tags: [],
     priority: 'none',
     // G-2. Null on a tree row and set by the `set` that follows the create on
@@ -83,9 +85,11 @@ function nodeAfter(existing: Node | undefined, op: Op): Node | undefined {
       if (op.every !== undefined) next.every = op.every;
       if (op.kind !== undefined) {
         next.kind = op.kind;
-        // A row turned into a note owes the editor a body to open on. Turning
-        // it back leaves the body in place, so the conversion is reversible.
-        if (op.kind === 'note' && next.body === null) next.body = '';
+        // A row turned into a note or a task owes the editor a body to open
+        // on. Turning it back leaves the body in place, so the conversion is
+        // reversible — and since K-12 the two body-carrying kinds convert into
+        // each other with the text untouched.
+        if (hasBody(op.kind) && next.body === null) next.body = '';
       }
       return next;
     }

@@ -228,9 +228,12 @@ describe('listAbove — X-21', () => {
     createOf('n_note', 'n_f', 'a1', 'note'),
     createOf('n_sub', 'n_note', 'a1', 'note'),
     createOf('n_task', 'n_sub', 'a1', 'task'),
+    // K-12: a note filed under that check item. A task has a body now, so the
+    // walk climbs past it exactly as it climbs past a note.
+    createOf('n_detail', 'n_task', 'a1', 'note'),
   ];
 
-  it('is the parent when the parent is not a note', () => {
+  it('is the parent when the parent has no body of its own', () => {
     expect(listAbove(treeOf(nested), 'n_note')).toBe('n_f');
   });
 
@@ -241,6 +244,9 @@ describe('listAbove — X-21', () => {
     expect(listAbove(tree, 'n_sub')).toBe('n_f');
     // Two notes deep is still n_f: the walk stops at a kind, not at a count.
     expect(listAbove(tree, 'n_task')).toBe('n_f');
+    // And past the task itself, which since K-12 is a row with a body rather
+    // than a list — n_detail's pane opens beside n_f like every other.
+    expect(listAbove(tree, 'n_detail')).toBe('n_f');
   });
 
   it('is the root when there is no list above at all', () => {

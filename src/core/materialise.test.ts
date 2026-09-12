@@ -65,6 +65,59 @@ describe('foldOps', () => {
   });
 });
 
+describe('which kinds arrive with a body — K-12', () => {
+  const createOf = (id: string, kind: 'folder' | 'note' | 'task'): Op => ({
+    op: 'create',
+    id,
+    parent: ROOT,
+    kind,
+    order: 'a1',
+    c: 1,
+    at: 100,
+    dev: 'aaaa0001',
+  });
+
+  it('opens a note and a task with an empty one, and a folder with none', () => {
+    // Null is not the empty string here: it is what tells "has no body" from
+    // "has a body nobody has typed in yet", which is what every drawing of one
+    // asks — `hasBody` in `types.ts`.
+    expect(foldOps([createOf('n_n', 'note')])['n_n']!.body).toBe('');
+    expect(foldOps([createOf('n_t', 'task')])['n_t']!.body).toBe('');
+    expect(foldOps([createOf('n_f', 'folder')])['n_f']!.body).toBeNull();
+  });
+
+  it('gives a row turned into either kind a body to open on', () => {
+    const into = (kind: 'note' | 'task'): Op => ({
+      op: 'set',
+      id: 'n_f',
+      kind,
+      c: 2,
+      at: 200,
+      dev: 'aaaa0001',
+    });
+    expect(foldOps([createOf('n_f', 'folder'), into('note')])['n_f']!.body).toBe('');
+    expect(foldOps([createOf('n_f', 'folder'), into('task')])['n_f']!.body).toBe('');
+  });
+
+  it('leaves the text alone when a row moves between the two kinds that have one', () => {
+    const typed: Op = { op: 'set', id: 'n_t', body: 'the address', c: 2, at: 200, dev: 'aaaa0001' };
+    const intoNote: Op = { op: 'set', id: 'n_t', kind: 'note', c: 3, at: 300, dev: 'aaaa0001' };
+    const backToTask: Op = { op: 'set', id: 'n_t', kind: 'task', c: 4, at: 400, dev: 'aaaa0001' };
+    const nodes = foldOps([createOf('n_t', 'task'), typed, intoNote, backToTask]);
+    expect(nodes['n_t']!.body).toBe('the address');
+    expect(nodes['n_t']!.kind).toBe('task');
+  });
+
+  it('keeps a body a peer wrote to a folder, because a kind is a field like any other', () => {
+    // The `create` says folder and a later `set kind` may say note; a `set body`
+    // that arrives between them is applied unconditionally, exactly as every
+    // other field is, so no ordering of the two can lose the text.
+    const typed: Op = { op: 'set', id: 'n_f', body: 'text', c: 2, at: 200, dev: 'bbbb0002' };
+    const intoNote: Op = { op: 'set', id: 'n_f', kind: 'note', c: 3, at: 300, dev: 'aaaa0001' };
+    expect(foldOps([createOf('n_f', 'folder'), typed, intoNote])['n_f']!.body).toBe('text');
+  });
+});
+
 describe('compareOps', () => {
   it('orders by time, then device, then counter', () => {
     expect(compareOps(create, rename)).toBeLessThan(0);

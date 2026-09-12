@@ -1,7 +1,11 @@
 <script lang="ts">
-  // X-21 and X-22. The note, drawn beside the list above `lg` and over it below
+  // X-21 and X-22. The body, drawn beside the list above `lg` and over it below
   // — one component and one breakpoint, because a phone is a narrower desktop
   // rather than a second application (X-1). requirements.md §10.3.
+  //
+  // It is called the note pane because a note was the only kind that had a body
+  // when it was built; K-12 gave a task the same field and the same editor, so
+  // `hasBody` is what decides whether there is anything to draw here.
   //
   // `lg` rather than X-2's `md`: the sidebar asks whether there is room for a
   // column of nav, and this asks whether there is room for two columns of
@@ -18,7 +22,7 @@
   // cover the row being typed into with the phone's keyboard under it, so the
   // caret raises nothing there and the icon still opens the sheet — §10.3.
   import { listAbove } from '../core/tree';
-  import { ROOT, type NodeId } from '../core/types';
+  import { hasBody, ROOT, type NodeId } from '../core/types';
   import type { Session } from '../app/Session.svelte';
   import { NOTE_WIDTH, type ViewState } from '../app/view-state.svelte';
   import type { RowFocus } from './focus.svelte';
@@ -248,7 +252,7 @@
          one thing it must not be. On the sheet it changes nothing — there is no
          free space to distribute under an auto height, so X-22's "as tall as
          the note" and the peek's floor both stand. -->
-    {#if node?.kind === 'note'}
+    {#if node && hasBody(node.kind)}
       <!-- X-37. `preview` for as long as the sheet is peeked: the tap layer
            over it swallows every tap, so a control there is one that cannot be
            used on text that cannot be selected. -->

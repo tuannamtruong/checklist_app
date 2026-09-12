@@ -49,6 +49,20 @@ function check(name, ok, detail = '') {
  * simply outran the write. What the run means to say is that the op reached the
  * folder, so it says that instead.
  */
+/**
+ * The add group the *list* owns — X-27's phone bar or K-10's page header,
+ * whichever the width draws — and never the note pane's copy of it (X-31).
+ *
+ * K-12 is why the distinction has to be in the selector rather than in a bare
+ * `:visible`: a caret in a task's title raises the pane, so the pane's own line
+ * is on screen for most of this run rather than only while a note is open.
+ */
+function listAdd(page, testid) {
+  return page.locator(
+    `[data-testid="topbar"] [data-testid="${testid}"]:visible, [data-testid="page-header"] [data-testid="${testid}"]:visible`,
+  );
+}
+
 async function landed(page, written) {
   await page.waitForFunction(
     (text) =>
@@ -370,10 +384,11 @@ async function main() {
     );
 
     // --- K-8: the quick-add line -------------------------------------------
-    // `:visible` because X-27 puts a group in the phone's top bar and X-26 puts
+    // `listAdd` because X-27 puts a group in the phone's top bar and X-26 puts
     // one in the page header, and the layout hides one of them in CSS rather
-    // than rendering only the width it is at — X-1.
-    const quickAdd = page.locator('[data-testid="quick-add"]:visible');
+    // than rendering only the width it is at — X-1. The note pane holds a third
+    // (X-31), which is never the one a check about the list means.
+    const quickAdd = listAdd(page, 'quick-add');
     await quickAdd.fill('Batteries');
     await page.keyboard.press('Enter');
     const added = await rowByTitle(page, 'Batteries');
@@ -458,7 +473,7 @@ async function main() {
 
     // --- K-11: the typed title is the kind button's title ------------------
     await quickAdd.fill('Packing tips');
-    await page.locator('[data-testid="add-note"]:visible').click();
+    await listAdd(page, 'add-note').click();
     const typedNote = await rowByTitle(page, 'Packing tips');
     check(
       'a title typed in the line and “+ Note” pressed is one note carrying it — K-11',
@@ -488,7 +503,10 @@ async function main() {
 
     await milkRow2.locator('[data-testid="row-menu-button"]').click();
     await page.locator('[data-testid="row-menu"] [data-action="tags"]').click();
-    await page.locator('[data-testid="tag-input"]').fill('#Town');
+    // The row's editor, which is the one the menu opened: the note pane has an
+    // editor of its own for the row it draws, and since K-12 that pane is open
+    // whenever a caret has been in a task's title.
+    await page.locator('[data-testid="tree"] [data-testid="tag-input"]').fill('#Town');
     await page.keyboard.press('Enter');
     check(
       'a tag typed with a hash and a capital is stored as one tag — A-1',
@@ -673,17 +691,32 @@ async function main() {
 
     const chosenRow = await page.locator('[data-testid="tagged-row"]').first().getAttribute('href');
     await page.locator('[data-testid="tagged-row"]').first().click();
-    // The page title is an editable input on a row's page, so its value is what
-    // says which row was opened — `src/ui/PageTitle.svelte`.
+    // The page title is an editable input, so its *property* is what says which
+    // row was opened — the attribute a CSS selector reads is never written.
+    // There are two titles on screen now: the row is a task, and since K-12 a
+    // task's route draws the list it hangs under and the task beside it (X-21),
+    // so the one to look for is whichever of them says so.
+    const titlesShown = () =>
+      page.evaluate(() =>
+        [...document.querySelectorAll('[data-testid="page-title"]')].map(
+          (el) => el.value ?? el.textContent,
+        ),
+      );
     await page
-      .locator(`[data-testid="page-title"][value="Errand run"]`)
-      .waitFor({ timeout: 5_000 })
+      .waitForFunction(
+        () =>
+          [...document.querySelectorAll('[data-testid="page-title"]')].some(
+            (el) => el.value === 'Errand run',
+          ),
+        null,
+        { timeout: 5_000 },
+      )
       .catch(() => {});
+    const openedTitles = await titlesShown();
     check(
       'a row opens from the list, which is the way back into the tree — A-7',
-      (await page.locator('[data-testid="page-title"]').inputValue()) === 'Errand run' &&
-        page.url().endsWith(chosenRow),
-      `${page.url()} for ${chosenRow}`,
+      openedTitles.includes('Errand run') && page.url().endsWith(chosenRow),
+      `${openedTitles.join(' | ')} at ${page.url()} for ${chosenRow}`,
     );
     await page.locator('[data-testid="all-lists-link"]').click();
     await page.waitForSelector('[data-testid="tree"]');
@@ -710,7 +743,7 @@ async function main() {
 
     await page.locator('[data-testid="agenda-link"][data-agenda="tomorrow"]').click();
     await page.waitForSelector('[data-testid="agenda-page"][data-agenda="tomorrow"]');
-    const agendaAdd = page.locator('[data-testid="quick-add"]:visible');
+    const agendaAdd = listAdd(page, 'quick-add');
     await agendaAdd.fill('Collect the parcel');
     await page.keyboard.press('Enter');
     check(
@@ -813,11 +846,11 @@ async function main() {
     );
     check(
       'and its add line offers no kind but a check item — R-1',
-      (await page.locator('[data-testid="add-note"]:visible').count()) === 0 &&
-        (await page.locator('[data-testid="add-folder"]:visible').count()) === 0,
+      (await listAdd(page, 'add-note').count()) === 0 &&
+        (await listAdd(page, 'add-folder').count()) === 0,
     );
 
-    await page.locator('[data-testid="quick-add"]:visible').fill('Water the plants');
+    await listAdd(page, 'quick-add').fill('Water the plants');
     await page.keyboard.press('Enter');
     let plants = await rowByTitle(page, 'Water the plants');
     check(
@@ -1227,7 +1260,7 @@ async function main() {
     // check here is that contrast.
     await page.goto(`${BASE_URL}#/n/n_seed0005`);
     await page.waitForSelector('[data-testid="tree"]');
-    await page.locator('[data-testid="add-note"]:visible').click();
+    await listAdd(page, 'add-note').click();
     await page.waitForSelector('[data-testid="note-pane"]');
     check(
       'a note made from the line opens beside it, because the caret is in it — X-30',
@@ -1274,8 +1307,9 @@ async function main() {
 
     await (await rowByTitle(page, 'Boiler manual')).locator('[data-testid="title"]').click();
     await page.waitForSelector('[data-testid="note-pane"]');
-    // The caret raises a note and nothing else lowers it: a folder's title and
-    // a task's both leave the pane exactly where it was — X-30.
+    // The caret raises a body and nothing else lowers it, so a folder's title —
+    // the one kind with nothing behind it — leaves the pane exactly where it
+    // was — X-30.
     await (await rowByTitle(page, 'Kitchen')).locator('[data-testid="title"]').click();
     await page.waitForTimeout(150);
     const afterFolder = await page.evaluate(() => ({
@@ -1283,18 +1317,34 @@ async function main() {
       list: document.querySelector('[data-testid="page-header"] ~ div [data-testid="page-title"]')
         ?.value,
     }));
+    check(
+      'a caret in a folder leaves the pane as it is — X-30',
+      afterFolder.note === 'Boiler manual' && afterFolder.list === 'House',
+      `${afterFolder.list} | ${afterFolder.note}`,
+    );
+
+    // And a task's raises the task, because a check item has a body of its own
+    // now — K-12. The left column is the one thing that must not move: the pane
+    // followed the caret and the route did not, which is X-30 read on the kind
+    // a checklist is mostly made of.
     await (await rowByTitle(page, 'Descale the kettle')).locator('[data-testid="title"]').click();
     await page.waitForTimeout(150);
-    const afterTask = await page.evaluate(
-      () => document.querySelector('[data-testid="note-pane"] [data-testid="page-title"]')?.value,
-    );
+    const afterTask = await page.evaluate(() => ({
+      hash: location.hash,
+      note: document.querySelector('[data-testid="note-pane"] [data-testid="page-title"]')?.value,
+      list: document.querySelector('[data-testid="page-header"] ~ div [data-testid="page-title"]')
+        ?.value,
+      caret: document.querySelector('[data-testid="note-pane"]')?.dataset.fromCaret,
+    }));
     check(
-      'a caret in a folder or a task leaves the pane as it is — X-30',
-      afterFolder.note === 'Boiler manual' &&
-        afterFolder.list === 'House' &&
-        afterTask === 'Boiler manual',
-      `${afterFolder.list} | ${afterFolder.note} then ${afterTask}`,
+      'a caret in a task raises the task’s own body, and moves nothing — K-12, X-30',
+      afterTask.note === 'Descale the kettle' &&
+        afterTask.list === 'House' &&
+        afterTask.hash === '#/n/n_seed0005' &&
+        afterTask.caret === 'true',
+      `${afterTask.list} | ${afterTask.note} | ${afterTask.hash}`,
     );
+    await page.screenshot({ path: join(shots, 'task-body-caret.png'), fullPage: true });
 
     // Navigating is the reader choosing what is on screen, so the route decides
     // both panes again and the caret's note does not follow them — X-30.
@@ -1325,6 +1375,75 @@ async function main() {
         iconOpened.caret === 'false',
       `${iconOpened.list} | ${iconOpened.hash}`,
     );
+
+    // --- X-39: the chip is a task's own way in ------------------------------
+    // A task's head is the checkbox, so the link that a folder and a note wear
+    // there sits in the strip beside the tags instead. It is on *every* task
+    // rather than only the ones with text in them, which is the check a seeded
+    // body would not make: the first body has to be reachable too.
+    // The census is taken on Shopping, which is the longest list this run has
+    // built: a page with one task on it would pass the "on every task" claim by
+    // accident.
+    await page.goto(`${BASE_URL}#/n/n_seed0001`);
+    await page.waitForSelector('[data-testid="tree"]');
+    const chips = await page.evaluate(() => {
+      const rows = [...document.querySelectorAll('[data-testid="row"]')];
+      const tasks = rows.filter((row) => row.dataset.kind === 'task');
+      return {
+        tasks: tasks.length,
+        chipped: tasks.filter((row) => row.querySelector('[data-testid="body-chip"]')).length,
+        elsewhere: rows.filter(
+          (row) => row.dataset.kind !== 'task' && row.querySelector('[data-testid="body-chip"]'),
+        ).length,
+      };
+    });
+    check(
+      'every task row carries the way into its own body, and no other row does — X-39',
+      chips.tasks > 0 && chips.chipped === chips.tasks && chips.elsewhere === 0,
+      `${chips.chipped}/${chips.tasks} tasks, ${chips.elsewhere} elsewhere`,
+    );
+
+    await page.goto(`${BASE_URL}#/n/n_seed0005`);
+    await page.waitForSelector('[data-testid="tree"]');
+    const kettle = await rowByTitle(page, 'Descale the kettle');
+    check(
+      'and it says whether there is anything behind it — X-39',
+      (await kettle.locator('[data-testid="body-chip"]').getAttribute('data-has-body')) === 'false',
+    );
+
+    await kettle.locator('[data-testid="body-chip"]').click();
+    await page.waitForSelector('[data-testid="note-pane"]');
+    await page.waitForTimeout(150);
+    const chipOpened = await page.evaluate(() => ({
+      hash: location.hash,
+      note: document.querySelector('[data-testid="note-pane"] [data-testid="page-title"]')?.value,
+      list: document.querySelector('[data-testid="page-header"] ~ div [data-testid="page-title"]')
+        ?.value,
+      caret: document.querySelector('[data-testid="note-pane"]')?.dataset.fromCaret,
+    }));
+    check(
+      'the chip navigates, and the task opens beside the list it hangs under — X-39, X-21',
+      chipOpened.hash === '#/n/n_seed0007' &&
+        chipOpened.note === 'Descale the kettle' &&
+        chipOpened.list === 'Kitchen' &&
+        chipOpened.caret === 'false',
+      `${chipOpened.list} | ${chipOpened.note} | ${chipOpened.hash}`,
+    );
+
+    // The same editor, in the same pane: what is typed here is one `set body`
+    // on a task — K-12 — and the chip on the row behind it says so.
+    await page.locator('[data-testid="note-pane"] [data-testid="note-body"]').click();
+    await page.keyboard.type('Half a litre of vinegar, an hour.');
+    await page.waitForTimeout(1_200);
+    const typedChip = await (await rowByTitle(page, 'Descale the kettle'))
+      .locator('[data-testid="body-chip"]')
+      .getAttribute('data-has-body');
+    check(
+      'a body typed on a task is drawn by the chip on its row — K-12, X-39',
+      typedChip === 'true',
+      `has-body ${typedChip}`,
+    );
+    await page.screenshot({ path: join(shots, 'task-body.png'), fullPage: true });
 
     await page.goto(`${BASE_URL}#/n/n_seed0012`);
     await page.waitForSelector('[data-testid="note-pane"]');
@@ -2321,6 +2440,33 @@ async function main() {
     );
     await page.locator('[data-testid="topbar"] [data-testid="quick-add"]').click();
     await page.keyboard.press('Escape');
+
+    // X-39 at the width the chip exists for. The caret raises nothing here, so
+    // the chip is a task's only way into its own body — it is a link, so what it
+    // opens is the same route the desktop opened, drawn as X-22's sheet.
+    await page.goto(`${BASE_URL}#/n/n_seed0006`);
+    await page.waitForSelector('[data-testid="tree"]');
+    await (await rowByTitle(page, 'Descale the kettle'))
+      .locator('[data-testid="body-chip"]')
+      .click();
+    await page.waitForSelector('[data-testid="note-pane"]');
+    await page.waitForTimeout(300);
+    const phoneChip = await page.evaluate(() => {
+      const pane = document.querySelector('[data-testid="note-pane"]');
+      return {
+        title: pane?.querySelector('[data-testid="page-title"]')?.value,
+        peeked: pane?.dataset.expanded,
+        height: Math.round(pane?.getBoundingClientRect().height ?? 0),
+      };
+    });
+    check(
+      'the chip is the phone’s way into a task’s body, and it opens as the sheet — X-39, X-22',
+      phoneChip.title === 'Descale the kettle' &&
+        phoneChip.peeked === 'false' &&
+        phoneChip.height <= 844 * 0.6 + 1,
+      `${phoneChip.title} at ${phoneChip.height}px, expanded ${phoneChip.peeked}`,
+    );
+    await page.screenshot({ path: join(shots, 'phone-task-body.png') });
 
     for (const width of [390, 768, 1280]) {
       await page.setViewportSize({ width, height: 900 });

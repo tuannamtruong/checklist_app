@@ -181,12 +181,14 @@ committed, and a note body updates the store on a 1 s debounce but only becomes 
 
 ### The note body
 
-`body` is a string and stays one (B-2). Bold, two heading levels and code are Markdown marks *inside* it — `**bold**`,
-`# `, `## `, three backticks on a line of their own, one backtick inside a line — so the merge, the conflict rows and
-compaction never learned that a body can be formatted, and a build that predates M7 shows the marks as characters rather
-than as noise. `src/core/markup.ts` is the only module that spells a mark: `parseBody` returns blocks and spans (never
-HTML — B-6), `plainText` is what search matches and snippets show (B-5), and `toggleBold`/`setHeading`/`toggleCode` are
-the three controls, which write marks a person could have typed and are therefore undone by the field's own undo.
+`body` is a string and stays one (B-2), and since K-12 it belongs to a task as well as a note — one editor, one set of
+marks, one debounce, whichever kind is open in the pane. Bold, two heading levels and code are Markdown marks *inside*
+it — `**bold**`, `# `, `## `, three backticks on a line of their own, one backtick inside a line — so the merge, the
+conflict rows and compaction never learned that a body can be formatted, and a build that predates M7 shows the marks as
+characters rather than as noise. `src/core/markup.ts` is the only module that spells a mark: `parseBody` returns blocks
+and spans (never HTML — B-6), `plainText` is what search matches and snippets show (B-5), and
+`toggleBold`/`setHeading`/`toggleCode` are the three controls, which write marks a person could have typed and are
+therefore undone by the field's own undo.
 
 Three controls, never five: bold; a heading that cycles none, heading, subheading — the shape A-2's priority flag
 already has; and one `</>` whose mark is decided by the selection rather than by a second button — a run inside one line
@@ -203,13 +205,14 @@ afterwards because Chromium leaves it one short on an empty insert.
 
 **A fenced block is the one construct that spans lines, and every mark but bold is a character inside it** — `# ` is a
 comment and `- ` is a flag, but `**` is bold (B-11), read a line at a time, because the reason a long box is on screen
-is usually one line in it. `boldRuns` is what both code paths call, so an inline run reads the same way. An unclosed fence stays literal, for the reason an unmatched `**`
-does. It draws as a box headed `Code` with a Copy button, and that button is the one positioned thing inside B-3's
-`aria-hidden` rendered half carrying a `z-index`: without it the click lands in the transparent textarea lying over the
-box. It is `tabindex="-1"` because the text is in that field, which is what a screen reader reads. Placing that pair is
-the one hard part: a textarea has no range geometry, so `src/ui/text-rect.ts` lays the text out again in a mirror
-wearing the field's metrics and measures the run there, and `selectionchange` on the document is what raises the
-controls — a field fires nothing of its own when a drag ends outside it.
+is usually one line in it. `boldRuns` is what both code paths call, so an inline run reads the same way. An unclosed
+fence stays literal, for the reason an unmatched `**` does. It draws as a box headed `Code` with a Copy button, and that
+button is the one positioned thing inside B-3's `aria-hidden` rendered half carrying a `z-index`: without it the click
+lands in the transparent textarea lying over the box. It is `tabindex="-1"` because the text is in that field, which is
+what a screen reader reads. Placing that pair is the one hard part: a textarea has no range geometry, so
+`src/ui/text-rect.ts` lays the text out again in a mirror wearing the field's metrics and measures the run there, and
+`selectionchange` on the document is what raises the controls — a field fires nothing of its own when a drag ends
+outside it.
 
 `src/ui/NoteBody.svelte` holds one textarea that is never unmounted. When the caret is elsewhere it lies transparent
 over the rendered blocks, so the click that reaches it is the click that focuses it; swapping two elements would drop
@@ -218,17 +221,20 @@ X-10's repaint-without-eating-the-caret both need to keep.
 
 ### The note pane
 
-`#/n/<id>` of a **note** draws two things: the note, and the page of the nearest list above it (X-21). Both come out of
-the one route — `src/ui/App.svelte` derives `noteId` and `listId` from it — so there is no second route and no stored
-pair, and Back closes the note by leaving the route exactly as it always did. A `folder` or a `task` renders the single
-page it always did: a list beside a list is the same drawing twice.
+`#/n/<id>` of a row that **has a body** — a note or, since K-12, a task — draws two things: the body, and the page of
+the nearest list above it (X-21). Both come out of the one route — `src/ui/App.svelte` derives `noteId` and `listId`
+from it — so there is no second route and no stored pair, and Back closes it by leaving the route exactly as it always
+did. A `folder` renders the single page it always did: a list beside a list is the same drawing twice. The pane is still
+called the note pane and `Panes.noteId` is still called that — a name from the kind that had the only body, kept because
+renaming it would be a diff across the shell that changes nothing.
 
 **"The nearest list above it" is a walk, not the parent.** `listAbove` in `src/core/tree.ts` climbs T-6's resolved
-parents past every `note`, so opening a note *inside* a note swaps the pane and leaves the left column exactly where the
-reader put it — the nested note is a row in that column's own tree, which draws the whole subtree, so the click is a
-click on the left and only the pane answers it. Drawing the parent note on the left instead was the first cut: it put a
-second body and a second K-7 debounce on screen, and moved the list on every step down. `closeHref` walks the same way,
-or ✕ on a nested note would open its parent rather than close anything.
+parents past every row `hasBody` answers for — a note, and a task since K-12 — so opening a note *inside* a note (or a
+note inside a task) swaps the pane and leaves the left column exactly where the reader put it — the nested note is a row
+in that column's own tree, which draws the whole subtree, so the click is a click on the left and only the pane answers
+it. Drawing the parent note on the left instead was the first cut: it put a second body and a second K-7 debounce on
+screen, and moved the list on every step down. `closeHref` walks the same way, or ✕ on a nested note would open its
+parent rather than close anything.
 
 **The divider between them is dragged — X-24.** `src/ui/WidthGrip.svelte` is X-20's sidebar grip generalised: the same
 pointer capture and the same `role="slider"`, with `sign={-1}` at the pane because the divider is the pane's *left*
@@ -267,16 +273,26 @@ arrived. And `syncScroll` puts the rendered half under the field's own `scrollTo
 boxes each have a scrollbar now and the transparent one is on top: the wheel reaches the field, and the view that stays
 put is the one the reader is looking at.
 
-**The caret is a second way in, and it moves nothing — X-30.** Putting the caret in a **note** row's title raises that
-note in the pane; the route, the history and the left column stay exactly where the reader left them. `src/ui/panes.ts`
-is the whole of both rules — the pane is the note the caret is in, or the note the route names, and the list is the
-route's *always*, which is what makes X-30 true by construction. The caret's note is `RowFocus.noteId`, written only by
-a note's title: a caret in a folder or a task leaves the pane as it is, because the caret raises a note and nothing else
-lowers it. It is not cleared on blur either — clicking from the title into the note's own body would otherwise close the
+**The caret is a second way in, and it moves nothing — X-30.** Putting the caret in the title of a row that has a body
+raises that body in the pane; the route, the history and the left column stay exactly where the reader left them.
+`src/ui/panes.ts` is the whole of both rules — the pane is the note the caret is in, or the note the route names, and
+the list is the route's *always*, which is what makes X-30 true by construction. The caret's row is `RowFocus.noteId`,
+written only by a title with a body behind it: a caret in a folder leaves the pane as it is, because the caret raises a
+body and nothing else lowers it. Since K-12 that is the only kind that leaves it alone, so walking a list with the arrow
+keys moves the pane from row to row — the pane is the body of the row the caret is in, and an empty one draws an empty
+editor. It is not cleared on blur either — clicking from the title into the note's own body would otherwise close the
 pane under the click about to edit it — so exactly two things end it: the ✕, the one control that differs by how the
 pane was opened, and a navigation, which hands the question back to the route. Above `lg` only: below it the pane is
 X-22's sheet, and a sheet raised by typing would cover the row being typed. The icon on the row still navigates, which
 is what moves the left column to `listAbove` the note.
+
+**A task's row has no icon to spare, so its link is a chip — X-39.** The kind icon at the head of a row is the link, and
+a task's head is the checkbox; a checkbox means `done` and goes on meaning only that. `src/ui/BodyChip.svelte` is that
+link moved into the strip right of the title, beside `TagChips` and the flag, on **every** task rather than only the
+ones with text — a way in that appears once there is something behind it cannot be used to put the first thing behind
+it, and below `lg` there is nothing else, since the caret raises no sheet there. It is an `<a>` and never a button, so
+the route, Back and X-8's deep link are the browser's; `data-has-body` is the one shade of difference between an empty
+body and a written one, and it is in the label as well, because a colour is not something a screen reader reads.
 
 Pages are **left-aligned rather than centred** (X-23), so the list does not slide sideways when the pane opens.
 `src/ui/PageTitle.svelte` is the title-and-flag heading both the page and the pane use. requirements.md §10.3,
@@ -285,11 +301,15 @@ past_decision.md §14.
 ### Kinds
 
 Three, and `src/core/types.ts` is the whole list: `folder`, `note`, `task` (K-1). Kind drives rendering and never
-structure — any kind may own children — so the only real distinctions are that a task is checkable and a note has a
-body. `list` was a fourth until M6 and was a folder with a different icon; `src/core/op-log.ts` reads a `list` in an
-older file as a `folder`, which is the only migration there is and is the same read-time normalisation `tags.ts` does.
-Nothing rewrites a file to do it, and a peer on an older build reads `folder` without noticing anything happened —
-past_decision.md §11.
+structure — any kind may own children — so the only real distinctions are that a task is checkable and a folder has no
+body. **A task carries the same body a note does — K-12**: the same `body` field, the same `set` op, the same
+`NoteBody`, so a check item holds the line about it rather than a second row beside it. `hasBody` in `types.ts` is the
+one place the pair of kinds is written down, and it has four callers — the fold, `listAbove`, `panes.ts` and the caret
+in `focus.svelte.ts`. Nothing in the payload learned anything: `body` was always a field of a node, so an older build
+folds a task's body, merges it, compacts it and only fails to draw it — past_decision.md §21. `list` was a fourth until
+M6 and was a folder with a different icon; `src/core/op-log.ts` reads a `list` in an older file as a `folder`, which is
+the only migration there is and is the same read-time normalisation `tags.ts` does. Nothing rewrites a file to do it,
+and a peer on an older build reads `folder` without noticing anything happened — past_decision.md §11.
 
 `src/ui/SidebarLinks.svelte` renders the **top-level** folders and notes and, under each, its immediate folder and note
 children — two levels, and it does not recurse (T-10). Every entry carries the tree's own `⋮` menu on its right (T-18),
@@ -369,17 +389,18 @@ typed. `src/ui/QuickAdd.svelte` is the one caller, per line of a K-9 paste as we
 
 The tree itself is **not** filtered and `TagFilter.svelte` is gone. The bar cost five rules that each repaired a hole
 the one before it opened — hide the non-matching rows, add the ancestors back, override T-8's collapse state, and A-6 to
-stop a row vanishing as it was typed — for a mode a tree could be left in. `src/ui/TagChips.svelte` draws a link to `#/tags/<tag>` per chip
-(A-10) — one tag rather than the chosen set — and A-6 is withdrawn: tagging at creation is A-8's `#tag` on the add line.
+stop a row vanishing as it was typed — for a mode a tree could be left in. `src/ui/TagChips.svelte` draws a link to
+`#/tags/<tag>` per chip (A-10) — one tag rather than the chosen set — and A-6 is withdrawn: tagging at creation is A-8's
+`#tag` on the add line.
 
 **A tag's colour is the tag's own name (A-9).** `src/core/tag-colour.ts` hashes it to one of sixteen tints and returns a
-*number* — even steps of an `oklch` wheel, so a blue and a teal weigh what a red does, and the hash is avalanched
-before the remainder because FNV-1a's low bits are its worst ones; `.tag-chip` in `src/app.css` is what a tint looks like, mixed from that hue toward the palette's own `ink`,
-`line` and `surface` so one rule serves six themes. Nothing is stored, chosen or merged — a colour per tag as a field
-would be a second last-writer-wins value with a conflict row, for a decoration — and a tag is the same colour on the
-row, in `TagEditor` and on `#/tags` because all three call the same function. Chosen on `#/tags` is that same hue turned
-up (`.tag-chip-chosen`) rather than the accent, which would have taken the tag's colour away exactly when it is being
-pointed at.
+*number* — even steps of an `oklch` wheel, so a blue and a teal weigh what a red does, and the hash is avalanched before
+the remainder because FNV-1a's low bits are its worst ones; `.tag-chip` in `src/app.css` is what a tint looks like,
+mixed from that hue toward the palette's own `ink`, `line` and `surface` so one rule serves six themes. Nothing is
+stored, chosen or merged — a colour per tag as a field would be a second last-writer-wins value with a conflict row, for
+a decoration — and a tag is the same colour on the row, in `TagEditor` and on `#/tags` because all three call the same
+function. Chosen on `#/tags` is that same hue turned up (`.tag-chip-chosen`) rather than the accent, which would have
+taken the tag's colour away exactly when it is being pointed at.
 
 **The three flag colours are theme tokens** — `flag-low`, `flag-medium`, `flag-high` — so a palette is fourteen
 properties rather than eleven and no component names a colour. `themes.test.ts` fails if a theme leaves one out.

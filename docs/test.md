@@ -276,12 +276,13 @@ fourth: the collapse is sampled once a frame for 400ms and the claim is that one
 which is a check that does not depend on guessing when to look — reading one height at a fixed instant is what would
 have been flaky.
 
-X-30 is two halves and the unit half carries most of it. `panes.test.ts` is a table over the one derivation — which note
-the pane draws and which list is beside it, given a route and the note the caret is in — and `focus.svelte.test.ts` is
-the rule that feeds it: a note's title raises the pane, a folder's and a task's leave it exactly where it was, and only
-the ✕ and a navigation clear it. Between them they hold the cases a browser would be slow to reach, including the two
-that close a pane without touching the caret at all: a peer deleting the note under it (T-7) and the row menu turning it
-into a folder (K-5).
+X-30 is two halves and the unit half carries most of it. `panes.test.ts` is a table over the one derivation — which row
+the pane draws and which list is beside it, given a route and the row the caret is in — and `focus.svelte.test.ts` is
+the rule that feeds it: a note's title raises the pane, a task's raises it too since K-12, a folder's leaves it exactly
+where it was, and only the ✕ and a navigation clear it. Between them they hold the cases a browser would be slow to
+reach, including the two that close a pane without touching the caret at all: a peer deleting the row under it (T-7) and
+the row menu turning it into a folder (K-5) — which is now the only turn that closes anything, since a note turned into
+a task keeps its body and keeps the pane.
 
 The browser half is the claim the unit tests cannot make, and it is one measurement: the caret goes into a nested note's
 title, the pane opens, and the left column's title and `x` are both what they were before — the route's list, not the
@@ -290,6 +291,21 @@ note's parent, and not moved sideways. The run then checks what the composition 
 columns alone, a navigation closes it rather than carrying it to the next page, and at 390px the same caret raises no
 sheet at all. The contrast is checked beside it, because it is the requirement's own argument: the icon on that same row
 *does* move the left column, to the list above the note.
+
+K-12 is a field question and a drawing question, and they are checked in different places. The field is
+`materialise.test.ts`: a `create` of a task opens with an empty body where a folder's stays null, a `set kind` into
+either body-carrying kind gives a row without one an empty body, and turning a note into a task leaves the text alone —
+which is the assertion that keeps K-5 reversible. The merge, the conflict row and the compaction cut get no new tests,
+because they have none to gain: `set body` was never a note's op, so the cases in `merge.test.ts`, `conflicts.test.ts`
+and `compact.test.ts` already cover a task's body without knowing it. `tree.test.ts` covers the walk that changed —
+`listAbove` climbs past a task exactly as it climbs past a note — and `panes.test.ts` covers a task's route splitting
+into two panes.
+
+X-39 is the browser's, and it is three assertions in the run that already opens a note. Every task row draws the chip,
+which is the requirement's own "on every task" and the one thing a check on a seeded body would not catch; the chip's
+`data-has-body` tells the two states apart on two rows of the same seeded tree; and clicking it lands on `#/n/<id>` with
+the body in the pane and the list still beside it, which is X-21 asserted through the new way in. At 390px the same
+click opens the sheet, since that is the phone's only door.
 
 X-29 is checked at a deliberately short window, because that is the cheapest way to make the seeded tree taller than the
 viewport and the claim is only about what scrolling one column does to the other. Three numbers say it: the document

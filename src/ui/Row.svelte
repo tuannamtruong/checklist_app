@@ -12,6 +12,7 @@
   import type { RowActionContext } from './actions';
   import { handleRowKey } from './keyboard';
   import { rowAbove, rowBelow } from './rows';
+  import BodyChip from './BodyChip.svelte';
   import KindIcon from './KindIcon.svelte';
   import PriorityFlag from './PriorityFlag.svelte';
   import RepeatChip from './RepeatChip.svelte';
@@ -249,16 +250,25 @@
       data-testid="title"
       onfocus={() => {
         editing = true;
-        // X-30 reads this: a caret landing in a *note's* title is what raises
-        // the pane, and one landing in a folder's or a task's leaves whatever
-        // is there alone. Never cleared on blur either, which is what lets the
-        // reader click from the title into the note's own body — §10.3.
+        // X-30 reads this: a caret landing in the title of a row that has a
+        // body raises the pane — a note, or a task since K-12 — and one landing
+        // in a folder's leaves whatever is there alone. Never cleared on blur
+        // either, which is what lets the reader click from the title into the
+        // body itself — §10.3.
         focus.enter(id, node.kind);
       }}
       oninput={() => (editing = true)}
       onblur={commit}
       onkeydown={onKeyDown}
     />
+
+    <!-- X-39, first in the strip so it is in the same place on every task
+         whatever a row's tags do. A task only: the other two kinds are opened by
+         the icon at the head of the row, and this is the slot a task spent on
+         its checkbox — requirements.md §10.3. -->
+    {#if node.kind === 'task'}
+      <BodyChip {id} title={node.title} filled={(node.body ?? '') !== ''} />
+    {/if}
 
     <!-- A-1 and A-2, right of the title: what the row is for, after what it is. -->
     <TagChips tags={node.tags} />

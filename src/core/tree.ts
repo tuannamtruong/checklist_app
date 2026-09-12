@@ -12,6 +12,7 @@
 
 import { compareSiblings } from './order';
 import {
+  hasBody,
   isRoot,
   ROOT,
   SIDEBAR_KINDS,
@@ -205,19 +206,24 @@ export function siblingAt(tree: ResolvedTree, id: NodeId, offset: number): NodeI
 }
 
 /**
- * X-21. The nearest ancestor that is not a `note`, or `ROOT`.
+ * X-21. The nearest ancestor with no body of its own — a folder, or one of the
+ * three roots.
  *
- * The list a note is drawn beside, and a walk rather than one `parentOf`
- * because a note's children may be notes: opening one is a click inside the
- * pane, and the pane is what should answer it — the column on the left keeps
- * the list it was already showing. requirements.md §10.3.
+ * The list a body is drawn beside, and a walk rather than one `parentOf`
+ * because a row with a body may own rows with bodies: opening one is a click
+ * inside the pane, and the pane is what should answer it — the column on the
+ * left keeps the list it was already showing. K-12 put a task in that set, so
+ * the walk climbs past a task exactly as it climbs past a note.
+ * requirements.md §10.3.
  */
 export function listAbove(tree: ResolvedTree, id: NodeId): ParentId {
   let cursor: ParentId = parentOf(tree, id);
-  while (!isRoot(cursor) && tree.nodes[cursor]?.kind === 'note') {
+  for (;;) {
+    if (isRoot(cursor)) return cursor;
+    const kind = tree.nodes[cursor]?.kind;
+    if (kind === undefined || !hasBody(kind)) return cursor;
     cursor = parentOf(tree, cursor);
   }
-  return cursor;
 }
 
 /**

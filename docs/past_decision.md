@@ -817,3 +817,47 @@ taste, not about the number two. What does not reopen it is option B — the ans
 `line` is a step away from `surface` and the surface is the theme's. Option C returns if a picked pair ever has to
 travel: a palette a person made on the laptop and wants on the phone is a thing to store and to name, and X-14's
 argument against syncing a preference is weaker for a colour somebody built than for one they chose off a list.
+
+## 21. A task's body
+
+A check item is where the work is written down, and what a person wants beside one is usually a line about it — the
+address, the part number, the reason it slipped.
+[requirements.md §4 Item kinds and attributes](requirements.md#4-item-kinds-and-attributes) answered that with the note
+kind and with K-4: put a note next to the task, or under it. That answer is a second row to keep in step with the first,
+and T-11 takes the task away when it is ticked and leaves the note sitting on the list.
+
+### 21.1 Where the text goes
+
+| # | Option | What it costs |
+| --- | --- | --- |
+| A | **The note's own `body` field, on a task as well** — chosen | One predicate, `hasBody`, and four call sites. Nothing reaches the payload: `set body` already named an id and a string, so the merge, the conflict row and the compaction cut are the ones that were already there, and a peer on an older build folds the field and simply does not draw it |
+| B | A second field — `notes` on a task, `body` on a note | A second last-writer-wins value with a second conflict row, a second thing for `compact.ts` to supersede, a second decoder branch, and a second editor to keep in step with B-1 to B-11 — for text that is text either way. It also makes K-5 lossy in one direction: turning a task into a note would have to choose which of the two fields survives |
+| C | A note as a child of the task, created on demand | The row that exists today, with a button on it. It is still a row: it appears in the tree, in search results, in the Done view and in every peer's merge as a separate node, and the delete that removes the task leaves it behind unless T-7's subtree rule is bent |
+| D | Nothing — keep K-4's "put a note beside it" | The status quo, and the request was exactly that this is work: two rows, two titles and two places to look for one thing |
+
+**What decided it is that a body was never a note's.** The op says `set body`, the node says `body`, and the merge, the
+conflict row and the compaction cut all read it as a field of a node — the only thing that made it a note's was the
+`kind === 'note'` in `materialise.ts` that decided whether to initialise it and the same test in two components deciding
+whether to draw an editor. Option A takes those tests out and puts one predicate in their place, which is why the change
+is a rename of a question rather than an addition to the model.
+
+### 21.2 What the caret cost
+
+X-30 raises the pane from a caret in a title, and it did that only for a note because only a note had something to
+raise. Extending it to a task extends it to the kind a checklist is mostly made of, so arrowing down a list now moves
+the pane from row to row where it used to stay put on the rows the pane could not draw.
+
+That was the one real objection, and the alternative was to leave the caret alone and reach a task's body only by
+navigating. It was not taken because it makes the two kinds behave differently at the one gesture the reader uses most,
+for a difference the reader cannot see — the row under the caret has a body either way. What the pane draws is the body
+of the row the caret is in, at every row, and a row with an empty body draws an empty editor rather than nothing at all.
+
+### 21.3 What reopens it
+
+A body large enough to want its own file. Everything here rests on `body` being a string in the one op log
+([sync-flow.md §4.2 B — Append-only op log per device](sync-flow.md#42-b--append-only-op-log-per-device)), which is what
+makes a second field expensive and a per-node file unthinkable; a body that carried an image would break that before it
+broke anything about which kinds have one.
+
+Option B returns if a task ever needs *both* — a description and a note — which is a request for two fields rather than
+for one on a second kind, and would be answered by asking why the tree cannot hold the second one as a child.

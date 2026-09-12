@@ -171,9 +171,26 @@ describe('field edits', () => {
 
   it('gives a row turned into a note a body to open — K-3, K-5', () => {
     const [a] = threeRows();
-    expect(session.tree.nodes[a]!.body).toBeNull();
+    // A task, which since K-12 arrives with one of its own.
+    expect(session.tree.nodes[a]!.body).toBe('');
+    session.apply(turnInto(session.tree, ctx, a, 'folder'));
+    ctx.tick();
     session.apply(turnInto(session.tree, ctx, a, 'note'));
     expect(session.tree.nodes[a]!.body).toBe('');
+  });
+
+  it('carries a body between the two kinds that have one — K-12', () => {
+    const [a] = threeRows();
+    session.apply(setBody(session.tree, ctx, a, 'the address'));
+    ctx.tick();
+    session.apply(turnInto(session.tree, ctx, a, 'note'));
+    // Nothing is written to `body` by the conversion, in either direction: it
+    // is what makes K-5 reversible, and what makes K-12 one field rather than
+    // two that have to agree.
+    expect(session.tree.nodes[a]!.body).toBe('the address');
+    ctx.tick();
+    session.apply(turnInto(session.tree, ctx, a, 'task'));
+    expect(session.tree.nodes[a]!.body).toBe('the address');
   });
 
   it('keeps a note that owns children — K-4', () => {

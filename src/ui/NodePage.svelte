@@ -1,16 +1,18 @@
 <script lang="ts">
-  // One node's page: its path, its title, its body if it is a note, and its
-  // children. The root gets the same page with no node, which is why the tree
-  // and the sidebar need no special case for the top level.
+  // One node's page: its path, its title and its children. The root gets the
+  // same page with no node, which is why the tree and the sidebar need no
+  // special case for the top level.
   //
-  // Since X-21 this is also the *left* pane of a note's route: the list the note
-  // hangs under, drawn exactly as it is drawn on its own — requirements.md §10.3.
+  // Since X-21 this is also the *left* pane of a body's route: the list the row
+  // hangs under, drawn exactly as it is drawn on its own — requirements.md
+  // §10.3. That is also why no body is drawn here. `panesFor` hands this page
+  // the nearest list *above* a row that has one, so the id it is given never has
+  // a body of its own, and the editor for one lives in the pane — X-31.
   import { ROOT, type NodeId, type ParentId } from '../core/types';
   import type { Session } from '../app/Session.svelte';
   import type { ViewState } from '../app/view-state.svelte';
   import type { RowFocus } from './focus.svelte';
   import Breadcrumbs from './Breadcrumbs.svelte';
-  import NoteBody from './NoteBody.svelte';
   import PageTitle from './PageTitle.svelte';
   import QuickAdd from './QuickAdd.svelte';
   import TagEditor from './TagEditor.svelte';
@@ -73,13 +75,6 @@
 
     <TagEditor {session} {id} />
 
-    <!-- K-4. A note's body, and then whatever it owns, with nothing between
-         them: the children read as the note's own list. Changing what this row
-         *is* is the row menu's (K-5), one level up, and is the only place it
-         ever was — K-6. -->
-    {#if node.kind === 'note'}
-      <NoteBody {session} {id} />
-    {/if}
   {:else}
     <h1 class="text-2xl font-semibold" data-testid="page-title">All</h1>
   {/if}

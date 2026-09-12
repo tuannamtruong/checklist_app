@@ -5,7 +5,7 @@
 // that handled the key. The sequence number is what lets the same row be asked
 // twice — after an Escape, say — since the id alone would not have changed.
 
-import type { Kind, NodeId } from '../core/types';
+import { hasBody, type Kind, type NodeId } from '../core/types';
 
 export class RowFocus {
   id = $state<NodeId | null>(null);
@@ -13,12 +13,13 @@ export class RowFocus {
   /** Where the caret goes when the row takes focus. */
   caret = $state<'end' | 'start'>('end');
   /**
-   * X-30. The note the caret is in, which is what the note pane draws.
+   * X-30. The row whose body the caret is in, which is what the note pane
+   * draws — a note, or a task since K-12.
    *
-   * A caret in a `folder` or a `task` leaves this alone rather than clearing
-   * it: the caret raises a note and nothing else lowers it, so ticking a task
-   * beside an open note is not a request for the note to go. What ends it is
-   * the pane's own ✕ or a navigation — requirements.md §10.3.
+   * A caret in a `folder` leaves this alone rather than clearing it: the caret
+   * raises a body and nothing else lowers it, so a title with nothing behind it
+   * is not a request for the pane to go. What ends it is the pane's own ✕ or a
+   * navigation — requirements.md §10.3.
    */
   noteId = $state<NodeId | null>(null);
 
@@ -34,7 +35,7 @@ export class RowFocus {
    */
   enter(id: NodeId, kind: Kind): void {
     this.id = id;
-    if (kind === 'note') this.noteId = id;
+    if (hasBody(kind)) this.noteId = id;
   }
 
   /** The ✕ on a caret-raised pane, and every navigation — §10.3. */

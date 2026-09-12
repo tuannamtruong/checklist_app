@@ -8,15 +8,19 @@
 //
 // The rule is two lines and the order between them is the requirement:
 //
-//   the pane  = the note the caret is in, or the note the route names
+//   the pane  = the body the caret is in, or the body the route names
 //   the list  = the route's, always
+//
+// "The note" is what the pane has been called since it was built for the one
+// kind that had a body; K-12 gave a task the same one, so the names here mean
+// "the row whose body is drawn" — requirements.md §10.3.
 //
 // The list is a function of the *route* alone, which is what makes X-30 true by
 // construction: a caret cannot move the left column, because the left column
 // never reads it. requirements.md §10.3.
 
 import { isVisible, listAbove } from '../core/tree';
-import { isRoot, type NodeId } from '../core/types';
+import { hasBody, isRoot, type NodeId } from '../core/types';
 import type { ResolvedTree } from '../core/tree';
 
 export interface Panes {
@@ -32,20 +36,25 @@ export interface Panes {
   fromCaret: boolean;
 }
 
-/** The route's node if it is a note that still exists — X-21. */
+/**
+ * The route's node if it still exists and has a body to draw — X-21, and K-12,
+ * which is why the question is `hasBody` rather than a kind: a task splits the
+ * route exactly as a note does, and a folder is a list and splits nothing.
+ */
 function noteAt(tree: ResolvedTree, id: NodeId | null): NodeId | null {
   if (id === null || !isVisible(tree, id)) return null;
-  return tree.nodes[id]?.kind === 'note' ? id : null;
+  const kind = tree.nodes[id]?.kind;
+  return kind !== undefined && hasBody(kind) ? id : null;
 }
 
 /**
  * @param routeId      the node `#/n/<id>` names, or `null` at `#/`.
- * @param caretNoteId  the note the caret is in — `RowFocus.noteId`, which only
- *                     a note's title ever sets. A caret in a folder's or a
- *                     task's title leaves it where it was, and blurring the
- *                     title does not clear it: clicking from the title into the
- *                     note's own body would otherwise close the pane under the
- *                     click that was about to edit it — §10.3.
+ * @param caretNoteId  the row whose body the caret is in — `RowFocus.noteId`,
+ *                     which only a title with a body behind it ever sets. A
+ *                     caret in a folder's title leaves it where it was, and
+ *                     blurring the title does not clear it: clicking from the
+ *                     title into the body itself would otherwise close the pane
+ *                     under the click that was about to edit it — §10.3.
  *
  * It is still checked here rather than trusted, because the note it names can
  * stop being one under it: a peer's delete (T-7) or a kind change from the row
@@ -58,9 +67,9 @@ export function panesFor(
 ): Panes {
   const routeNote = noteAt(tree, routeId);
   const caretNote = noteAt(tree, caretNoteId);
-  // The route's node when it is not a note — a `folder` is a list and a `task`
-  // is a page — and otherwise the nearest list above the note, walked past
-  // every note ancestor so a sub-note leaves the left column where it is.
+  // The route's node when it has no body — a `folder` is a list — and
+  // otherwise the nearest list above it, walked past every ancestor that has
+  // one so a nested body leaves the left column where it is.
   const listId = routeNote === null ? routeId : nearestList(tree, routeNote);
   return {
     listId,

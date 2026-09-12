@@ -14,23 +14,27 @@ describe('X-30, which note the caret is in', () => {
     expect(focus.id).toBe('n_note');
   });
 
-  it('is left alone by a folder or a task taking it — the point of the rule', () => {
+  it('is raised by a task taking the caret too — K-12', () => {
+    focus.enter('n_task', 'task');
+    expect(focus.noteId).toBe('n_task');
+    expect(focus.id).toBe('n_task');
+  });
+
+  it('is left alone by a folder taking it — the point of the rule', () => {
     focus.enter('n_note', 'note');
     focus.enter('n_folder', 'folder');
     expect(focus.noteId).toBe('n_note');
     expect(focus.id).toBe('n_folder');
-    focus.enter('n_task', 'task');
-    expect(focus.noteId).toBe('n_note');
   });
 
-  it('is replaced by the next note, not added to', () => {
+  it('is replaced by the next body, not added to', () => {
     focus.enter('n_one', 'note');
-    focus.enter('n_task', 'task');
+    focus.enter('n_folder', 'folder');
     focus.enter('n_two', 'note');
     expect(focus.noteId).toBe('n_two');
   });
 
-  it('is nothing until a note has held the caret', () => {
+  it('is nothing until a body has held the caret', () => {
     focus.enter('n_folder', 'folder');
     expect(focus.noteId).toBeNull();
   });
