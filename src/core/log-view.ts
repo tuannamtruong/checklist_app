@@ -56,6 +56,13 @@ function setDetail(op: Extract<Op, { op: 'set' }>): string {
     const body = op.body ?? '';
     parts.push(body === '' ? 'body cleared' : `body, ${body.length} characters`);
   }
+  // A-3. The whole set is the write, so the whole set is what the line says.
+  if (op.tags !== undefined) {
+    parts.push(op.tags.length === 0 ? 'tags cleared' : `tags ${op.tags.join(', ')}`);
+  }
+  if (op.priority !== undefined) {
+    parts.push(op.priority === 'none' ? 'flag cleared' : `flagged ${op.priority}`);
+  }
   // An op that reached the file with nothing in it should be impossible — S-10
   // drops a no-op edit before it is written — so say what was seen rather than
   // render a blank cell.

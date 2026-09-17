@@ -243,3 +243,30 @@ statements and duplicates nothing: it reads the same `localStorage` key the clas
 **What reopens it.** A seventh theme costs a CSS block and a catalog line, so growth is not a reason. What would reopen
 it is a theme that changes more than colour — a compact density, a larger type scale — because that is no longer a
 palette and A has nothing to say about it.
+
+## 10. Tags as one field
+
+A-1 makes `tags` a set on a node, and the merge treats the whole set as one field: the later write wins, and the set
+that lost is offered back on a conflict row. Two devices tagging one row concurrently therefore keep one set and are
+told about the other.
+
+### 10.1 The options
+
+| # | Option | What it costs |
+| --- | --- | --- |
+| A | **One field, last-writer-wins** — the set is a value like a title | A concurrent add on two devices keeps one set. The other is a click away on the conflict row, because C-1 already offers a dropped value back |
+| B | An OR-set: every member carries the device and counter that added it, and a removal carries a tombstone | Nothing is ever lost. A second merge mechanism lives inside one field, the payload grows a stamp per tag, and a removed tag needs a tombstone that compaction may not drop — every rule [sync-flow.md §4 Sync data model](sync-flow.md#4-sync-data-model) settles once, settled again differently |
+| C | A `tag`/`untag` op pair, merged by `(at, device id)` per member | Two new op kinds and a per-member total order. It is option B with the state in the log rather than in the node, and it grows the same tombstone question |
+
+**A was taken.** The reason is not that losing a tag is cheap; it is that C-1 already exists. A field two devices wrote
+concurrently is the case the conflict list was built for, and a tag set is that case with no new mechanism at all — the
+row says what was kept, offers what was not, and taking it back is an ordinary `set`. B and C both buy "never lose a
+concurrent add" by giving one field its own merge rule, its own tombstone lifetime and its own compaction question,
+which is the cost [sync-flow.md §4.6 The decision](sync-flow.md#46-the-decision) refused for the tree itself.
+
+### 10.2 What reopens it
+
+A measurement, like everything else here: two devices routinely tagging the same rows while apart, so that the conflict
+list fills with tag rows rather than with the races it was built for. One person with a phone and a laptop is not that
+workload. If it ever is, option B is the one to reach for, and the thing to reuse is the `orderBy` pattern — a member
+carrying the device that wrote it — rather than a new op.

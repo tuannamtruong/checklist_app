@@ -6,17 +6,23 @@ import {
   canMoveTo,
   canOutdent,
   canRestore,
+  addTag,
   createFirstChild,
+  createLastChild,
   createSiblingBelow,
   dropOnto,
   indent,
   moveDown,
   moveTo,
   moveUp,
+  nextPriority,
   outdent,
   remove,
+  removeTag,
   restore,
   setBody,
+  setPriority,
+  setTags,
   setTitle,
   toggleDone,
   turnInto,
@@ -214,6 +220,65 @@ describe('arbitrary moves — T-5', () => {
     ctx.tick();
     session.apply(moveTo(session.tree, ctx, b, a, null));
     expect(parentOf(session.tree, b)).toBe(a);
+  });
+});
+
+describe('tags and priority — A-1, A-2', () => {
+  it('writes the whole set, cleaned and sorted', () => {
+    const [a] = threeRows();
+    ctx.tick();
+    const ops = setTags(session.tree, ctx, a, ['#Town', ' errand ', 'town']);
+    session.apply(ops);
+    expect(session.tree.nodes[a]!.tags).toEqual(['errand', 'town']);
+    expect(ops).toHaveLength(1);
+  });
+
+  it('adds and removes by rewriting the set — past_decision.md §10', () => {
+    const [a] = threeRows();
+    session.apply(setTags(session.tree, ctx.tick(), a, ['town']));
+    session.apply(addTag(session.tree, ctx.tick(), a, 'Errand'));
+    expect(session.tree.nodes[a]!.tags).toEqual(['errand', 'town']);
+    session.apply(removeTag(session.tree, ctx.tick(), a, 'town'));
+    expect(session.tree.nodes[a]!.tags).toEqual(['errand']);
+  });
+
+  // S-10: a set that is already what the row holds is not a write.
+  it('writes nothing when the set is unchanged, whatever order it arrives in', () => {
+    const [a] = threeRows();
+    session.apply(setTags(session.tree, ctx.tick(), a, ['errand', 'town']));
+    expect(setTags(session.tree, ctx.tick(), a, ['town', 'ERRAND'])).toEqual([]);
+    expect(removeTag(session.tree, ctx.tick(), a, 'nothing')).toEqual([]);
+  });
+
+  it('starts every row at no tags and no flag', () => {
+    const [a] = threeRows();
+    expect(session.tree.nodes[a]!.tags).toEqual([]);
+    expect(session.tree.nodes[a]!.priority).toBe('none');
+  });
+
+  it('sets and clears a priority, and clearing is a write like any other', () => {
+    const [a] = threeRows();
+    session.apply(setPriority(session.tree, ctx.tick(), a, 'high'));
+    expect(session.tree.nodes[a]!.priority).toBe('high');
+    const cleared = setPriority(session.tree, ctx.tick(), a, 'none');
+    expect(cleared).toHaveLength(1);
+    session.apply(cleared);
+    expect(session.tree.nodes[a]!.priority).toBe('none');
+    expect(setPriority(session.tree, ctx.tick(), a, 'none')).toEqual([]);
+  });
+
+  it('cycles the flag highest first — §4.1', () => {
+    expect(nextPriority('none')).toBe('high');
+    expect(nextPriority('high')).toBe('medium');
+    expect(nextPriority('medium')).toBe('low');
+    expect(nextPriority('low')).toBe('none');
+  });
+
+  // A-6. Without this the row would leave the filtered view as it was created.
+  it('gives a new row the tags it was created under', () => {
+    const ops = createLastChild(session.tree, ctx.tick(), ROOT, { title: 'Milk', tags: ['Town'] });
+    session.apply(ops);
+    expect(session.tree.nodes[ops[0]!.id]!.tags).toEqual(['town']);
   });
 });
 

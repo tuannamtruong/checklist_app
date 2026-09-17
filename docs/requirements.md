@@ -2,8 +2,8 @@
 
 Requirement docs and its current state.
 
-**Milestones M1, M2, M3 and M4 are built** — the production tree is `src/`, and every ✅ row below names the file that
-implements it.
+**Milestones M1 to M5 are built** — the production tree is `src/`, and every ✅ row below names the file that implements
+it.
 
 Two commands verify the ✅ rows:
 
@@ -51,6 +51,8 @@ and never replays per read — [sync-flow.md §4.6 The decision](sync-flow.md#46
 | `title` | string | The row label, every kind |
 | `done` | boolean | Tasks only — K-2. Also the T-11 filter: a row carrying it leaves the normal view |
 | `body` | string or null | Notes only — K-3 |
+| `tags` | string set | A-1. Normalised, sorted and deduplicated by `src/core/tags.ts`; merges as one field |
+| `priority` | one of `none`, `low`, `medium`, `high` | A-2. `none` is a value, not an absent field |
 | `order` | base-62 string | Fractional index among siblings — T-2 |
 | `orderBy` | device id | The device that minted `order`, and the sort tiebreak |
 | `deleted` | boolean | T-7. Absence and deletion must stay distinguishable |
@@ -69,7 +71,7 @@ receipt changes. The encoding and an example are in
 | Op | Carries |
 | --- | --- |
 | `create` | `id`, `parent`, `kind`, `order` |
-| `set` | `id` plus the fields that changed — `title`, `done`, `body`, `kind` |
+| `set` | `id` plus the fields that changed — `title`, `done`, `body`, `kind`, `tags`, `priority` |
 | `move` | `id`, `parent`, `order`; `at` becomes the node's `parentSetAt` |
 | `delete` | `id`; tombstones the subtree at read time, per T-7 |
 | `restore` | `id`; clears that node's own tombstone — T-13 |
@@ -90,8 +92,9 @@ the rule is [sync-flow.md §4.8 The compaction cut](sync-flow.md#48-the-compacti
 Device-local state, held in `localStorage` and never written to a shared file: the device id, collapse/expand state
 (T-8), the sync cadence (S-19), which folder this device reaches the tree through
 ([architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter)), dismissed conflict notices (C-6), the
-chosen theme (X-14), which cloud provider this device's folder belongs to (X-17), and any filter the Done view grows
-(T-12). Anything the user would not want to converge across devices belongs here rather than in the tree.
+chosen theme (X-14), which cloud provider this device's folder belongs to (X-17), which tags the tree is filtered by
+(A-5), and any filter the Done view grows (T-12). Anything the user would not want to converge across devices belongs
+here rather than in the tree.
 
 The **search index** is not state at all, in the same sense the Done view is not: F-4 scans the materialised tree on
 each keystroke, so there is nothing to store, nothing to invalidate and nothing to sync.
@@ -170,7 +173,7 @@ application rather than on the row under the caret, so the row menu is the wrong
 where a phone reaches it. `KEY_BOUND_ACTIONS` stays the list of *row* actions, which is what makes the parity test mean
 something.
 
-## 4. Item kinds
+## 4. Item kinds and attributes
 
 | ID | Requirement | State | Where |
 | --- | --- | --- | --- |
@@ -181,9 +184,71 @@ something.
 | K-5 | Any row can be converted to any kind after the fact ("Turn into") | ✅ | `turnInto` in `src/core/edit.ts`, in the row menu. Two devices converting one row differently resolve by `(at, device id)`, with a notice — [§9 Conflict presentation](#9-conflict-presentation) |
 | K-6 | A note can be promoted to a checklist from its own page | ✅ | `src/ui/NodePage.svelte`; the body is kept, so it is reversible |
 | K-7 | Note body saves are debounced (1 s) so typing is not one op per keystroke | ✅ | `src/ui/NoteBody.svelte`. The 1 s debounce governs the store; an **op** is emitted on blur, on navigating away, or after 60 s of continuous editing — S-20 |
+| K-8 | Every list ends in a line where typing a title and pressing Enter makes a **task**, and leaves the line ready for the next one | ✅ | `src/ui/QuickAdd.svelte`, over `createLastChild` with no kind — which is `task`, the default every other creation path already used. The other three kinds keep their buttons beside it |
 
 Notes are deliberately not checkable. `done` is still a field on every node, because K-5 keeps it across a "Turn into"
 so that turning back restores the tick — which is also why T-11's filter reads `done` rather than `kind === 'task'`.
+
+**The quick-add line makes a task and nothing else, and that is the whole of K-8.** A checklist is mostly tasks, so the
+one path that costs no decision has to produce the kind the person was already going to pick — `createLastChild` with no
+kind, which has meant `task` since M1. The other three kinds keep their buttons beside the line, one click away, because
+picking a kind is a decision worth a button rather than a mode.
+
+Its `Enter` is not a row action and is not in the row menu, for the same reason `/` is not —
+[§3.1 Keyboard (desktop)](#31-keyboard-desktop). It acts on the list rather than on the row under the caret, and there
+is no caret in a row when it fires. What it does have in common with the row keys is where the text goes: nothing typed
+is lost, so leaving the line commits what is in it exactly as leaving a title does, and `Escape` is the one way to throw
+it away.
+
+### 4.1 Tags and priority
+
+A kind says what a row *is*. A tag and a priority say what it is *for*, and they are the two attributes worth the merge
+rule they cost: everything else on the backlogged list — [§16 Explicitly out of scope](#16-explicitly-out-of-scope) — is
+a date, and a date wants a calendar rather than a field.
+
+| ID | Requirement | State | Where |
+| --- | --- | --- | --- |
+| A-1 | Any row carries a set of tags, whatever its kind | ✅ | `tags` in `src/core/types.ts`; `src/core/tags.ts` is the one place a tag is cleaned. A row is tagged from its `⋮` menu and from its own page |
+| A-2 | Any row carries a priority — none, low, medium or high — drawn as a flag in green, yellow or red | ✅ | `Priority` in `src/core/types.ts`; `src/ui/PriorityFlag.svelte` is the control, and the three colours are theme tokens like every other colour — [§10.1 Themes](#101-themes) |
+| A-3 | Both are ordinary fields: one `set` op, last-writer-wins, and a conflict row when two devices raced | ✅ | `setTags` and `setPriority` in `src/core/edit.ts`; `src/core/conflicts.ts` classifies them beside `title` and `done`, and `src/core/compact.ts` drops a superseded one like any other field |
+| A-4 | The tree can be filtered to the rows carrying a tag, and several tags are AND-ed | ✅ | `src/core/filter.ts`, `src/ui/TagFilter.svelte`. Every selected tag must be on the row |
+| A-5 | The filter is device-local and never reaches a file | ✅ | `src/app/view-state.svelte.ts`, beside the collapse state — [§2.3 What is never in the Sync Folder](#23-what-is-never-in-the-sync-folder) |
+| A-6 | A row created while a filter is on carries that filter's tags | ✅ | `CreateOptions.tags` in `src/core/edit.ts`, passed by `src/ui/TreeView.svelte`. Without it the new row would vanish as it was typed |
+
+**A tag is normalised on the way in, and the normal form is what is stored.** Case-folded, its inner whitespace
+collapsed, a leading `#` dropped, trimmed to 32 characters, and the set held sorted and deduplicated —
+`src/core/tags.ts`. Two devices that type `Work` and `work` have typed one tag, which is what a filter over one person's
+own checklist has to mean. The cap is twelve tags to a row: a row that needs a thirteenth is a row that wants a list.
+
+**Tags merge as one field, not as a set of members.** Two devices adding different tags to one row concurrently resolve
+like any other field — the later write wins whole, and the conflict row offers the set that lost, which is one click to
+take back. Making the *members* merge independently would mean a stamp and a tombstone per member, which is a second
+merge mechanism living inside one field —
+[past_decision.md §10 Tags as one field](past_decision.md#10-tags-as-one-field).
+
+**Priority is four names rather than a number.** The log is read by a person (D-4), and `high` is legible in it where
+`3` is a guess. `none` is a real value rather than an absent field, so clearing a flag is a write that can win a race
+against setting one, exactly like un-ticking a box.
+
+Priority has no row-menu entry, and that is not the [§3.1 Keyboard (desktop)](#31-keyboard-desktop) rule being broken:
+the flag *is* a control on the row, reachable by thumb and by mouse, and four menu entries would teach nothing the four
+states of one flag do not.
+
+### 4.2 Filtering by tag
+
+The filter is one set of tags, held by the device rather than by the tree, and it applies to the tree view on every
+page. A row survives it when it carries **every** selected tag — AND rather than OR, because two tags on one row is the
+question people actually ask ("what is tagged `errand` *and* `town`"), and OR is what search already does with two
+words.
+
+**A filter shows a matching row's ancestors too, and expands them.** A hit three levels down a collapsed folder is a row
+the filter promised and did not deliver, so the collapse state (T-8) is overridden for as long as the filter is on, and
+it is remembered rather than cleared when the filter comes off. The ancestors are context, not matches: they are drawn
+as ordinary rows because opening one is the whole point of showing it.
+
+**Nothing else in the application is filtered.** Search (F-4) already scans every row by name and the Done view (T-12)
+is a list of what has left the tree — a filter over either would be a second answer to a question the user asked
+somewhere else. The filter is the tree's, and the nav says so by showing what is active on the tree's own page.
 
 ## 5. Navigation and routing
 
@@ -357,7 +422,7 @@ time the user sees them.
 | C-1 | A genuine race asks the user to choose | ✅ | Decision | `src/core/conflicts.ts`, rendered by `src/ui/ConflictsPage.svelte`. The op log moved where this lives — see below |
 | C-2 | A T-6 repair names the node it re-rooted and offers to jump to it | ✅ | Notice | `resolveTree`'s `repairs` become rows in `src/core/conflicts.ts`; the row links to the node — [sync-flow.md §6.3 The user has to see it](sync-flow.md#63-the-user-has-to-see-it) |
 | C-3 | A tiebreak that landed two concurrently inserted rows in device-id order says so | ✅ | Notice | Two visible siblings holding one `order` with different `orderBy` — `src/core/conflicts.ts` — [sync-flow.md §5.3 The tiebreak](sync-flow.md#53-the-tiebreak) |
-| C-4 | A field resolved by last-writer-wins — a title, a tick, a "Turn into", a note body, a deletion — says so | ✅ | Notice | The same row as C-1, carrying what was kept, what was not, and which device wrote each — by name once D-1 has one |
+| C-4 | A field resolved by last-writer-wins — a title, a tick, a "Turn into", a note body, a deletion, a tag set, a priority — says so | ✅ | Notice | The same row as C-1, carrying what was kept, what was not, and which device wrote each — by name once D-1 has one |
 | C-5 | Nothing here blocks: no modal, no interruption of an edit in progress | ✅ | | One nav entry, present only when there is something in it. A re-rooted node reads as data loss, and a blocking prompt would make it read as worse |
 | C-6 | Rows are derived from merged state each cycle, never stored; only dismissals persist, per device | ✅ | | `conflictsOf` is a pure function of the merged ops and the resolved tree; dismissals are ids in `localStorage` — `src/app/dismissals.ts`. Storing the rows would mean writing a file to acknowledge a notice, which is a fresh concurrent edit |
 
@@ -417,11 +482,17 @@ and now share one.
 
 ### 10.1 Themes
 
-**A theme is eleven semantic tokens and nothing else.** `src/app.css` names roles — `surface`, `surface-sunken`,
-`surface-raised`, `line`, `ink`, `ink-muted`, `ink-faint`, `accent`, `accent-soft`, `danger`, `scrim` — and every
-component spells a role rather than a colour. A theme is therefore one block of eleven custom properties under a
-`[data-theme='…']` selector, and adding a seventh theme is that block plus one line in the catalog. No component
-changes, and none ever can: a component that named a colour would be the bug.
+**A theme is fourteen semantic tokens and nothing else.** `src/app.css` names roles — `surface`, `surface-sunken`,
+`surface-raised`, `line`, `ink`, `ink-muted`, `ink-faint`, `accent`, `accent-soft`, `danger`, `scrim`, and A-2's three
+flags `flag-low`, `flag-medium`, `flag-high` — and every component spells a role rather than a colour. A theme is
+therefore one block of fourteen custom properties under a `[data-theme='…']` selector, and adding a seventh theme is
+that block plus one line in the catalog. No component changes, and none ever can: a component that named a colour would
+be the bug.
+
+**The three flags are tokens for the same reason `scrim` is.** "Green, yellow, red" is a meaning rather than three
+colours: the green that reads as low priority on the light surface is invisible on the dark one, and the yellow that
+reads as medium beside a blue accent competes with a warm one. Each palette picks its own three, and the meaning is what
+stays fixed — a component asks for `flag-high`, never for red.
 
 | ID | What it is |
 | --- | --- |
@@ -438,7 +509,7 @@ close enough on the wheel that a careless yellow makes "Delete" look like a link
 
 **A role that is a *relationship* cannot be derived from another token.** `scrim` — what the phone's drawer lays over
 the page — was `ink` at 20% until the dark theme existed, and under a dark palette that is a white veil that brightens
-what it is meant to dim. It is the eleventh token because "darken whatever is behind this" is a role, and no arithmetic
+what it is meant to dim. It is a token of its own because "darken whatever is behind this" is a role, and no arithmetic
 on `ink` expresses it in both directions. `color-scheme` is the same argument for the things CSS does not own: a
 scrollbar, a caret and a form control's default read the browser's own setting, so the dark palette declares it.
 
@@ -518,8 +589,8 @@ bug — `npm test` and `npm run ui-smoke` both pass.
 ## 16. Explicitly out of scope
 
 Backlogged deliberately, not overlooked: dynamic lists, Google Calendar sync, recurring tasks, reminders and
-notifications, attachments, attributes (tags, priority, dates, quick add), sharing or multi-user, and any form of
-application server or hosted database.
+notifications, attachments, dates and quick add, sharing or multi-user, and any form of application server or hosted
+database.
 
 Themes were on this list until M4 and are now X-13. What took them off it is that the shell had always spelled roles
 rather than colours, so the feature turned out to be a palette per theme and no component change at all —
@@ -535,10 +606,11 @@ every possible destination is a second navigation to build and to test, and the 
 | ID | Milestone | Contains |
 | --- | --- | --- |
 | M0 | Decisions | **Closed.** The payload is an append-only op log per device — [sync-flow.md §4.6 The decision](sync-flow.md#46-the-decision) — and [§2 Data model](#2-data-model), [§8 Device management](#8-device-management) and [§9 Conflict presentation](#9-conflict-presentation) are written. The stack, the packaging and the application shape were already settled — [architecture.md §6 Technology stack](architecture.md#6-technology-stack), [architecture.md §7 Packaging](architecture.md#7-packaging), [past_decision.md §3 State Management](past_decision.md#3-state-management) |
-| M1 | Local-first core | **Closed.** The tree, the item kinds, the keyboard model, the shell — [§3 Tree structure and editing](#3-tree-structure-and-editing), [§4 Item kinds](#4-item-kinds) and [§10 Application shell, PWA, offline](#10-application-shell-pwa-offline), on one device. The store is `src/app/Session.svelte.ts`, the payload is already the real op log (S-21), and what it left standing is [§15 Deviations and defects found during verification](#15-deviations-and-defects-found-during-verification) |
+| M1 | Local-first core | **Closed.** The tree, the item kinds, the keyboard model, the shell — [§3 Tree structure and editing](#3-tree-structure-and-editing), [§4 Item kinds and attributes](#4-item-kinds-and-attributes) and [§10 Application shell, PWA, offline](#10-application-shell-pwa-offline), on one device. The store is `src/app/Session.svelte.ts`, the payload is already the real op log (S-21), and what it left standing is [§15 Deviations and defects found during verification](#15-deviations-and-defects-found-during-verification) |
 | M2 | Sync | **Closed.** Every device's file read and folded together (`src/core/merge.ts`, `src/app/folder-sync.ts`), the activity-driven cycle (S-19), the conflict nav of [§9 Conflict presentation](#9-conflict-presentation), and the adapter set — `fsaa`, `http`, `android` beside the two M1 shipped, chosen by [architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter)'s flowchart. What it left standing is rows 1 and 4 of [§15 Deviations and defects found during verification](#15-deviations-and-defects-found-during-verification) |
 | M3 | Compaction and polish | **Closed.** Compaction (S-14) once its trigger fires, [§6 Search](#6-search), device management ([§8 Device management](#8-device-management)), the restore path T-13 owes the Done view, and the two bundles [architecture.md §7 Packaging](architecture.md#7-packaging) describes — `make windows` and `make apk`. What it left standing is rows 5 and 10 of [§15 Deviations and defects found during verification](#15-deviations-and-defects-found-during-verification) |
 | M4 | Settings and appearance | **Closed.** One screen for everything about this device rather than about the tree (X-12), and the six themes X-13 puts behind it — [§10.1 Themes](#101-themes). It moved the D-1 name editor and the D-4 log link onto that screen and took a nav entry away rather than adding one. It changed no component's colours, because no component ever named one |
+| M5 | Attributes, the drag and the folder screen | **Closed.** Four features that each turned out to be a caller of something already there: the drag (T-14) over the `move` op M1 wrote, tags and priority ([§4.1 Tags and priority](#41-tags-and-priority)) over the `set` op and the conflict list M2 built, the quick-add line (K-8) over `createLastChild`, and the sync folder section ([§10.2 The sync folder, on the settings screen](#102-the-sync-folder-on-the-settings-screen)) over the shell that already held the folder. It closed row 2 of [§15 Deviations and defects found during verification](#15-deviations-and-defects-found-during-verification) — T-5's refusal has a gesture that can provoke it at last |
 
 M2 is closed against a folder, not against a provider. The three adapters it added are the three methods every other
 adapter already offers, so what remains untested is the client underneath them, and observing that needs a Windows and

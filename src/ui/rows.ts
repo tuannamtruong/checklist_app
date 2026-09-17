@@ -10,16 +10,24 @@ export interface VisibleRow {
   depth: number;
 }
 
+/**
+ * A-4: the ids a tag filter allows, or `null` when nothing is filtered. A row
+ * outside the set is not rendered at all — and since every edit reads these
+ * rows, `↑` and `Alt-↓` move through what the filter left exactly as they move
+ * through what T-11 left.
+ */
 export function visibleRows(
   tree: ResolvedTree,
   parent: ParentId,
   isCollapsed: (id: NodeId) => boolean,
+  allowed: ReadonlySet<NodeId> | null = null,
   depth = 0,
 ): VisibleRow[] {
   const rows: VisibleRow[] = [];
   for (const id of childrenOf(tree, parent)) {
+    if (allowed !== null && !allowed.has(id)) continue;
     rows.push({ id, depth });
-    if (!isCollapsed(id)) rows.push(...visibleRows(tree, id, isCollapsed, depth + 1));
+    if (!isCollapsed(id)) rows.push(...visibleRows(tree, id, isCollapsed, allowed, depth + 1));
   }
   return rows;
 }

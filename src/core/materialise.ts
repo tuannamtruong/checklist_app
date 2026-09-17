@@ -29,6 +29,8 @@ function created(op: Extract<Op, { op: 'create' }>): Node {
     title: '',
     done: false,
     body: op.kind === 'note' ? '' : null,
+    tags: [],
+    priority: 'none',
     order: op.order,
     orderBy: op.dev,
     deleted: false,
@@ -60,6 +62,8 @@ export function applyOp(nodes: NodeMap, op: Op): NodeMap {
       if (op.title !== undefined) next.title = op.title;
       if (op.done !== undefined) next.done = op.done;
       if (op.body !== undefined) next.body = op.body;
+      if (op.tags !== undefined) next.tags = op.tags;
+      if (op.priority !== undefined) next.priority = op.priority;
       if (op.kind !== undefined) {
         next.kind = op.kind;
         // A row turned into a note owes the editor a body to open on. Turning

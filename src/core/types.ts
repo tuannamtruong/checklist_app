@@ -24,6 +24,17 @@ export const KINDS: readonly Kind[] = ['folder', 'list', 'note', 'task'];
  */
 export const CONTAINER_KINDS: readonly Kind[] = ['folder', 'list'];
 
+/**
+ * A-2. Four names rather than a number, because D-4 puts this in front of a
+ * person: `high` is legible in a log line where `3` is a guess. `none` is a
+ * value rather than an absent field, so clearing a flag can win a race against
+ * setting one, exactly like un-ticking a box.
+ */
+export type Priority = 'none' | 'low' | 'medium' | 'high';
+
+/** Lowest first, which is the order the flag cycles and the menus list. */
+export const PRIORITIES: readonly Priority[] = ['none', 'low', 'medium', 'high'];
+
 export interface Node {
   id: NodeId;
   /** Never read directly — resolveTree() is the only legal reader, per T-6. */
@@ -38,6 +49,10 @@ export interface Node {
   done: boolean;
   /** Notes only — K-3. */
   body: string | null;
+  /** A-1. Normalised, sorted and deduplicated — `core/tags.ts` owns the shape. */
+  tags: readonly string[];
+  /** A-2. Never absent: an unflagged row carries `none`. */
+  priority: Priority;
   /** Fractional index among siblings — T-2, sync-flow.md §5. */
   order: string;
   /** The device that minted `order`, and the sort tiebreak — sync-flow.md §5.3. */
@@ -83,6 +98,9 @@ export interface SetOp extends OpBase {
   done?: boolean;
   body?: string | null;
   kind?: Kind;
+  /** A-3. The whole set, which is what makes it one field — past_decision.md §10. */
+  tags?: readonly string[];
+  priority?: Priority;
 }
 
 export interface MoveOp extends OpBase {

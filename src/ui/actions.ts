@@ -20,6 +20,13 @@ export interface RowActionContext {
   focus: RowFocus;
   rows: readonly VisibleRow[];
   id: NodeId;
+  /**
+   * A-1. Opens the row's own tag editor, which only the row can do — it is a
+   * field on screen rather than an edit. A caller with no editor (the tests,
+   * and any future list of rows that is not the tree) leaves it out, and the
+   * menu shows the entry disabled rather than lying about where tags live.
+   */
+  editTags?: () => void;
 }
 
 export interface RowAction {
@@ -113,6 +120,13 @@ export function rowActions(ctx: RowActionContext): RowAction[] {
         session.run((t, c) => edit.moveDown(t, c, id));
         focus.request(id);
       },
+    },
+    {
+      name: 'tags',
+      label: node.tags.length === 0 ? 'Add tags' : `Tags (${node.tags.length})`,
+      keys: null,
+      enabled: ctx.editTags !== undefined,
+      run: () => ctx.editTags?.(),
     },
     ...KINDS.filter((kind) => kind !== node.kind).map((kind) => ({
       name: `turn-into-${kind}`,
