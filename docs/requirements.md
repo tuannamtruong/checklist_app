@@ -480,7 +480,7 @@ over.
 
 | ID | Requirement | State | Where |
 | --- | --- | --- | --- |
-| B-1 | A note body carries **bold**, two levels of heading, code and list items, and no other formatting | ✅ | `src/core/markup.ts` — the one place a mark is spelled, beside `tags.ts` and `paste.ts`; `markup.test.ts` |
+| B-1 | A note body carries **bold**, two levels of heading, code, list items and a table, and no other formatting | ✅ | `src/core/markup.ts` — the one place a mark is spelled, beside `tags.ts` and `paste.ts`; `markup.test.ts` |
 | B-2 | The marks are Markdown's — `**bold**`, `# ` and `## ` — and they are stored in `body` itself | ✅ | Nothing changed in `Node`, the op, the merge, the conflict rows or compaction: `body` is a string before and after |
 | B-3 | The body is edited as text and read as rendered: the marks are visible while the caret is in it, the formatting when it is not | ✅ | `src/ui/NoteBody.svelte`. One textarea, never unmounted — transparent over the rendered blocks when the caret is elsewhere, so the click that reaches it is the click that focuses it |
 | B-4 | `Ctrl-B` wraps the selection, and two on-screen controls do the same: bold, and a heading that cycles heading, subheading, none | ✅ | `toggleBold`, `setHeading` and `nextHeading` in `src/core/markup.ts`, driven by `src/ui/NoteBody.svelte`. A phone has no Ctrl key, which is [§3.1 Keyboard (desktop)](#31-keyboard-desktop)'s rule applied to a body rather than to a row |
@@ -491,6 +491,7 @@ over.
 | B-10 | A line that opens `- ` or `1. ` is a list item, drawn with its marker. Enter carries the marker onto the next line and counts the numbers up; Enter on an item with nothing in it takes the marker off and the list ends | ✅ | `LIST` and `listEnter` in `src/core/markup.ts`, typed into the field by `src/ui/NoteBody.svelte`. Nothing renumbers: what is drawn is the number in the string, which is what B-3 promises |
 | B-9 | And a run of code inside a line: one backtick each side | ✅ | `spansOf` in `src/core/markup.ts`, which reads a backtick before an asterisk, and then reads the run it found for `**` — B-11. The same control writes it: `toggleCode` reads the selection to decide which of the two marks it means |
 | B-11 | `**bold**` reads inside code, in the box and in an inline run | ✅ | `boldRuns` in `src/core/markup.ts`, called by both code paths, so a code span carries `bold` like any other span; `src/ui/NoteBody.svelte` draws it as `<strong>` inside the `<code>`. A pair per line, so a `**` with no partner on its own line is two characters |
+| B-12 | A line fenced by a pipe at each end is a row of a table, consecutive rows are one table, and it draws with its columns lined up. A line of dashes under the first row makes that row the header, Enter opens the next row with the same cells in it, and one control writes a starter table and takes the pipes off again | ✅ | `TABLE_ROW`, `parseBody`, `tableEnter` and `toggleTable` in `src/core/markup.ts`, drawn by `src/ui/NoteBody.svelte`; `markup.test.ts`. The second construct that spans lines, and the first that spans them without a mark saying where it ends: the table is over when the pipes are |
 
 **The marks live in the body, and that is the whole design.** `body` stays a string, so every rule already written about
 it still holds without a word changed: one field, last-writer-wins, a conflict row when two devices raced (C-4), a whole
@@ -549,7 +550,7 @@ exactly the characters a person could have typed, so the field's own undo revers
 keep in step. A button must not take the focus while it does that, or the blur would commit the body and move the caret
 out of the text the button is about to edit.
 
-**Three controls for seven marks, and B-10 has none of them.** A list is *typed* — `- ` or `1. ` are two characters
+**Four controls for eight marks, and B-10 has none of them.** A list is *typed* — `- ` or `1. ` are two characters
 anywhere there is a keyboard, which is the reach a control exists to give — and what a control would have to add is a
 mode. Enter is the whole feature: it carries the marker on so the second item costs nothing, and it takes the marker off
 on an item with nothing in it, which is the way out that stops a list being something the field is stuck in.
@@ -571,6 +572,13 @@ run inside one line is selected, a box when it is a caret or a selection crossin
 off again from inside a box. Which of the two marks is meant is a question about the selection, so the selection answers
 it rather than a fourth button.
 
+**The fourth is B-12's, and it is the one whose mark is a block rather than a run.** `▦` writes a starter table — two
+columns, the header rule and a row — on the caret's own line when it is empty and on a fresh line under it when it is
+not, and from inside a table it takes the pipes off, a line per row and the rule line with them. One control for both
+directions, which is `</>`'s rule; and it is lit while the caret is in a table, which is the heading control's way of
+saying which direction it would go. What it writes is characters a person could have typed, so the field's own undo
+takes a table back exactly as it takes back a bold pair.
+
 **B-7 puts those controls where the words are.** Selected text is a question about those words, so the answer belongs
 beside them rather than at the top of the page — and it is the *same* controls, because a second vocabulary for one edit
 is a second thing to learn. The row above the field stays, and is not redundant: it is the only reach when nothing is
@@ -584,6 +592,47 @@ the width the field does. The alternative was to pin the controls to the top of 
 selection" in any body long enough to scroll. `selectionchange` on the document is what raises them, because a field
 fires no event of its own when a drag ends outside it, and it is the one signal a mouse, a keyboard and a long press on
 a phone all produce.
+
+**A table is the fifth mark, and it makes the same trade the other four made — B-12.** A line fenced by pipes is a row,
+consecutive rows are one table, and the cells line up on screen because the renderer draws a table. `body` is still a
+string with one merge rule, so nothing about the payload learned that a note can have columns in it — and the fallback
+is the best of any mark here, because a build that predates B-12 shows `| Mon | 07:40 |`, which is what a table looked
+like before there were tables.
+
+**The table is over when the pipes are.** It is the second construct that spans lines and the first with no mark saying
+where it ends, which is what keeps it from doing what an unclosed fence would: every line is read on its own and the
+table stops at the first line that is not a row, so a table being typed can never swallow the note under it. A row must
+begin and end with a pipe, for the reason a heading needs its space — `a | b` is a sentence with a pipe in it, and only
+the pair of them says "these are columns".
+
+**The dashes are optional, and the alignment in them is read and drawn with nothing.** `| --- | --- |` directly under
+the first row makes that row the header and is not drawn as a row of its own; `:---:` is read and draws the same
+heading, which is B-8's rule for the word after a fence applied to the one other thing a table is pasted in with. A body
+that never types the dashes has a table with no header, which is the ordinary case for two columns of notes.
+
+**Nothing pads and nothing lines the pipes up in the string.** What is in the field is what was typed, B-3's rule, and a
+body that reformatted its own pipes as they were typed would be arguing with the typing exactly as a list that
+renumbered itself would — [§4.3 Marks in a note body](#43-marks-in-a-note-body) refused that once already. The columns
+are the renderer's, and the ragged text under the caret is the price, paid once per table and only while it is being
+looked at as text.
+
+**A cell is a line's worth of marks and no more.** Bold and an inline run read inside one; `# ` and `- ` are characters
+in there, which is B-11's rule for a box arrived at from the other side. The pipe is the separator and there is no
+escape for it: a cell that needs a pipe in it is a cell that wants a line of its own, and an escape is one more thing to
+teach, to render and to strip before matching. Search reads a table as its cells with a space between them (B-5), so
+`plainText` takes the pipes off like every other mark.
+
+**Enter carries the row, and it never splits one.** On a table row it opens the next row with the same number of empty
+cells and puts the caret in the first of them, and on a row with nothing in any cell it takes the row off, which is the
+way out B-10 gave a list. Where it differs from a list is deliberate: a caret halfway along an item splits the item,
+while a caret halfway along a *row* would leave two lines that are each half a row and neither of them a table, so the
+new row always opens under the line whatever the caret was doing on it.
+
+**One control, and Enter is still most of it.** The pipe is one character on every keyboard, so a table could have been
+B-10's second typed mark — but the shape is what a table *is*, and a starter three lines long is the one mark here where
+what a person has to type first is more than the two characters a control exists to save. The button writes that first
+shape and takes it apart again; Enter is what makes every row after the first cost nothing, which is the division B-10
+and B-4 already share.
 
 ### 4.4 Today and Tomorrow
 

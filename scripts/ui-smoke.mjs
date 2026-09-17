@@ -1700,6 +1700,97 @@ async function main() {
     );
     await page.screenshot({ path: join(shots, 'note-lists.png'), fullPage: true });
 
+    // --- B-12: a table is typed, and Enter carries the row -----------------
+    // The parser owns what a pipe means; what only a browser can show is that
+    // the cells are drawn as columns that line up, which is the whole reason
+    // to type the pipes rather than to pad them.
+    await codeField.click();
+    await page.keyboard.press('Control+End');
+    // Out of the numbered list above by B-10's own way out, since a line that
+    // opens `3. ` is an item whatever else is typed on it.
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('| Day | Ferry |');
+    await page.keyboard.press('Enter');
+    check(
+      'Enter opens the next row with the cells the row had — B-12',
+      (await codeField.inputValue()).endsWith('| Day | Ferry |\n|  |  |'),
+      (await codeField.inputValue()).split('\n').slice(-2).join(' / '),
+    );
+    // The caret is left between the two spaces of the first cell, so the row is
+    // typed rather than navigated to.
+    await page.keyboard.type('---');
+    for (const _ of [0, 1, 2]) await page.keyboard.press('ArrowRight');
+    await page.keyboard.type('---');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('Mon');
+    for (const _ of [0, 1, 2]) await page.keyboard.press('ArrowRight');
+    await page.keyboard.type('07:40');
+    check(
+      'and the caret lands in the first cell, so the row is typed straight in — B-12',
+      (await codeField.inputValue()).endsWith(
+        '| Day | Ferry |\n| --- | --- |\n| Mon | 07:40 |',
+      ),
+      (await codeField.inputValue()).split('\n').slice(-3).join(' / '),
+    );
+
+    await page.locator('[data-testid="page-title"]').first().click();
+    await page.waitForSelector('[data-testid="note-rendered"]');
+    const table = noteView.locator('[data-testid="table-block"]');
+    check(
+      'the rows draw as one table, with the dashes taken as its header — B-12',
+      (await table.count()) === 1 &&
+        (await table.locator('th').allInnerTexts()).join('/') === 'Day/Ferry' &&
+        (await table.locator('tbody td').allInnerTexts()).join('/') === 'Mon/07:40',
+      `${await table.count()} tables, ${(await table.locator('th').allInnerTexts()).join('/')}`,
+    );
+    const column = await table.evaluate((el) => {
+      const head = el.querySelectorAll('th')[1].getBoundingClientRect();
+      const cell = el.querySelectorAll('tbody td')[1].getBoundingClientRect();
+      return { head: Math.round(head.left), cell: Math.round(cell.left) };
+    });
+    check(
+      'and the second column lines up under its heading, which the pipes never did — B-12',
+      column.head === column.cell,
+      JSON.stringify(column),
+    );
+    await page.screenshot({ path: join(shots, 'note-table.png'), fullPage: true });
+
+    // The way out is the one B-10 gave a list: a row with nothing in it.
+    await codeField.click();
+    await page.keyboard.press('Control+End');
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('Enter');
+    check(
+      'and Enter on a row with nothing in it ends the table — B-12',
+      (await codeField.inputValue()).endsWith('| Mon | 07:40 |\n'),
+      (await codeField.inputValue()).split('\n').slice(-2).join(' / '),
+    );
+
+    // B-4's rule applied to a block: the control writes characters a person
+    // could have typed, and one button is both directions.
+    await page.keyboard.press('Enter');
+    await page.locator('[data-testid="mark-table"]').click();
+    check(
+      'the ▦ control writes a starter table on an empty line — B-12',
+      (await codeField.inputValue()).endsWith('|  |  |\n| --- | --- |\n|  |  |'),
+      (await codeField.inputValue()).split('\n').slice(-3).join(' / '),
+    );
+    await page.keyboard.type('Tue');
+    check(
+      'and leaves the caret in the first cell of it — B-12',
+      (await codeField.inputValue()).endsWith('| Tue |  |\n| --- | --- |\n|  |  |') &&
+        (await page.locator('[data-testid="mark-table"]').getAttribute('data-in-table')) ===
+          'true',
+      (await codeField.inputValue()).split('\n').slice(-3).join(' / '),
+    );
+    await page.locator('[data-testid="mark-table"]').click();
+    check(
+      'and pressing it from inside takes the pipes off again — B-12',
+      (await codeField.inputValue()).endsWith('| Mon | 07:40 |\n\nTue\n'),
+      (await codeField.inputValue()).split('\n').slice(-3).join(' / '),
+    );
+
     // --- B-3: the rendered half keeps the spacing the field holds ---------
     await codeField.click();
     await page.keyboard.press('Control+End');

@@ -21,8 +21,12 @@
     parseBody,
     setHeading,
     spliced,
+    tableAt,
+    tableEnter,
     toggleBold,
     toggleCode,
+    toggleTable,
+    type Cell,
     type Span,
     type Splice,
   } from '../core/markup';
@@ -95,6 +99,8 @@
 
   const blocks = $derived(parseBody(draft));
   const level = $derived(headingAt(draft, start));
+  /** B-12. Whether the control would write a table or take one apart. */
+  const inTable = $derived(tableAt(draft, start));
 
   // A body changed from outside — a peer's edit, in M2 — shows while this device
   // is not the one typing.
@@ -258,6 +264,16 @@
     }
   }
 
+  /**
+   * B-12. The fourth control, and one control for both directions:
+   * `toggleTable` writes a starter table outside a table and takes the pipes
+   * off inside one, which is `toggleCode`'s rule applied to the block mark.
+   */
+  function table(): void {
+    if (!field) return;
+    void apply(toggleTable(draft, field.selectionStart, field.selectionEnd));
+  }
+
   /** One control, three states — `nextHeading` is the cycle, A-2's flag the precedent. */
   function heading(): void {
     if (!field) return;
@@ -270,11 +286,15 @@
       bold();
       return;
     }
-    // B-10. Enter on a list item carries the marker on, and Enter on an item
-    // with nothing in it takes it off. `listEnter` answers null for every other
-    // Enter there is, which is the browser's.
+    // B-10, B-12. Enter on a list item carries the marker on and Enter on a
+    // table row opens the next one, and on an item or a row with nothing in it
+    // both take the marks off. Each answers null for every other Enter there
+    // is, which is the browser's — and a line cannot be both, since one opens
+    // with a marker and the other with a pipe.
     if (event.key === 'Enter' && !event.shiftKey && !event.ctrlKey && !event.metaKey && field) {
-      const splice = listEnter(draft, field.selectionStart, field.selectionEnd);
+      const splice =
+        listEnter(draft, field.selectionStart, field.selectionEnd) ??
+        tableEnter(draft, field.selectionStart, field.selectionEnd);
       if (splice === null) return;
       event.preventDefault();
       typeInto(splice);
@@ -295,7 +315,7 @@
       // insert — which is how the list *ends* — leaves Chromium's caret one
       // short, in front of the newline the line above it ends with, so the next
       // thing typed lands back on the item that was just closed.
-      const at = splice.from + splice.insert.length;
+      const at = splice.caret ?? splice.from + splice.insert.length;
       field.setSelectionRange(at, at);
       draft = field.value;
       onInput();
@@ -343,6 +363,15 @@
    */
   function textOf(spans: readonly Span[]): string {
     return spans.map((span) => span.text).join('');
+  }
+
+  /**
+   * B-12. A cell with nothing in it still has to hold the row's height open,
+   * which is the same reason an empty paragraph draws a space rather than
+   * nothing.
+   */
+  function empty(cell: Cell): boolean {
+    return textOf(cell.spans) === '';
   }
 </script>
 
@@ -423,6 +452,24 @@
   >
     {'</>'}
   </button>
+  <!-- B-12. The fourth, and the only one whose mark is a block rather than a
+       run: outside a table it writes two columns, inside one it takes the
+       pipes off. It is lit while the caret is in a table, which is the
+       heading control's way of saying which direction it would go. -->
+  <button
+    type="button"
+    class="row-control rounded border border-line px-2 py-1 text-xs text-ink-muted hover:border-accent hover:text-accent"
+    class:border-accent={inTable}
+    class:text-accent={inTable}
+    aria-label="Table"
+    title="Table — two columns, or the pipes off again"
+    data-testid="mark-table"
+    data-in-table={inTable}
+    onmousedown={keepCaret}
+    onclick={table}
+  >
+    ▦
+  </button>
 </div>
 
 <!-- X-31's `fill` grows this box to the pane's height, and the floor is what
@@ -491,6 +538,40 @@
           <h4
             class="mt-2 mb-1 text-sm font-semibold whitespace-pre-wrap text-ink-muted first:mt-0"
           >{@render runs(block.spans)}</h4>
+        {:else if block.table}
+          <!-- B-12. The columns are the renderer's: what is in the string is
+               the pipes the person typed, ragged or lined up, and this is the
+               one thing on the rendered half that is not laid out line for
+               line with the field over it. It scrolls sideways inside itself
+               rather than pushing the pane wider, which is what the box of
+               code does with a long line. -->
+          <div class="my-2 overflow-x-auto" data-testid="table-block">
+            <table class="w-full border-collapse text-sm">
+              {#if block.table.header}
+                <thead>
+                  <tr>
+                    {#each block.table.rows[0]?.cells ?? [] as cell, column (column)}
+                      <th
+                        class="border border-line bg-surface-sunken px-2 py-1 text-left align-top font-semibold whitespace-pre-wrap"
+                        >{#if empty(cell)}&nbsp;{:else}{@render runs(cell.spans)}{/if}</th
+                      >
+                    {/each}
+                  </tr>
+                </thead>
+              {/if}
+              <tbody>
+                {#each block.table.header ? block.table.rows.slice(1) : block.table.rows as row, index (index)}
+                  <tr>
+                    {#each row.cells as cell, column (column)}
+                      <td class="border border-line px-2 py-1 align-top whitespace-pre-wrap"
+                        >{#if empty(cell)}&nbsp;{:else}{@render runs(cell.spans)}{/if}</td
+                      >
+                    {/each}
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
         {:else if block.list}
           <!-- B-10. One row per line, like every other block: the marker is
                drawn rather than typed out, and the indent is the one in the
@@ -576,6 +657,20 @@
       onclick={code}
     >
       {'</>'}
+    </button>
+    <!-- B-7 is the same controls, all four of them: a second vocabulary at the
+         selection would be a second thing to learn. -->
+    <button
+      type="button"
+      class="row-control rounded px-2 py-1 text-xs text-ink hover:bg-surface-sunken hover:text-accent"
+      class:text-accent={inTable}
+      aria-label="Table"
+      data-testid="selection-table"
+      data-in-table={inTable}
+      onmousedown={keepCaret}
+      onclick={table}
+    >
+      ▦
     </button>
   </div>
 {/if}

@@ -360,6 +360,13 @@ but the thing a long box is usually being shown for is one line in it, and there
 pair per line is what the parser already does with every other mark, so nothing about the payload, the merge or the
 fallback changed: a build that predates it shows two asterisks in a box, next to the line they were pointing at.
 
+B-12 is the fourth, and it is the one this section named as the thing that would end option A — a table. What it named
+is not what was built: the refusal was about *a table with dragged column widths*, and a width dragged with the pointer
+is state that no string can hold, which is why it would have forced B. A table typed as pipes holds nothing of the kind.
+The columns are what the renderer does with the cells, the cells are what the pipes say they are, and the whole of it is
+characters a person could have typed — so the trade is the one A always offered, and a build that predates B-12 shows
+the pipes, which is a table drawn the way tables were drawn before there was anything to draw them with.
+
 What that argument does *not* answer is the caret. Every mark here is written by an edit to the text and read back by a
 parser, so a control is typing and the field's own undo reverses it; the moment a body wants something that cannot be
 spelled as characters a person could have typed — an image, a table with dragged column widths, a link whose target is
@@ -367,11 +374,13 @@ not its text — A stops being cheap and the thing to reach for is B, with the c
 
 ### 12.3 What is still refused
 
-A link, an image, a table, and anything that needs a second field. A bullet in a note body was refused once on the
-grounds that the application already has lists — that is the tree, T-1 — and the answer held until the notes got long
-enough to have steps in them. It is still true of anything that wants to be *ticked*, moved or found: a step that
-matters is a row, and B-10 is for the ones that do not. The measurement that would justify B remains the one this
-section always named: bodies long enough that the person is writing *in* the app rather than *about* the rows.
+A link, an image, anything that needs a second field — and the half of a table that B-12 left alone: a dragged column
+width, a merged cell, a cell holding more than a line. Each of those is state the string cannot carry, which is the one
+line this section draws. A bullet in a note body was refused once on the grounds that the application already has lists
+— that is the tree, T-1 — and the answer held until the notes got long enough to have steps in them. It is still true of
+anything that wants to be *ticked*, moved or found: a step that matters is a row, and B-10 is for the ones that do not.
+The measurement that would justify B remains the one this section always named: bodies long enough that the person is
+writing *in* the app rather than *about* the rows.
 
 ---
 

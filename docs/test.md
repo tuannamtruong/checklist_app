@@ -229,6 +229,14 @@ empty one, and the browser owns the one thing that is not a function of the stri
 with `insertText` so the field's own undo can take it back, and only a real field has an undo stack. The run types two
 items, presses Enter on the empty third, and asserts the marker came off rather than the list carrying on.
 
+B-12 splits where B-10 does. `markup.test.ts` owns what a pipe means — a line fenced by them is a row, consecutive rows
+are one table, the dashes under the first row make it the header, a line that is not a row ends the table, and a pipe
+inside a fenced block is a character — and it owns what Enter does on a row and on an empty one. The browser owns the
+one thing that is not a function of the string: the cells are drawn as a table with the columns lined up, which is the
+whole reason to type the pipes rather than to pad them, and the same rendered half still holds the box, the headings and
+the list around it. The `▦` control is checked there too, for B-4's reason applied to a block — the run presses it on an
+empty line, types into the cell the caret was left in, and presses it again from inside to get the pipes off.
+
 K-9 is a browser check for a reason a unit test cannot get at: the split itself is `paste.test.ts`'s, but the event that
 carries a clipboard into an input only exists in a browser. The smoke run dispatches one over the quick-add line with
 something already typed in it, and asserts the three things the rule promises — a row per line, in the pasted order, the

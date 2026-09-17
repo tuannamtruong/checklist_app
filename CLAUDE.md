@@ -190,11 +190,12 @@ and spans (never HTML — B-6), `plainText` is what search matches and snippets 
 `toggleBold`/`setHeading`/`toggleCode` are the three controls, which write marks a person could have typed and are
 therefore undone by the field's own undo.
 
-Three controls, never five: bold; a heading that cycles none, heading, subheading — the shape A-2's priority flag
-already has; and one `</>` whose mark is decided by the selection rather than by a second button — a run inside one line
+Four controls, never eight: bold; a heading that cycles none, heading, subheading — the shape A-2's priority flag
+already has; one `</>` whose mark is decided by the selection rather than by a second button — a run inside one line
 becomes `` `inline` ``, a caret or a selection crossing a line break becomes a fenced box, and a caret already inside a
-box takes the fences off. They sit in a row above the field, and **selecting a run of text raises the same controls
-beside the selection** (B-7).
+box takes the fences off; and one `▦` that writes B-12's starter table outside a table and takes the pipes off inside
+one, lit while the caret is in a table. They sit in a row above the field, and **selecting a run of text raises the same
+controls beside the selection** (B-7).
 
 **A list is typed and Enter is the whole of it (B-10).** `- ` or `1. ` opens one; Enter carries the marker onto the next
 line and counts the numbers up, and Enter on an item with nothing in it takes the marker off, which is the way out.
@@ -203,16 +204,26 @@ characters already reach every keyboard. `listEnter` returns a *splice* rather t
 with `insertText`: a marker the app wrote is then undone by the field's own `Ctrl-Z`, and the caret is placed explicitly
 afterwards because Chromium leaves it one short on an empty insert.
 
-**A fenced block is the one construct that spans lines, and every mark but bold is a character inside it** — `# ` is a
-comment and `- ` is a flag, but `**` is bold (B-11), read a line at a time, because the reason a long box is on screen
-is usually one line in it. `boldRuns` is what both code paths call, so an inline run reads the same way. An unclosed
-fence stays literal, for the reason an unmatched `**` does. It draws as a box headed `Code` with a Copy button, and that
-button is the one positioned thing inside B-3's `aria-hidden` rendered half carrying a `z-index`: without it the click
-lands in the transparent textarea lying over the box. It is `tabindex="-1"` because the text is in that field, which is
-what a screen reader reads. Placing that pair is the one hard part: a textarea has no range geometry, so
-`src/ui/text-rect.ts` lays the text out again in a mirror wearing the field's metrics and measures the run there, and
-`selectionchange` on the document is what raises the controls — a field fires nothing of its own when a drag ends
-outside it.
+**A fenced block spans lines, and every mark but bold is a character inside it** — `# ` is a comment and `- ` is a flag,
+but `**` is bold (B-11), read a line at a time, because the reason a long box is on screen is usually one line in it.
+`boldRuns` is what both code paths call, so an inline run reads the same way. An unclosed fence stays literal, for the
+reason an unmatched `**` does. It draws as a box headed `Code` with a Copy button, and that button is the one positioned
+thing inside B-3's `aria-hidden` rendered half carrying a `z-index`: without it the click lands in the transparent
+textarea lying over the box. It is `tabindex="-1"` because the text is in that field, which is what a screen reader
+reads. Placing that pair is the one hard part: a textarea has no range geometry, so `src/ui/text-rect.ts` lays the text
+out again in a mirror wearing the field's metrics and measures the run there, and `selectionchange` on the document is
+what raises the controls — a field fires nothing of its own when a drag ends outside it.
+
+**A table is typed as pipes, and it is the second construct that spans lines (B-12).** A line fenced by a pipe at each
+end is a row, consecutive rows are one table, and `| --- | --- |` directly under the first row makes it the header —
+alignment colons read and drawn with nothing, which is the fence's language word again. It is the first construct with
+no mark saying where it *ends*: every line is read on its own and the table stops at the first line that is not a row,
+so a table being typed can never swallow the note under it. A cell is a line's worth of marks — bold and an inline run
+read in one, `# ` and `- ` are characters — and there is no escape for a pipe. Nothing pads the string: the columns are
+the renderer's, which is what keeps B-3's promise that the field holds what was typed. `tableEnter` is Enter's whole
+part in it, and it never splits a row — it opens the next one with the same cells under the line, and takes a row with
+nothing in it off. `toggleTable` is the `▦` control: a starter table outside one, the pipes off inside one, and
+`tableAt` is what lights the button.
 
 `src/ui/NoteBody.svelte` holds one textarea that is never unmounted. When the caret is elsewhere it lies transparent
 over the rendered blocks, so the click that reaches it is the click that focuses it; swapping two elements would drop

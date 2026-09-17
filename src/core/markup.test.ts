@@ -6,25 +6,45 @@ import {
   plainText,
   listEnter,
   setHeading,
+  tableAt,
+  tableEnter,
   spliced,
   toggleBold,
   toggleCode,
+  toggleTable,
   type Block,
+  type Span,
 } from './markup';
 
-/** A block as `kind: text`, with the marked runs marked, which is what a test asserts about. */
+/** The runs of one line, with the marked ones marked. */
+function marks(spans: readonly Span[]): string {
+  return spans
+    .map((span) => {
+      // B-11: the two marks nest, so the shape nests too — `<[x]>` is a
+      // bold run inside code, and `[x]` is a bold run outside it.
+      const marked = span.bold ? `[${span.text}]` : span.text;
+      return span.code ? `<${marked}>` : marked;
+    })
+    .join('');
+}
+
+/**
+ * A block as `kind: text`, with the marked runs marked, which is what a test
+ * asserts about. B-12's table is `table*` when the first row is the header,
+ * cells split by ` | ` and rows by ` // `.
+ */
 function shape(blocks: readonly Block[]): string[] {
-  return blocks.map(
-    (block) =>
-      `${block.kind}${block.list ? `(${block.list.indent}${block.list.marker})` : ''}: ${block.spans
-        .map((span) => {
-          // B-11: the two marks nest, so the shape nests too — `<[x]>` is a
-          // bold run inside code, and `[x]` is a bold run outside it.
-          const marked = span.bold ? `[${span.text}]` : span.text;
-          return span.code ? `<${marked}>` : marked;
-        })
-        .join('')}`,
-  );
+  return blocks.map((block) => {
+    if (block.table) {
+      const rows = block.table.rows
+        .map((row) => row.cells.map((cell) => marks(cell.spans)).join(' | '))
+        .join(' // ');
+      return `table${block.table.header ? '*' : ''}: ${rows}`;
+    }
+    return `${block.kind}${
+      block.list ? `(${block.list.indent}${block.list.marker})` : ''
+    }: ${marks(block.spans)}`;
+  });
 }
 
 describe('parseBody — B-1', () => {
@@ -344,5 +364,134 @@ describe('lists — B-10', () => {
     expect(listEnter('- Socks', 3, 7)).toBe(null);
     expect(listEnter('- Socks', 1, 1)).toBe(null);
     expect(listEnter('```\n- Socks\n```', 11, 11)).toBe(null);
+  });
+});
+
+describe('tables — B-12', () => {
+  it('reads a line fenced by pipes as a row, and only that', () => {
+    expect(
+      shape(parseBody('| Mon | 07:40 |\nTue at 08:10\na | b\n| Wed |')),
+    ).toEqual([
+      'table: Mon | 07:40',
+      'paragraph: Tue at 08:10',
+      'paragraph: a | b',
+      'table: Wed',
+    ]);
+  });
+
+  it('makes one table of the rows that touch, and ends it at the first line that is not one', () => {
+    expect(shape(parseBody('| a | b |\n| c | d |\n\n| e |'))).toEqual([
+      'table: a | b // c | d',
+      'paragraph: ',
+      'table: e',
+    ]);
+  });
+
+  it('takes the dashes under the first row as the header, and does not draw them', () => {
+    expect(shape(parseBody('| Day | Ferry |\n| --- | --- |\n| Mon | 07:40 |'))).toEqual([
+      'table*: Day | Ferry // Mon | 07:40',
+    ]);
+    // The alignment is read and drawn with nothing — B-8's language word.
+    expect(shape(parseBody('| Day |\n| :---: |\n| Mon |'))).toEqual([
+      'table*: Day // Mon',
+    ]);
+  });
+
+  it('draws a rule anywhere else as the row of dashes it is', () => {
+    expect(shape(parseBody('| a |\n| b |\n| --- |'))).toEqual([
+      'table: a // b // ---',
+    ]);
+  });
+
+  it('trims the padding a person lined the pipes up with', () => {
+    expect(shape(parseBody('|  a  |b|'))).toEqual(['table: a | b']);
+  });
+
+  it('reads bold and a run of code inside a cell, and nothing else', () => {
+    expect(shape(parseBody('| **Mon** | `npm test` | # not a heading |'))).toEqual([
+      'table: [Mon] | <npm test> | # not a heading',
+    ]);
+  });
+
+  it('leaves a pipe inside a box of code alone — B-8', () => {
+    expect(shape(parseBody('```\n| a | b |\n```'))).toEqual(['code: <| a | b |>']);
+  });
+
+  it('matches search on the cells, without the pipes — B-5', () => {
+    expect(plainText('| Day | Ferry |\n| --- | --- |\n| Mon | 07:40 |')).toBe(
+      'Day Ferry\nMon 07:40',
+    );
+  });
+
+  it('opens the next row with the cells the row had, and the caret in the first', () => {
+    const body = '| Mon | 07:40 |';
+    const next = tableEnter(body, 6, 6);
+    expect(next && spliced(body, next)).toEqual({
+      text: '| Mon | 07:40 |\n|  |  |',
+      start: 18,
+      end: 18,
+    });
+    // The caret is between the two spaces, so typing makes the row a person
+    // would have typed by hand.
+    const typed = spliced(body, next!);
+    expect(`${typed.text.slice(0, typed.start)}x${typed.text.slice(typed.start)}`).toBe(
+      '| Mon | 07:40 |\n| x |  |',
+    );
+  });
+
+  it('opens it under the line rather than splitting the row', () => {
+    const body = '| Mon | 07:40 |';
+    const split = tableEnter(body, 3, 3);
+    expect(split && spliced(body, split).text).toBe('| Mon | 07:40 |\n|  |  |');
+  });
+
+  it('takes a row with nothing in it off, which is the way out', () => {
+    const body = '| Mon |\n|  |';
+    const out = tableEnter(body, 11, 11);
+    expect(out && spliced(body, out).text).toBe('| Mon |\n');
+  });
+
+  it('is an ordinary Enter everywhere else', () => {
+    expect(tableEnter('plain line', 4, 4)).toBeNull();
+    expect(tableEnter('| a | b |', 0, 4)).toBeNull();
+    expect(tableEnter('```\n| a |\n```', 6, 6)).toBeNull();
+  });
+});
+
+describe('toggleTable — B-12', () => {
+  it('writes a starter table on an empty line, with the caret in the first cell', () => {
+    const made = toggleTable('Ferry\n\nafter', 6, 6);
+    expect(made.text).toBe('Ferry\n|  |  |\n| --- | --- |\n|  |  |\nafter');
+    expect(`${made.text.slice(0, made.start)}Day${made.text.slice(made.start)}`).toBe(
+      'Ferry\n| Day |  |\n| --- | --- |\n|  |  |\nafter',
+    );
+  });
+
+  it('opens it under a line that has something on it, rather than wrapping it', () => {
+    const made = toggleTable('Ferry times', 5, 5);
+    expect(made.text).toBe('Ferry times\n|  |  |\n| --- | --- |\n|  |  |');
+    expect(made.start).toBe(14);
+  });
+
+  it('takes the pipes off from inside, and the rule line with them', () => {
+    const body = 'Ferry\n| Day | Ferry |\n| --- | --- |\n| Mon | 07:40 |\nafter';
+    const bare = toggleTable(body, 30, 30);
+    expect(bare.text).toBe('Ferry\nDay Ferry\nMon 07:40\nafter');
+    // The caret was on the rule line, which is gone: it lands at the end of
+    // the row that line was describing.
+    expect(bare.text.slice(0, bare.start)).toBe('Ferry\nDay Ferry');
+  });
+
+  it('keeps the caret on its own row when that row survives', () => {
+    const body = '| Day | Ferry |\n| Mon | 07:40 |';
+    const bare = toggleTable(body, 20, 20);
+    expect(bare.text).toBe('Day Ferry\nMon 07:40');
+    expect(bare.text.slice(0, bare.start)).toBe('Day Ferry\nMon 07:40');
+  });
+
+  it('says where the caret is, and reads no table inside a box of code', () => {
+    expect(tableAt('| a | b |', 3)).toBe(true);
+    expect(tableAt('plain\n| a | b |', 3)).toBe(false);
+    expect(tableAt('```\n| a | b |\n```', 6)).toBe(false);
   });
 });

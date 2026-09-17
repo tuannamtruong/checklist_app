@@ -1,4 +1,4 @@
-// B-1 to B-9. The only place a mark in a note body is spelled — requirements.md
+// B-1 to B-12. The only place a mark in a note body is spelled — requirements.md
 // §4.3, past_decision.md §12.
 //
 // The marks are stored in `body` itself, so this module is a reader of a string
@@ -32,7 +32,35 @@ const CODE = '`';
  */
 const LIST = /^([ \t]*)(-|\d{1,9}\.) (.*)$/;
 
-export type BlockKind = 'heading1' | 'heading2' | 'paragraph' | 'code' | 'bullet' | 'number';
+/**
+ * B-12. A row of a table: a line fenced by a pipe at each end, with at least
+ * one cell between them. Both pipes are required for the reason a heading needs
+ * its space — `a | b` is a sentence with a pipe in it, and only the pair of them
+ * says "these are columns".
+ */
+const TABLE_ROW = /^\|.*\|$/;
+
+/**
+ * B-12. The line under the first row that makes it the header. The colons are
+ * an alignment this build reads and draws nothing with — B-8's rule for the
+ * word after a fence, applied to the one other thing a table is pasted in with.
+ */
+const TABLE_RULE = /^:?-+:?$/;
+
+/** B-12. What Enter opens: a cell with room to type in, and a caret between the two spaces. */
+const EMPTY_CELL = '  |';
+
+/** B-12. What the control writes: two columns, which is what "split this in two" means. */
+const TABLE_COLUMNS = 2;
+
+export type BlockKind =
+  | 'heading1'
+  | 'heading2'
+  | 'paragraph'
+  | 'code'
+  | 'bullet'
+  | 'number'
+  | 'table';
 
 export interface Span {
   text: string;
@@ -44,11 +72,38 @@ export interface Span {
   code: boolean;
 }
 
+/** B-12. One cell: a line's worth of marks, which is bold and a run of code. */
+export interface Cell {
+  spans: readonly Span[];
+}
+
+export interface TableRow {
+  cells: readonly Cell[];
+}
+
+/**
+ * B-12. The rows of one table, and whether the first of them is the header —
+ * which it is when the line under it is the dashes. The rule line itself is not
+ * a row: it says something about the row above rather than holding anything.
+ */
+export interface Table {
+  rows: readonly TableRow[];
+  header: boolean;
+}
+
 export interface Block {
   kind: BlockKind;
+  /**
+   * The marked runs of the block. A `table` carries none of its own — its text
+   * is in the cells — so everything reading a body has to read `table` beside
+   * this, which is why there are two readers of it and no more: `plainText`
+   * here, and `NoteBody` on screen.
+   */
   spans: readonly Span[];
   /** B-10. A list item's own marker — `-`, or the number as typed — and its indent. */
   list?: { marker: string; indent: string };
+  /** B-12. The rows, when this block is a table. */
+  table?: Table;
 }
 
 /** A line of the body, and where it sits in the string. */
@@ -90,10 +145,74 @@ export function parseBody(body: string): Block[] {
       at = close + 1;
       continue;
     }
+    // B-12. The other construct that spans lines, and the one with no mark
+    // saying where it ends: every line is read on its own and the table stops
+    // at the first line that is not a row, so a table being typed can never
+    // swallow the note under it the way an unclosed fence would.
+    if (isTableRow(line)) {
+      const end = tableEnd(lines, at);
+      blocks.push(tableBlock(lines.slice(at, end)));
+      at = end;
+      continue;
+    }
     blocks.push(lineBlock(line));
     at += 1;
   }
   return blocks;
+}
+
+/** B-12. A line fenced by pipes, whatever it carries between them. */
+function isTableRow(line: string): boolean {
+  const bare = line.trimEnd();
+  return bare.length > 1 && TABLE_ROW.test(bare);
+}
+
+/** The line after the last row of the table opened at `from`. */
+function tableEnd(lines: readonly string[], from: number): number {
+  let at = from;
+  while (at < lines.length && isTableRow(lines[at]!)) at += 1;
+  return at;
+}
+
+/**
+ * B-12. The cells of one row: the text between the pipes, each trimmed, because
+ * the pipes a person lines up are spaces they do not mean.
+ */
+function cellsOf(line: string): string[] {
+  const bare = line.trimEnd();
+  return bare
+    .slice(1, -1)
+    .split('|')
+    .map((cell) => cell.trim());
+}
+
+/** B-12. Whether the line is the dashes that make the row above it the header. */
+function isTableRule(line: string): boolean {
+  const cells = cellsOf(line);
+  return cells.length > 0 && cells.every((cell) => TABLE_RULE.test(cell));
+}
+
+/**
+ * B-12. The rows drawn, and whether the first is the header.
+ *
+ * A rule line is the header's mark and never a row, and it is read in the one
+ * place Markdown puts it — directly under the first row. Anywhere else it is a
+ * row of dashes, because B-3 draws what is in the string and a row that
+ * disappeared from the middle of a table would be the string arguing back.
+ */
+function tableBlock(lines: readonly string[]): Block {
+  const header = lines.length > 1 && isTableRule(lines[1]!);
+  const drawn = header ? [lines[0]!, ...lines.slice(2)] : lines;
+  return {
+    kind: 'table',
+    spans: [],
+    table: {
+      header,
+      rows: drawn.map((line) => ({
+        cells: cellsOf(line).map((cell) => ({ spans: spansOf(cell) })),
+      })),
+    },
+  };
 }
 
 /** The line that closes a block opened at `from - 1`, or -1 while there is none. */
@@ -265,7 +384,20 @@ function boldRuns(text: string, code: boolean): Span[] {
  */
 export function plainText(body: string): string {
   return parseBody(body)
-    .map((block) => block.spans.map((span) => span.text).join(''))
+    .map((block) =>
+      block.table === undefined
+        ? block.spans.map((span) => span.text).join('')
+        : // B-12. A table is its cells with a space between them: the pipes come
+          // off like every other mark, so "Mon 07:40" is what F-1 matches and
+          // what the snippet shows.
+          block.table.rows
+            .map((row) =>
+              row.cells
+                .map((cell) => cell.spans.map((span) => span.text).join(''))
+                .join(' '),
+            )
+            .join('\n'),
+    )
     .join('\n');
 }
 
@@ -533,6 +665,12 @@ export interface Splice {
   from: number;
   to: number;
   insert: string;
+  /**
+   * Where the caret goes, when it is not the end of what was inserted — B-12's
+   * new row is opened whole and typed into the middle of, which a list's marker
+   * never was.
+   */
+  caret?: number;
 }
 
 /**
@@ -576,9 +714,154 @@ function nextMarker(marker: string): string {
   return `${Number(marker.slice(0, -1)) + 1}. `;
 }
 
+/**
+ * B-12. Whether the caret is in a table, which is what the control shows and
+ * what decides which way it writes. A row inside a fenced block is not one: a
+ * pipe in a box of code is a pipe.
+ */
+export function tableAt(text: string, caret: number): boolean {
+  return tableAround(lineRanges(text), caret, caret) !== null;
+}
+
+/**
+ * B-12. The contiguous rows around the caret, and `null` when it is not in a
+ * table. The rows are found from the caret's own line outwards, which is the
+ * same walk `parseBody` does from the top.
+ */
+function tableAround(
+  lines: readonly Line[],
+  start: number,
+  end: number,
+): { open: number; close: number } | null {
+  if (fenceAround(lines, start, end) !== null) return null;
+  const at = lineAt(lines, start);
+  if (!isTableRow(lines[at]!.text)) return null;
+  let open = at;
+  let close = at;
+  while (open > 0 && isTableRow(lines[open - 1]!.text)) open -= 1;
+  while (close < lines.length - 1 && isTableRow(lines[close + 1]!.text)) close += 1;
+  return { open, close };
+}
+
+/**
+ * B-12. The fourth control, and one control for both directions — the shape
+ * `toggleCode` has, and for the same reason: a second button for "not a table"
+ * teaches nothing the first one does not.
+ *
+ * Outside a table it writes a starter — two columns, the header rule and one
+ * row — on the caret's own line when that line is empty and on a fresh line
+ * under it when it is not, with the caret in the first cell. Inside one it
+ * takes the pipes off, a line per row and the rule line gone, which is the
+ * table undone rather than deleted.
+ *
+ * Everything it writes is characters a person could have typed, so the field's
+ * own undo reverses it — B-4's rule, which is what keeps a control from having
+ * a state of its own.
+ */
+export function toggleTable(text: string, start: number, end: number): Edited {
+  const lines = lineRanges(text);
+  const table = tableAround(lines, start, end);
+  if (table !== null) return untable(text, lines, table, start);
+
+  const from = lineStart(text, start);
+  const to = lineEnd(text, end);
+  const empty = `|${EMPTY_CELL.repeat(TABLE_COLUMNS)}`;
+  const rule = `|${' --- |'.repeat(TABLE_COLUMNS)}`;
+  const written = `${empty}\n${rule}\n${empty}`;
+  // A line with something on it keeps it: a table is a block of its own, and
+  // wrapping the sentence that was there in pipes would make it a cell.
+  const blank = text.slice(from, to).trim() === '';
+  const at = blank ? from : to + 1;
+  // Between the two spaces of the first cell, which is where Enter leaves it too.
+  const caret = at + 2;
+  return {
+    text: blank
+      ? text.slice(0, from) + written + text.slice(to)
+      : `${text.slice(0, to)}\n${written}${text.slice(to)}`,
+    start: caret,
+    end: caret,
+  };
+}
+
+/**
+ * B-12. The pipes off every row of one table: a line per row, its cells joined
+ * by a space, and the rule line gone because it is a mark rather than content.
+ *
+ * The caret is kept on the row it was on, at the end of it — the row is a
+ * different length now, and the end of the line is the one place in it that
+ * still means what it meant.
+ */
+function untable(
+  text: string,
+  lines: readonly Line[],
+  table: { open: number; close: number },
+  caret: number,
+): Edited {
+  const rows = lines.slice(table.open, table.close + 1).map((line) => line.text);
+  const ruled = rows.length > 1 && isTableRule(rows[1]!);
+  const kept = rows
+    .map((row, at) => ({ row, at }))
+    .filter((row) => !(ruled && row.at === 1));
+  const plain = kept.map((row) => cellsOf(row.row).join(' ').trim());
+
+  const from = lines[table.open]!.from;
+  const on = lineAt(lines, caret) - table.open;
+  // A caret on the rule line has no line of its own left to sit on, so it
+  // lands at the end of the row that line was describing — the one above it.
+  const held = Math.max(0, kept.findIndex((row) => row.at === on));
+  const before = plain.slice(0, held);
+  const at =
+    from + before.reduce((sum, line) => sum + line.length + 1, 0) + (plain[held]?.length ?? 0);
+  return {
+    text: text.slice(0, from) + plain.join('\n') + text.slice(lines[table.close]!.to),
+    start: at,
+    end: at,
+  };
+}
+
+/**
+ * B-12. What Enter means on a row of a table, and `null` when it means what
+ * Enter always meant — requirements.md §4.3.
+ *
+ * It opens the next row with the same number of empty cells and puts the caret
+ * in the first of them, so the second row of a table costs what the second item
+ * of a list costs. **Enter on a row with nothing in any cell takes the row off**,
+ * which is B-10's way out of a list applied to a table.
+ *
+ * It never *splits* a row, which is where it differs from `listEnter` on
+ * purpose: a caret halfway along an item leaves two items, while a caret
+ * halfway along a row would leave two lines that are each half a row and
+ * neither of them a table. The new row therefore opens under the line whatever
+ * the caret was doing on it.
+ */
+export function tableEnter(text: string, start: number, end: number): Splice | null {
+  // A selection Enter replaces what is selected, which is the browser's own
+  // rule and not a table question.
+  if (start !== end) return null;
+  const lines = lineRanges(text);
+  // Inside a fenced block Enter is Enter: a pipe in code is a pipe.
+  if (fenceAround(lines, start, end) !== null) return null;
+
+  const line = lines[lineAt(lines, start)]!;
+  if (!isTableRow(line.text)) return null;
+
+  const cells = cellsOf(line.text);
+  if (cells.every((cell) => cell === '')) return { from: line.from, to: line.to, insert: '' };
+
+  const row = `|${EMPTY_CELL.repeat(cells.length)}`;
+  return {
+    from: line.to,
+    to: line.to,
+    insert: `\n${row}`,
+    // Between the two spaces of the first cell: `| x |` is what typing then
+    // makes of it, which is the row the person would have typed by hand.
+    caret: line.to + 3,
+  };
+}
+
 /** The splice applied, for a field that cannot be typed into — and for the tests. */
 export function spliced(text: string, splice: Splice): Edited {
-  const at = splice.from + splice.insert.length;
+  const at = splice.caret ?? splice.from + splice.insert.length;
   return {
     text: text.slice(0, splice.from) + splice.insert + text.slice(splice.to),
     start: at,
