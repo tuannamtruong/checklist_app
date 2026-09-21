@@ -117,6 +117,7 @@ export function shellActions(source: FolderSource, offered: string | null = null
         // The system picker takes over from here and the page reloads once a
         // folder comes back, so this resolves without having changed anything.
         changeFolder: async () => android.pickFolder(),
+        changeLabel: null,
         changeNote: null,
       };
     }
@@ -125,6 +126,7 @@ export function shellActions(source: FolderSource, offered: string | null = null
         openFolder: () => askHelper({ what: 'folder' }),
         openApp: (provider) => askHelper({ what: 'app', command: provider.command }),
         changeFolder: null,
+        changeLabel: null,
         changeNote: 'the folder is the one this device was launched with — `--folder` on the launcher',
       };
     case 'fsaa':
