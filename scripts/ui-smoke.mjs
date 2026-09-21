@@ -60,7 +60,13 @@ async function main() {
   const consoleErrors = [];
   const page = await context.newPage();
   page.on('console', (message) => {
-    if (message.type() === 'error') consoleErrors.push(message.text());
+    if (message.type() !== 'error') return;
+    // A `/folder/info` that fails is not an error, it is the answer: "nothing
+    // is serving a folder here" — X-18, and `helperInfo` catches it by design.
+    // Offline (X-5) every boot asks and every boot is refused, and the browser
+    // logs the refusal whatever the page does with it.
+    if (message.location()?.url?.includes('/folder/info')) return;
+    consoleErrors.push(message.text());
   });
   page.on('pageerror', (error) => consoleErrors.push(String(error)));
 

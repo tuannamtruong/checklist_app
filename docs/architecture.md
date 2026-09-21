@@ -107,21 +107,24 @@ flowchart TD
     S1 -->|yes| S2A[memory-folder adapter]
     S1 -->|no| S2M[stored choice?]
 
-    S2M -->|local| S3L[local-folder adapter]
-    S2M -->|fsaa| S5B
-    S2M -->|shell| S2B
-    S2M -->|none| S2B[window.AndroidFolder?]
+    S2M -->|fsaa| S5B["Load IndexedDB handle"]
+    S2M -->|local or none| S2B[window.AndroidFolder?]
 
     S2B -->|yes| S3A["AndroidFolder<br/>.hasFolder()"]
     S2B -->|no| S3B["GET /folder/info"]
 
     S3A -->|yes| S4A["android-folder adapter"]
-    S3A -->|no| S4B["User pick folder in UI"]
     S3B -->|configured: true| S4C["http-folder adapter"]
-    S3B -->|configured: false| S4D["FSAA supported?"]
+
+    S3A -->|no| S3C{stored local?}
+    S3B -->|configured: false| S3C
+
+    S3C -->|yes| S3L[local-folder adapter]
+    S3C -->|"no, Android"| S4B["User pick folder in UI"]
+    S3C -->|"no, browser"| S4D["FSAA supported?"]
 
     S4B -->S5A["reload"]
-    S4D -->|yes| S5B["Load IndexedDB handle"]
+    S4D -->|yes| S5B
     S4D -->|no| S5C["setup screen:<br/>this browser only"]
 
     S5B -->|granted| S6A["stored fsaa-folder adapter"]
@@ -132,23 +135,27 @@ flowchart TD
     S6C -->S7A["fsaa-folder adapter"]
 ```
 
-Three things the flowchart is worth reading twice for.
+Four things the flowchart is worth reading twice for.
 
-**The stored choice is first, and it is only ever what the user picked.** A device that has been shown the setup screen
-never sees it again, so an app that reaches the folder through the helper today does not silently move to a File System
-Access handle tomorrow because the browser changed. It lives in `localStorage`, per-origin like the device id. There are
-three values, not two: `local` and `fsaa` are what the setup screen can be answered with, and `shell` records that the
-device was moved *off* the browser-only fallback and back onto whatever the process that launched it hands over — X-18.
-`shell` exists because "no value at all" cannot say it: a browser still holding an old `local-folder` log reads as
-`local` by the inference below, so the move would not survive the reload that performs it.
+**A stored `fsaa` is first, and it is only ever what the user picked.** A device that picked a folder does not silently
+move to a different way of reaching one because the browser changed overnight, and a helper serving the same origin does
+not take it over. It lives in `localStorage`, per-origin like the device id.
 
-**A stored `local` is a decision, and it is reversible from the settings screen rather than at startup.** The rule above
-cuts both ways: a device that once answered "this browser only" — because it was launched with no folder, or because the
-page was open before the helper had one — keeps that answer even after a real folder becomes reachable, and until X-18
-it kept it *with no way back*, since the only escape offered was the File System Access picker and the browser that
-needs the helper most is exactly the browser that has no picker. So the settings screen asks the shell a second question
-— [§4.1 Shell actions, beside the adapter](#41-shell-actions-beside-the-adapter) — and the switch stays a button rather
-than becoming automatic, because the rows written into `localStorage` do not follow the device to the folder.
+**A stored `local` is not a folder, so the shells outrank it — X-18.** `local` records that this device had no folder to
+reach when it was set up; it is not a preference for having none. A device whose own launcher is now holding a folder
+takes it, on the next load, without being asked. That is a deliberate exception to the rule above and it is narrow: only
+the two shells that hand a folder in *unasked* can override `local`, and they can override nothing else.
+
+The exception is there because without it the fallback has no exit on the browser it matters on. Firefox is the browser
+the loopback helper exists for, and it has no picker to offer instead — so a device that answered "this browser only"
+once, on a launch with no `--folder` or before setup had run, kept that answer forever while the folder sat in the
+process that was serving the page. The way in is easy to fall through and there was no way back out; row 11 of
+[requirements.md §15 Deviations and defects found during verification](requirements.md#15-deviations-and-defects-found-during-verification)
+is that bug.
+
+**The key is left alone when the shell's folder is taken.** Nothing is written on adoption, so a device that later runs
+without its helper reads `local` again and returns to the browser-only fallback rather than to a setup screen. The rows
+it wrote there are still in `localStorage`, untouched, and it sees them again.
 
 **A folder that already holds this device's op log counts as a stored choice of `local`.** Without that rule, every
 device that ran M1 would come back to a setup screen with its tree apparently gone — the ops are in `localStorage`, the
@@ -175,19 +182,18 @@ answers it gets:
 | --- | --- | --- | --- |
 | `openFolder` | `AndroidFolder.openFolder()`, an `ACTION_VIEW` on the granted tree | `POST /shell/open` with `{"what":"folder"}` | — |
 | `openApp` | `AndroidFolder.openApp(pkg)`, the launch intent for a package | `POST /shell/open` with `{"what":"app"}` and a command found on `PATH` | — |
-| `changeFolder` | `AndroidFolder.pickFolder()` | — (`--folder` is the launcher's) | The File System Access picker, or — on the browser-only fallback — the helper's own folder, X-18 |
+| `changeFolder` | `AndroidFolder.pickFolder()` | — (`--folder` is the launcher's) | The File System Access picker |
 
 Three properties keep this from being the fourth method by another name:
 
 **Nothing in the sync path calls any of it.** A device with no shell actions at all syncs identically. They are
-convenience, and the merge cannot tell whether they exist. X-18 is the one that is not merely convenience — it is the
-only route off `local-folder` that a browser without a picker has — and it is still not the adapter's business: it asks
-the shell what it is holding and then re-enters startup, which opens the folder the ordinary way.
+convenience, and the merge cannot tell whether they exist.
 
-**One of the three answers is not synchronous.** `showDirectoryPicker` either exists on `globalThis` or does not, and
-the Android bridge likewise; whether a loopback helper is serving this origin *and holding a folder* is a `GET
-/folder/info` away. So `shellActions` stays a pure function of what it is told, and the settings screen asks that one
-question first and hands the answer in.
+**None of it is how a device gets *onto* a folder.** X-18 was drafted as a fourth action here — "the folder this shell
+is holding, offered to a device on the fallback" — and that was the wrong place for it. Startup already asks the shells
+that exact question, so the answer belongs where the folder is chosen and not on a screen the user has to find first. It
+also has to be asynchronous, where every other answer on this table is a property of `globalThis`. `shellActions` stays
+synchronous and this table stays three rows because the fix went into §4's flowchart instead.
 
 **The helper takes a command, never a path.** `POST /shell/open` accepts a bare command name matching the same narrow
 pattern the folder API uses, resolves it with `shutil.which` and runs it with no arguments and no shell. It cannot be

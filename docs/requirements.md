@@ -481,7 +481,7 @@ to empty, and a dismissal is only for a row the user is content to leave as it l
 | X-15 | The settings screen names the folder this device syncs through, and opens it in the system's file manager where the shell can | ✅ | `src/ui/SettingsPage.svelte`, over `src/app/shell.ts`. Opening a folder is not a fourth adapter method and never becomes one — [architecture.md §4.1 Shell actions, beside the adapter](architecture.md#41-shell-actions-beside-the-adapter) |
 | X-16 | The settings screen points this device at a different folder, and names who decides when it cannot | ✅ | `changeFolder` in `src/app/shell.ts`, which re-enters [architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter)'s picker and reloads. The rows already written do not follow the device to the new folder, and the screen says so before the picker opens |
 | X-17 | The settings screen launches the cloud provider's own app, and which provider that is stays on this device | ✅ | `src/core/providers.ts` is the catalog; the choice is `localStorage`, per [§2.3 What is never in the Sync Folder](#23-what-is-never-in-the-sync-folder). A shell that cannot launch an app says so rather than offering a button that does nothing |
-| X-18 | A device on the browser-only fallback can move to the folder its own launcher is holding, in a browser that has no picker | ✗ | `shellFolder` in `src/app/folder-choice.ts`, over the `local` branch of `src/app/shell.ts`: the loopback helper is asked what it is holding, and taking it stores the `shell` mode and reloads into [architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter)'s ordinary startup. Without it, "this browser only" is a one-way door on the one browser the helper exists for — [§10.2 The sync folder, on the settings screen](#102-the-sync-folder-on-the-settings-screen) |
+| X-18 | A device on the browser-only fallback takes the folder its own launcher is holding, rather than keeping an answer it gave before there was one | ✅ | `chooseFolder` in `src/app/folder-choice.ts`: the two shells that hand a folder in unasked are asked before a stored `local` is honoured, and nothing is written when one is taken — [architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter). `folder-choice.test.ts`; a real Firefox is [test.md §3.6 Platform](test.md#36-platform) check 3b. Without it, "this browser only" is a one-way door on the one browser the helper exists for |
 
 Packaging decides which of these are reachable, and it answers them per target rather than once — see
 [architecture.md §7 Packaging](architecture.md#7-packaging). X-3 in particular is a PWA install on Chromium and an APK
@@ -556,7 +556,7 @@ optional capability of the *shell*, and each shell answers for itself:
 | Android (`android-folder`) | The system's file viewer, on the granted tree | The provider's launch intent, by package name | The system picker, then a reload |
 | Windows helper (`http-folder`) | The desktop's own file manager, from the process that already holds the folder | The provider's command, found on `PATH` and run with no arguments | Not offered: the launcher's `--folder` decides, and the screen says so |
 | Chrome/Edge (`fsaa-folder`) | Not offered: a page holds a directory handle, not a window | Not offered | The File System Access picker, then a reload |
-| This browser only (`local-folder`) | Nothing to open — there is no folder | Not offered | The folder the launcher is holding, where one is; otherwise the picker, where the browser has one (X-18) |
+| This browser only (`local-folder`) | Nothing to open — there is no folder | Not offered | The picker, where the browser has one. A folder the *shell* is holding was taken at startup and never reaches this screen — X-18 |
 
 A button that a shell cannot honour is absent rather than disabled-with-a-tooltip: the row above it already says what
 this device reaches its folder through, so an absent button reads as "not here" rather than as a fault.
@@ -565,32 +565,25 @@ this device reaches its folder through, so an absent button reads as "not here" 
 new one is read from scratch on the way back up, exactly as a new device reads it. That is stated on the screen before
 the picker opens, because it is the one thing on this page that can lose work.
 
-**"This browser only" must not be a one-way door — X-18.** The last row of that table used to read "the picker, where
-the browser has one", and on Firefox the browser has none: a device that answered "use this browser only" on the setup
-screen could never answer anything else, no matter what became reachable afterwards. That is the wrong shape twice over.
-Firefox is precisely the browser the loopback helper was written for
-([architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter)), so the folder is usually sitting right
-there, being served by the process that served the page; and the screen was saying "this browser cannot open a folder at
-all" while that was true of the browser and false of the device. The way in is easy to fall through — launch the helper
-once with no `--folder`, or open the page before setup has run, and the setup screen offers the browser-only button as
-its only option — and until X-18 there was no way back out.
+**"This browser only" must not be a one-way door — X-18.** That last row used to read "the picker, where the browser has
+one", and on Firefox the browser has none: a device that answered "use this browser only" on the setup screen could
+never answer anything else, however much became reachable afterwards. The way in is easy to fall through — launch the
+helper once with no `--folder`, or open the page before setup has run, and the browser-only button is the only one the
+setup screen offers — and there was no way back out. Firefox is precisely the browser the loopback helper was written
+for, so the folder was usually sitting right there, held by the process that served the page, while the screen said
+"this browser cannot open a folder at all" — true of the browser, false of the device.
 
-So the fallback gets the one escape its shell can offer: the settings screen asks the helper what folder it is holding,
-names it, and offers to take it. Three properties keep that honest.
+**The fix is not on this screen, and that is the point.** It was drafted here, as a button offering the folder the
+helper is holding, and that was the wrong altitude: startup already asks the shells that question, so a device that has
+to be *told* to take the folder is a device that was asked the wrong question. `local` is not a folder — it is the
+absence of one — so a shell holding a folder now outranks it, and the device takes it on the next load with nothing to
+press: [architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter). This screen keeps the picker for
+the browser that has one, and nothing else changed on it.
 
-**It is a button, never automatic.** The rows written into `localStorage` do not follow the device to the folder — the
-same rule every other folder change obeys — so a startup that silently adopted the helper's folder would show an empty
-tree to a user who had been writing into this browser all week. The screen says whose rows stay where before the button
-is pressed.
-
-**Taking it is recorded, not merely acted on.** The move stores the `shell` mode, which is what makes it survive the
-reload that performs it: a browser still holding the old `local-folder` log is read as a stored choice of `local`
-otherwise, and startup would put the device straight back where it was.
-
-**The sidebar's warning and this screen's button are the two halves of one thing.** An unsynced device says so in the
-footer on every page, in the one line X-12 left there when everything else moved onto this screen, and the Settings
-entry it sits directly above is the door to the only button that can answer it. The warning is what makes the escape
-findable; without a button behind it, it is a device telling the user something they cannot act on.
+**Nothing is written when the shell's folder is taken.** The stored `local` stays, so a device that later runs without
+its helper falls back to the browser rather than to a setup screen, and the rows it wrote there are still in
+`localStorage` for it to find. Those rows do not follow it to the folder — the same rule every other folder change obeys
+— which is the one cost of doing this without asking, and it is the cost of the fallback itself rather than of the fix.
 
 **The provider is a device-local label, not a code path.** Nothing in the merge, the adapter or the file format knows
 which provider is under the folder — [§7.3 Fixed constraints](#73-fixed-constraints) — so the catalog in
@@ -619,7 +612,7 @@ _Not written yet._ Expected to cover: the no-server rule, the three-method adapt
 
 What M1, M2 and M3 leave standing, in the order it matters. Every row here but the last is a deliberate gap rather than
 a discovered bug — `npm test` and `npm run ui-smoke` both pass. Row 11 is the exception: a defect found by running the
-Windows bundle in Firefox, and the reason X-18 exists.
+Windows bundle in Firefox, fixed rather than accepted, and the reason X-18 exists.
 
 | # | Deviation | Why it stands |
 | --- | --- | --- |
@@ -633,7 +626,7 @@ Windows bundle in Firefox, and the reason X-18 exists.
 | 8 | Two tabs on one origin are one device with two writers | The device id is per-origin, so both tabs write `checklist.<same-id>.ops.jsonl` from separate in-memory logs, and the one that flushes second replaces the other's file. Nothing is lost while both tabs live — the next write from either restores its own ops — but a tab closed without flushing loses what only it had. It is one-writer-per-file (S-3) broken by the browser rather than by the code, it predates M2, and the fix is a lock between tabs rather than anything in the merge. **Compaction makes it sharper**: the second tab's write can restore ops the first tab had already compacted away, so the file grows back. It converges and loses nothing; it merely undoes the saving until both tabs agree |
 | 9 | A device with no name is still eight hex characters | D-1 is built, and a device that has never been named has nothing else to show. The list is where it gets one |
 | 10 | The Windows and Android bundles are built but unobserved | `make windows` and `make apk` produce them — [architecture.md §7 Packaging](architecture.md#7-packaging) — which is what row 1 was waiting for. Running them against a real provider's client is still [test.md §3.6 Platform](test.md#36-platform)'s checklist and has not been done |
-| 11 | The Windows bundle in Firefox showed "This browser only — not synced" while the helper beside it held the folder | **Found in use; the fix is specified as X-18 and not yet built.** Not a Firefox bug and nothing to do with the adapter: the device had a stored choice of `local` from a launch that had no folder yet, the stored choice outranks every shell at startup by design, and the only way out on offer was the File System Access picker — which is the one thing Firefox does not have, so the screen said "this browser cannot open a folder at all" and meant it. Edge was unaffected because it had answered the setup screen with a picked folder instead. The fix is a second question to the shell rather than a change to the startup order: [§10.2 The sync folder, on the settings screen](#102-the-sync-folder-on-the-settings-screen) |
+| 11 | The Windows bundle in Firefox showed "This browser only — not synced" while the helper beside it held the folder | **Found in use, fixed by X-18.** Not a Firefox bug and nothing to do with the adapter: the device had a stored choice of `local` from a launch that had no folder yet, that choice outranked every shell at startup, and the only way out on offer was the File System Access picker — which is the one thing Firefox does not have, so the screen said "this browser cannot open a folder at all" and meant it. Edge was unaffected because it had answered the setup screen with a picked folder instead. The fix is one line of precedence rather than a new button: `local` is the absence of a folder, so a shell holding one now outranks it — [architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter) |
 
 ## 16. Explicitly out of scope
 

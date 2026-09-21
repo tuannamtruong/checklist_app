@@ -198,6 +198,7 @@ row 10. In the order that finds the most:
 | 1 | Install `bundles/checklist.apk`, grant a folder in the provider's synced directory, add a row | The SAF grant and the Android adapter against a real client |
 | 2 | Force-stop the app, reopen it | `takePersistableUriPermission` survived, so there is no second prompt |
 | 3 | Unzip `checklist-windows.zip` on Windows, double-click `Setup.vbs`, pick the folder, point Firefox at it | The loopback helper path, which no headless run can hold |
+| 3b | In that Firefox, on a device that says "This browser only", reload the page | X-18 against a real Firefox rather than a Chromium with `showDirectoryPicker` deleted: the folder is taken on load, and the reload is the whole gesture. `folder-choice.test.ts` covers the decision and the smoke run cannot — `vite preview` serves no `/folder/info`, so there is never a folder to take |
 | 3a | Launch it again from the desktop icon | No console window appears at any point, and the folder is not asked for twice — [architecture.md §7.1 The two Windows bundles](architecture.md#71-the-two-windows-bundles) |
 | 4 | Edit on the phone, wait for the provider's client, refresh on Windows | Provider latency and partial files — [sync-flow.md §7 What is still open](sync-flow.md#7-what-is-still-open) item 5 |
 | 5 | Edit both while both are offline, then reconnect | A real race with a real clock skew between two real devices |

@@ -16,17 +16,8 @@ import type { FolderAdapter } from '../core/folder';
 
 const MODE_KEY = 'checklist.folder.mode';
 
-/**
- * `local` and `fsaa` are the two the setup screen can be answered with; the
- * rest of the flowchart is decided by the shell and stores nothing.
- *
- * `shell` is neither: it records that a device was moved *off* the browser-only
- * fallback and back onto whatever the process that launched it hands over —
- * X-18. Clearing the key would not say that, because a browser still holding
- * the old `local-folder` log is read as `local` by inference below, so the move
- * would not survive the reload that performs it.
- */
-export type FolderMode = 'local' | 'fsaa' | 'shell';
+/** Only the two the user can be asked for. The rest are decided by the shell. */
+export type FolderMode = 'local' | 'fsaa';
 
 /**
  * Which of the flowchart's branches this folder came out of. The adapters are
@@ -63,7 +54,7 @@ function isUiTest(search: string): boolean {
 
 export function storedMode(storage: Storage): FolderMode | null {
   const stored = storage.getItem(MODE_KEY);
-  return stored === 'local' || stored === 'fsaa' || stored === 'shell' ? stored : null;
+  return stored === 'local' || stored === 'fsaa' ? stored : null;
 }
 
 export function rememberMode(mode: FolderMode, storage: Storage = window.localStorage): void {
@@ -97,16 +88,6 @@ function openHelper(helper: HelperInfo): OpenFolder | null {
     synced: true,
     uiTest: false,
   };
-}
-
-/**
- * The folder the process that served this page is holding, if it is holding
- * one. Startup reaches it through the flowchart below; this is the same
- * question asked out of turn, by the one screen that has to offer it to a
- * device the flowchart has already answered `local` for — X-18.
- */
-export async function shellFolder(): Promise<OpenFolder | null> {
-  return openHelper(await helperInfo());
 }
 
 async function fromHandle(): Promise<FolderChoice | null> {
@@ -144,18 +125,23 @@ export async function chooseFolder(
   // whether or not this key records it: M1 shipped before the key existed, and
   // "where did my checklist go" is not a question to answer with a migration note.
   const mode = storedMode(storage) ?? (localFolderHasData(storage) ? 'local' : null);
-  if (mode === 'local') return browserOnly(storage);
   if (mode === 'fsaa') {
     const chosen = await fromHandle();
     if (chosen) return chosen;
     return { kind: 'setup', how: 'fsaa', reason: 'the folder this device used is no longer available' };
   }
 
+  // The two shells that hand a folder in unasked, and they are asked before a
+  // stored `local` is honoured rather than after — X-18.
+  //
+  // `local` records that this device had no folder to reach, not that it wants
+  // none. A device whose own launcher is now holding one has no reason left to
+  // stay in the browser, and on Firefox it has no other way out: there is no
+  // picker to offer it, so a fallback that outranked the helper was a fallback
+  // with no exit. `fsaa` above is not overridden, because that device picked a
+  // folder and is still using it.
   const android = bridge();
-  if (android) {
-    if (!android.hasFolder()) {
-      return { kind: 'setup', how: 'android', reason: 'this app has not been given a folder yet' };
-    }
+  if (android?.hasFolder()) {
     return {
       kind: 'folder',
       source: 'android',
@@ -166,10 +152,19 @@ export async function chooseFolder(
     };
   }
 
-  const helper = await helperInfo();
+  // An Android WebView has no helper behind it, and asking is a request that
+  // can only fail.
+  const helper = android ? { present: false, configured: false } : await helperInfo();
   const served = openHelper(helper);
   if (served) return served;
 
+  // Nothing is holding a folder for this device. A device that has already
+  // answered the setup screen keeps its answer rather than being asked twice.
+  if (mode === 'local') return browserOnly(storage);
+
+  if (android) {
+    return { kind: 'setup', how: 'android', reason: 'this app has not been given a folder yet' };
+  }
   if (supported()) {
     return { kind: 'setup', how: 'fsaa', reason: 'no folder has been picked on this device yet' };
   }
