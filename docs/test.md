@@ -171,6 +171,11 @@ capital that `cleanTag` folds away, and the filter (A-4, A-6) is checked for the
 the tree shows a match *and the path to it*, and that a row created while the filter is on carries the filter's tags
 rather than vanishing as it is typed.
 
+K-9 is a browser check for a reason a unit test cannot get at: the split itself is `paste.test.ts`'s, but the event that
+carries a clipboard into an input only exists in a browser. The smoke run dispatches one over the quick-add line with
+something already typed in it, and asserts the three things the rule promises — a row per line, in the pasted order, the
+blank line making none of them, and the text that was already there joined to the first.
+
 M5 adds the sync folder section, and what the smoke run can assert about it is narrow on purpose: the section names the
 same folder the sidebar warns about when it is the unsynced fallback, and a shell that cannot open a folder or start an
 app offers no button for either

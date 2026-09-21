@@ -201,6 +201,35 @@ async function main() {
         (await page.evaluate(() => document.activeElement?.dataset?.testid ?? null)) === 'quick-add',
       String(await page.evaluate(() => document.activeElement?.dataset?.testid ?? null)),
     );
+    // --- K-9: a pasted paragraph is one row per line -----------------------
+    // Only a browser can answer this one: it is a paste event carrying a
+    // clipboard, and what it asserts is that the line breaks became rows rather
+    // than one row holding a paragraph.
+    await quickAdd.focus();
+    await quickAdd.fill('Buy ');
+    await page.evaluate(() => {
+      const line = document.querySelector('[data-testid="quick-add"]');
+      line.setSelectionRange(line.value.length, line.value.length);
+      const data = new DataTransfer();
+      data.setData('text/plain', 'apples\r\n\n  pears  \nplums\n');
+      line.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+    });
+    // The line adds to the page it is on, which here is the root — so the rows
+    // it made are the top-level ones, and the caret half of the paste is the
+    // "Buy " that was already typed.
+    const pasted = await topLevelTitles(page);
+    check(
+      'a pasted paragraph is one row per line, in order — K-9',
+      pasted.slice(-3).join('|') === 'Buy apples|pears|plums',
+      pasted.join('|'),
+    );
+    check(
+      'the blank line made no row, and the line is empty and ready again',
+      !pasted.includes('') && (await quickAdd.inputValue()) === '',
+      `${pasted.length} top-level rows, line "${await quickAdd.inputValue()}"`,
+    );
+    await quickAdd.focus();
+
     const rowsBeforeEscape = await page.locator('[data-testid="row"]').count();
     await quickAdd.fill('Never written');
     await page.keyboard.press('Escape');
@@ -860,6 +889,15 @@ async function dragRow(page, title, ontoTitle, where) {
   const refused = await target.getAttribute('data-drop-refused');
   await page.mouse.up();
   return refused;
+}
+
+/** The titles of the rows at the top level, in render order. */
+async function topLevelTitles(page) {
+  return page.evaluate(() =>
+    [...document.querySelectorAll('[data-testid="row"]')]
+      .filter((row) => row.dataset.depth === '0')
+      .map((row) => row.querySelector('[data-testid="title"]').value),
+  );
 }
 
 /** Every title on screen, in render order. */
