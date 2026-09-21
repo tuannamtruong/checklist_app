@@ -197,7 +197,9 @@ is the third and last nav entry, beside Search and Done. Four things sit on it, 
   can do, and a capability this shell lacks is an absent button. architecture.md §4.1.
 
 - **The device name** (D-1). The one editor for it; `#/devices` lists what every device calls itself and edits none of
-  them, including this one.
+  them, including this one. A device arrives already named (D-5): `src/core/device-name.ts` shapes
+  `platform-browser-id4` — `Win-Chro-a3f1` — off the user-agent string `src/app/device.ts` reads, and `Session.open`
+  applies it only to a header carrying no name, so a typed one is never overwritten.
 - **The log** (D-4). `#/logs` reads this device's own ops back newest first through `src/core/log-view.ts`, with the
   header line's vector above them. Nothing on that page writes.
 - **The theme** (X-13). `src/core/themes.ts` is the catalog of six ids, `src/app.css` holds one eleven-token palette per

@@ -157,6 +157,12 @@ asserted — it is a screenshot per theme, which is what a person can check and 
 assert about the rest of the palette is that no theme changes the layout: the app is measured for horizontal overflow
 under the widest one, and every theme renders the same DOM.
 
+D-5 puts one more check on that screen, and it is a check about a field nobody has touched: the device name is already
+filled in on a first launch, it matches `platform-browser-id4`, and its last four characters are the first four of the
+device id shown beside it. The mapping itself is a unit test — `src/core/device-name.test.ts` over a table of real
+user-agent strings, including the Android WebView the bundle runs in, which is the one string where "the browser" is not
+a browser the user chose.
+
 M5's other three features are driven end to end, because each of them is a claim about what is on screen rather than
 about a value. The drag (T-14) is driven with the pointer, not with a synthesised drag event: down on the grip, move, up
 — and once with a drop into the dragged row's own child, which asserts the refusal T-5 has carried since M1 with no UI

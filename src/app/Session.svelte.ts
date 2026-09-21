@@ -95,7 +95,17 @@ export class Session {
     this.nodeMap = foldOps(ops);
   }
 
-  static async open(folder: FolderAdapter, device: DeviceId): Promise<Session> {
+  /**
+   * `suggestedName` is D-5's: applied only when this device's header carries no
+   * name at all, so a typed one — or one an earlier launch suggested — is never
+   * overwritten. Passed in rather than derived, because deriving it means
+   * reading the browser and nothing below the shell may do that.
+   */
+  static async open(
+    folder: FolderAdapter,
+    device: DeviceId,
+    suggestedName = '',
+  ): Promise<Session> {
     let session: Session | undefined;
     const problem = (error: unknown) => {
       console.error(`device ${device}: op log`, error);
@@ -113,6 +123,10 @@ export class Session {
         console.warn(`device ${device}: ${name}: skipped ${lines} unreadable op line(s)`);
       },
     });
+    // D-5, requirements.md §8. A rename writes the header and no op, so a
+    // device that has never been named costs one header write to arrive with a
+    // name — and a device that has one is left exactly as its file holds it.
+    if (suggestedName !== '' && log.name === '') log.rename(suggestedName);
     session = new Session(log, folderSync, ops);
     return session;
   }

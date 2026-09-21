@@ -6,6 +6,7 @@
 // loopback bundle is two devices, and the design tolerates that rather than
 // fighting it.
 
+import { autoDeviceName } from '../core/device-name';
 import type { DeviceId } from '../core/types';
 
 const DEVICE_KEY = 'checklist.device';
@@ -22,6 +23,19 @@ export function deviceId(storage: Storage = window.localStorage): DeviceId {
   const minted = mintDeviceId();
   storage.setItem(DEVICE_KEY, minted);
   return minted;
+}
+
+/**
+ * D-5. What this device calls itself until somebody types something better.
+ * The user-agent string is read here rather than in `core/`, which has no
+ * `window` and no environment of any kind — the shape of the name is core's,
+ * and the one fact about this machine is this layer's.
+ */
+export function suggestedDeviceName(
+  id: DeviceId,
+  userAgent: string = navigator.userAgent,
+): string {
+  return autoDeviceName(userAgent, id);
 }
 
 /** Node ids are minted by the creating device and never reused — §2.1. */

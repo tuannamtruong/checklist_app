@@ -387,6 +387,7 @@ presentation.
 | D-2 | Each device carries an advisory `lastSeen`, so a dormant one is visible as dormant | ✅ | The `at` on the header line, stamped by the writing device on every write. Advisory only — the merge never reads it |
 | D-3 | Nothing in the merge path depends on the device list being complete or current | ✅ | Structural: `src/core/devices.ts` is the only reader of `name` and `at`, and neither `merge.ts` nor `materialise.ts` imports it. A header with neither field is a device that has not been named, not an error |
 | D-4 | The op log this device has written is readable inside the app, newest first, each op naming the row it touched | ✅ | `src/core/log-view.ts` turns ops into rows; `src/ui/LogPage.svelte` at `#/logs`, reached from the "This device" section of `#/settings`. Read-only — nothing on the page writes an op |
+| D-5 | A device nobody has named names itself, from what the browser will say about it | ✅ | `src/core/device-name.ts` shapes `platform-browser-id4`; `src/app/device.ts` is the one place the user-agent string is read, and `Session.open` applies the result only when the header carries no name |
 
 **D-4 shows the file as it stands, not the history.** The rows are this device's own ops in the order it wrote them,
 which after S-14 has run is the ops that survived the cut rather than everything ever written —
@@ -409,10 +410,23 @@ name is a thing this device says about itself, so it is typed where the other st
 list is the view of what every device has said. The self row there names the setting rather than repeating it, because
 two inputs bound to one value is two places for it to look edited and one place for it to actually be.
 
-The list is what closes row 9 of
+**A device arrives with a name rather than waiting for one.** D-5 is what a device calls itself before anybody types
+anything: up to five characters of platform, four of browser and four hex digits — `Win-Chro-a3f1`, `Andro-App-91b4`.
+The last four are the first four of the device id rather than a fresh random, so the name is stable across restarts and
+a person reading a conflict row can match it to the file in the folder. The other two are read off the user-agent
+string, which is a guess and is allowed to be a wrong one: an unrecognised platform or browser is `Web`, and
+`Web-Web-a3f1` is still a better answer to "which device wrote that" than eight hex characters.
+
+It is an ordinary D-1 name and not a second kind of name. It goes in the same header field, written by the same single
+writer, so the merge learns nothing new — and the settings screen edits it exactly as it edits a typed one. **A name
+already in the header is never overwritten**, including one the user typed and one an older build left empty and this
+build has since filled in; the suggestion applies only at startup and only to a header carrying no name at all. Clearing
+the field leaves the device unnamed until the next launch, which names it again.
+
+The name and the list together close row 9 of
 [§15 Deviations and defects found during verification](#15-deviations-and-defects-found-during-verification): a conflict
-row can now say "the laptop" where it used to have eight hex characters, and it falls back to the id for a device that
-has not been named.
+row can now say "the laptop" where it used to have eight hex characters, and where nobody has typed anything it says
+`Win-Chro-a3f1`. It still falls back to the id for a peer whose build predates D-5 and that was never named.
 
 One machine can be more than one device. The device id lives in `localStorage`, so it is per-origin, and
 [architecture.md §7.1 The two Windows bundles](architecture.md#71-the-two-windows-bundles) makes one Windows machine two
@@ -624,7 +638,7 @@ Windows bundle in Firefox, fixed rather than accepted, and the reason X-18 exist
 | 6 | `local-folder` has no quota story | A `localStorage` quota failure is reported and the ops stay queued, so nothing is lost in the session. Compaction makes it arrive later rather than never |
 | 7 | Restoring reverses a delete; it does not reverse a compaction | T-13 is built. What a restored row comes back with is the state the surviving ops fold to, which after a compaction is the last value of each field rather than the whole history — the same thing every other read gets |
 | 8 | Two tabs on one origin are one device with two writers | The device id is per-origin, so both tabs write `checklist.<same-id>.ops.jsonl` from separate in-memory logs, and the one that flushes second replaces the other's file. Nothing is lost while both tabs live — the next write from either restores its own ops — but a tab closed without flushing loses what only it had. It is one-writer-per-file (S-3) broken by the browser rather than by the code, it predates M2, and the fix is a lock between tabs rather than anything in the merge. **Compaction makes it sharper**: the second tab's write can restore ops the first tab had already compacted away, so the file grows back. It converges and loses nothing; it merely undoes the saving until both tabs agree |
-| 9 | A device with no name is still eight hex characters | D-1 is built, and a device that has never been named has nothing else to show. The list is where it gets one |
+| 9 | A device with no name is still eight hex characters | **Closed by D-5.** A device now names itself on its first write — `Win-Chro-a3f1`, from the platform, the browser and the first four digits of its own id — so the list and the conflict rows start from something readable and the typed name is an improvement on a name rather than the only one there is. Eight hex characters survive in one place: a peer whose build predates D-5 and that nobody ever named |
 | 10 | The Windows and Android bundles are built but unobserved | `make windows` and `make apk` produce them — [architecture.md §7 Packaging](architecture.md#7-packaging) — which is what row 1 was waiting for. Running them against a real provider's client is still [test.md §3.6 Platform](test.md#36-platform)'s checklist and has not been done |
 | 11 | The Windows bundle in Firefox showed "This browser only — not synced" while the helper beside it held the folder | **Found in use, fixed by X-18.** Not a Firefox bug and nothing to do with the adapter: the device had a stored choice of `local` from a launch that had no folder yet, that choice outranked every shell at startup, and the only way out on offer was the File System Access picker — which is the one thing Firefox does not have, so the screen said "this browser cannot open a folder at all" and meant it. Edge was unaffected because it had answered the setup screen with a picked folder instead. The fix is one line of precedence rather than a new button: `local` is the absence of a folder, so a shell holding one now outranks it — [architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter) |
 

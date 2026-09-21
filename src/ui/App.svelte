@@ -7,7 +7,7 @@
   // tree; and the sync cycle runs from here, driven by activity and focus
   // rather than by a timer (S-19).
   import { isVisible } from '../core/tree';
-  import { deviceId } from '../app/device';
+  import { deviceId, suggestedDeviceName } from '../app/device';
   import { chooseFolder, type FolderChoice } from '../app/folder-choice';
   import { Dismissals } from '../app/dismissals.svelte';
   import { Router } from '../app/router.svelte';
@@ -45,7 +45,10 @@
   async function open(chosen: FolderChoice): Promise<void> {
     choice = chosen;
     if (chosen.kind !== 'folder') return;
-    const opened = await Session.open(chosen.folder, deviceId());
+    // D-5. The device names itself here, on the one path that knows both the id
+    // and the browser, and only if its own header carries no name already.
+    const id = deviceId();
+    const opened = await Session.open(chosen.folder, id, suggestedDeviceName(id));
     session = opened;
     // The cycle runs against every folder, including the ones that reach no
     // other device: "is there a peer file here" is a question about the folder
