@@ -1,6 +1,8 @@
 <script lang="ts">
-  // K-8. The line at the end of every list: type, press Enter, the row is a
-  // task — requirements.md §4.
+  // K-8. The line in every list page's header: type, press Enter, the row is a
+  // task at the end of the list — requirements.md §4. Where the line sits and
+  // where the row lands are two questions; only `createLastChild` answers the
+  // second, and it is unchanged by the line having moved to the header.
   //
   // It keeps the caret rather than following the row it made, which is what
   // separates it from `Enter` on a row: that key is editing one row and moves
