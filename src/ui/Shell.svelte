@@ -42,10 +42,6 @@
   // otherwise. A permanent one would be empty almost always, which is how a nav
   // entry teaches a user to stop reading it.
   const pending = $derived(session.conflicts.filter((row) => !dismissals.has(row.id)).length);
-
-  const selfName = $derived(
-    session.devices.find((device) => device.self)?.name || session.deviceId,
-  );
 </script>
 
 <div class="flex min-h-dvh bg-surface text-ink">
@@ -86,10 +82,11 @@
         onNavigate={() => view.setDrawer(false)}
       />
 
-      <!-- T-12, F-5 and X-12. All three are always here, even when empty: a
-           view that appeared only once it had something in it is a view the user
-           never learns exists — requirements.md §5. The device list and the log
-           hang off Settings rather than taking entries of their own. -->
+      <!-- T-12 and F-5. Both are here even when empty: a view that appeared
+           only once it had something in it is a view the user never learns
+           exists — requirements.md §5. Settings is the third, and it sits in the
+           footer instead; the device list and the log hang off it rather than
+           taking entries of their own. -->
       <a
         href={SEARCH_HREF}
         class="mt-2 flex items-center gap-2 rounded-md border-t border-line px-2 pt-3 pb-1.5 text-sm hover:bg-surface-sunken"
@@ -115,18 +112,6 @@
         <span class="truncate">Done</span>
       </a>
 
-      <a
-        href={SETTINGS_HREF}
-        class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-surface-sunken"
-        class:text-accent={settingsOpen}
-        class:text-ink-muted={!settingsOpen}
-        data-testid="settings-link"
-        onclick={() => view.setDrawer(false)}
-      >
-        <span class="size-4 shrink-0 text-center" aria-hidden="true">⚙</span>
-        <span class="truncate">Settings</span>
-      </a>
-
       {#if pending > 0 || conflictsOpen}
         <a
           href={CONFLICTS_HREF}
@@ -147,22 +132,40 @@
       {/if}
     </nav>
 
-    <footer class="border-t border-line px-3 py-2 text-xs text-ink-faint">
-      <!-- D-1: the name once there is one, and the id until then — which is all
-           an unnamed device has to show. It leads to where the name is typed. -->
-      <p data-testid="device-id">
-        <a href={SETTINGS_HREF} class="hover:text-ink" onclick={() => view.setDrawer(false)}>
-          Device {selfName}
+    <!-- X-12. Settings is the foot of the sidebar rather than a fourth nav
+         entry: the entries above it are places in the tree, and this one is the
+         device the tree is being read on. What the footer used to spell out —
+         the name, the folder, the peer count — is on that screen and says more
+         there, so the corner is a door rather than a readout — §10. -->
+    <footer class="border-t border-line p-2">
+      <!-- The one exception, and it is a warning rather than a readout: a device
+           that believes it is synced and is not is the failure this shell must
+           never produce silently — architecture.md §4. The label says it in
+           full, so the line is the label — folder-choice.ts. -->
+      {#if !synced}
+        <p class="px-2 pb-1.5 text-xs text-danger" data-testid="not-synced">{folderLabel}</p>
+      {/if}
+
+      <div class="flex items-center gap-1">
+        <a
+          href={SETTINGS_HREF}
+          class="flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-surface-sunken"
+          class:text-accent={settingsOpen}
+          class:text-ink-muted={!settingsOpen}
+          data-testid="settings-link"
+          onclick={() => view.setDrawer(false)}
+        >
+          <span class="size-4 shrink-0 text-center" aria-hidden="true">⚙</span>
+          <span class="truncate">Settings</span>
         </a>
-      </p>
-      <p class="flex items-center gap-1">
-        <span class="min-w-0 truncate" data-testid="folder-label">{folderLabel}</span>
         {#if synced}
           <!-- S-19: the idle triggers are focus and this button, because a timer
-               in a hidden tab is throttled and a backgrounded PWA's is frozen. -->
+               in a hidden tab is throttled and a backgrounded PWA's is frozen.
+               It stays in the corner rather than moving to the screen it now
+               leads to — a sync you have to navigate to is one nobody presses. -->
           <button
             type="button"
-            class="row-control ml-auto shrink-0 rounded px-1 hover:text-ink"
+            class="row-control shrink-0 rounded px-2 py-1.5 text-sm text-ink-faint hover:text-ink"
             aria-label="Sync now"
             title="Sync now"
             data-testid="sync-now"
@@ -172,12 +175,7 @@
             {session.syncing ? '…' : '↻'}
           </button>
         {/if}
-      </p>
-      {#if synced || session.peers > 0}
-        <p data-testid="peer-count">
-          {session.peers === 0 ? 'No other device yet' : `${session.peers} other device${session.peers === 1 ? '' : 's'}`}
-        </p>
-      {/if}
+      </div>
     </footer>
   </aside>
 
