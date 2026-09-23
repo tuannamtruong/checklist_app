@@ -122,7 +122,7 @@ sync and no writes.
 | T-7 | Deleting a node tombstones its whole subtree, not just the node | ✅ | The ancestor walk must climb the T-6-resolved parent, or a tombstoned subtree containing a cycle hangs — [sync-flow.md §6.2 The repair](sync-flow.md#62-the-repair) — `src/core/tree.ts`; `tree.test.ts` covers the tombstoned subtree that contains a cycle |
 | T-8 | Collapse/expand state is per-device and never synced | ✅ | `src/app/view-state.svelte.ts` — `localStorage`, never a file |
 | T-9 | Breadcrumbs show the path back up from any node | ✅ | `src/ui/Breadcrumbs.svelte`, over `ancestorsOf` |
-| T-10 | Sidebar shows only containers — `folder` and `list` | ✅ | `CONTAINER_KINDS` in `src/core/types.ts`, read by `src/ui/SidebarBranch.svelte`. A note owns children (K-4) but is a destination rather than navigation, and a task would drown the list outright |
+| T-10 | Sidebar shows the **top-level** `folder` and `note` rows, and nothing deeper | ✅ | `SIDEBAR_KINDS` in `src/core/types.ts`, read by `src/ui/SidebarLinks.svelte`, which renders one level and does not recurse. A task would drown the two kinds that are navigation |
 | T-11 | A ticked row is not in the normal view at all — not in its list, not in the sidebar, not in the caret order, and neither is anything it holds | ✅ | The filter is `resolveTree`'s, beside T-7's: `src/core/tree.ts` drops an own-`done` node from `children`, and one filtered set answers all three. The subtree goes with it because nothing walks *into* a row that is not there — but the flag itself is **not** inherited, so a finished row's own page still shows what is inside it, which is what makes T-12's rows worth opening. `tree.test.ts`, `scripts/ui-smoke.mjs` |
 | T-12 | One Done view lists every finished row and every deleted row, each with the path it sat on | ✅ | `src/core/done.ts` derives both lists; `src/ui/DonePage.svelte` at `#/done`. Each list names the top of its run, never the descendants. A finished row is un-ticked from here and returns to the tree — an ordinary `set done:false`, so it costs no new op. `done.test.ts`, `scripts/ui-smoke.mjs` |
 | T-13 | A deleted row can be restored from the Done view | ✅ | The `restore` op of [§2.2 The op](#22-the-op), added in M3: `src/core/edit.ts` `restore`, offered by `src/ui/DonePage.svelte`. It clears the row's **own** tombstone and nothing else, so a row still under a deleted ancestor stays gone — which is why the Done view lists only the top of a deleted run, and restoring that one brings the whole subtree back with it. `done.test.ts`, `edit.test.ts`, `scripts/ui-smoke.mjs` |
@@ -144,6 +144,18 @@ is drawn as refused and the drop writes nothing.
 A drag is one `move` op, exactly like `Tab` and `Alt-↓` before it. It mints an order key among the target's siblings the
 way every other insertion does (T-2), so two devices dragging into one gap resolve by
 [§5.3 The tiebreak](sync-flow.md#53-the-tiebreak) rather than by anything the drag knows about.
+
+**The sidebar is one level deep, and that is the whole of T-10.** It used to mirror the tree: every container at every
+depth, indented. Two things were wrong with it. A tree that is unlimited in depth (T-1) makes the column unlimited too,
+so the nav entries under it — Search, Done, Merged — go off the bottom of the screen long before the tree itself does;
+and a second drawing of the same nesting is a second place to read it, one of which is always the narrower. What the
+sidebar is for is the way back to the few places worth starting from, and those are top level. Everything below is drawn
+by the tree view, which is the one that can collapse (T-8), filter (A-4) and drag (T-14), and breadcrumbs (T-9) are the
+way back up out of it.
+
+**A note is one of those places and a task is not.** A note is somewhere a person returns to — it holds a body (K-3) and
+may own a checklist (K-4) — so it belongs beside the folders. Tasks are the bulk of a checklist and would bury both
+kinds that are navigation, which is the same argument that kept them out when this row read "containers only".
 
 T-11 filters `children` rather than the rendering, so every edit sees the same rows the user does: `Alt-↓` cannot move a
 row past a hidden one, and `Backspace` on an empty row is not refused by children nobody can see. The cost is that a new
@@ -177,7 +189,7 @@ something.
 
 | ID | Requirement | State | Where |
 | --- | --- | --- | --- |
-| K-1 | A row is one of four kinds: `folder`, `list`, `note` or `task` | ✅ | `src/core/types.ts`. Only a task is checkable; `folder` and `list` are the containers T-10 shows in the sidebar. Kind drives rendering, never structure — any kind may own children |
+| K-1 | A row is one of four kinds: `folder`, `list`, `note` or `task` | ✅ | `src/core/types.ts`. Only a task is checkable; a top-level `folder` or `note` is what T-10 shows in the sidebar. Kind drives rendering, never structure — any kind may own children |
 | K-2 | Tasks render a checkbox; folders/lists/notes render a kind icon | ✅ | `src/ui/Row.svelte`, `src/ui/KindIcon.svelte` |
 | K-3 | A note has a long free-text body with its own full-page editor | ✅ | `src/ui/NodePage.svelte`, `src/ui/NoteBody.svelte` |
 | K-4 | A note can still own checklist children (heading + items pattern) | ✅ | The note's page renders its body and its children; `edit.test.ts` |
@@ -292,8 +304,9 @@ A node id that no longer resolves is not an error state: `#/n/<id>` of a deleted
 page, which tells deletion from absence because T-7 keeps the two distinguishable. A **finished** node resolves normally
 — T-11 hides a row from its parent's page, not from its own — so a row opened from `#/done` gets the page it always had.
 
-Two navigations exist besides the routes: the sidebar (T-10, containers only, and T-11 takes finished ones out of it)
-and breadcrumbs (T-9). Both climb the T-6-resolved parent, never the stored one. `#/done` and `#/search` are permanent
+Two navigations exist besides the routes: the sidebar (T-10, top-level folders and notes, and T-11 takes finished ones
+out of it) and breadcrumbs (T-9). Breadcrumbs climb the T-6-resolved parent, never the stored one, and the sidebar reads
+the same resolved set. `#/done` and `#/search` are permanent
 entries in the sidebar's nav and `#/settings` is a permanent entry in its footer, because a view that appeared only when
 it had something in it would be a view the user could not learn.
 

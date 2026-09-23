@@ -85,8 +85,8 @@ async function main() {
     );
     const sidebar = (await page.locator('[data-testid="sidebar-link"]').allInnerTexts()).map((t) => t.trim());
     check(
-      'the sidebar shows folders and lists only — T-10',
-      sidebar.length === 3 && sidebar.includes('Kitchen') && !sidebar.includes('Trip notes'),
+      'the sidebar shows top-level folders and notes, and nothing deeper — T-10',
+      sidebar.includes('House') && sidebar.includes('Trip notes') && !sidebar.includes('Kitchen'),
       sidebar.join(','),
     );
 

@@ -18,11 +18,13 @@ export type Kind = 'folder' | 'list' | 'note' | 'task';
 export const KINDS: readonly Kind[] = ['folder', 'list', 'note', 'task'];
 
 /**
- * T-10. The sidebar shows these and nothing else. A note may own children (K-4),
- * but it is somewhere the user goes rather than somewhere they go *through*, and
- * a task would bury both kinds that are actually navigation.
+ * T-10. The sidebar shows these kinds, at the top level only. It is the way
+ * back to the few places worth starting from rather than a second copy of the
+ * tree: nesting is what the tree view draws, and breadcrumbs (T-9) are the way
+ * back up out of it. A task is left out because tasks are the bulk of a
+ * checklist and would bury the two kinds that are navigation.
  */
-export const CONTAINER_KINDS: readonly Kind[] = ['folder', 'list'];
+export const SIDEBAR_KINDS: readonly Kind[] = ['folder', 'note'];
 
 /**
  * A-2. Four names rather than a number, because D-4 puts this in front of a

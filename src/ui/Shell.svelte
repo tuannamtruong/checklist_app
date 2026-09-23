@@ -6,9 +6,8 @@
   import type { Session } from '../app/Session.svelte';
   import type { Dismissals } from '../app/dismissals.svelte';
   import type { ViewState } from '../app/view-state.svelte';
-  import SidebarBranch from './SidebarBranch.svelte';
+  import SidebarLinks from './SidebarLinks.svelte';
   import { CONFLICTS_HREF, DONE_HREF, SEARCH_HREF, SETTINGS_HREF } from '../app/router.svelte';
-  import { ROOT } from '../core/types';
 
   let {
     session,
@@ -75,12 +74,7 @@
     </div>
 
     <nav class="flex-1 overflow-y-auto p-2" aria-label="Lists">
-      <SidebarBranch
-        {session}
-        parent={ROOT}
-        {currentId}
-        onNavigate={() => view.setDrawer(false)}
-      />
+      <SidebarLinks {session} {currentId} onNavigate={() => view.setDrawer(false)} />
 
       <!-- T-12 and F-5. Both are here even when empty: a view that appeared
            only once it had something in it is a view the user never learns
