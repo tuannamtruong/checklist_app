@@ -19,6 +19,7 @@ Legend:
 | ✅ | done |
 | ◐ | partial |
 | ✗ | not built |
+| ✗ **Withdrawn** | built once and taken out again. The row stays, so the ID is never reused and the reason outlives the code |
 
 Sections marked _Not written yet._ are placeholders: the heading records that the topic is owed, and the content is
 still to be decided.
@@ -145,18 +146,6 @@ A drag is one `move` op, exactly like `Tab` and `Alt-↓` before it. It mints an
 way every other insertion does (T-2), so two devices dragging into one gap resolve by
 [§5.3 The tiebreak](sync-flow.md#53-the-tiebreak) rather than by anything the drag knows about.
 
-**The sidebar is one level deep, and that is the whole of T-10.** It used to mirror the tree: every container at every
-depth, indented. Two things were wrong with it. A tree that is unlimited in depth (T-1) makes the column unlimited too,
-so the nav entries under it — Search, Done, Merged — go off the bottom of the screen long before the tree itself does;
-and a second drawing of the same nesting is a second place to read it, one of which is always the narrower. What the
-sidebar is for is the way back to the few places worth starting from, and those are top level. Everything below is drawn
-by the tree view, which is the one that can collapse (T-8), filter (A-4) and drag (T-14), and breadcrumbs (T-9) are the
-way back up out of it.
-
-**A note is one of those places and a task is not.** A note is somewhere a person returns to — it holds a body (K-3) and
-may own a checklist (K-4) — so it belongs beside the folders. Tasks are the bulk of a checklist and would bury both
-kinds that are navigation, which is the same argument that kept them out when this row read "containers only".
-
 T-11 filters `children` rather than the rendering, so every edit sees the same rows the user does: `Alt-↓` cannot move a
 row past a hidden one, and `Backspace` on an empty row is not refused by children nobody can see. The cost is that a new
 sibling's order key is minted against the visible siblings only, so a finished row un-ticked later lands wherever its
@@ -194,7 +183,7 @@ something.
 | K-3 | A note has a long free-text body with its own full-page editor | ✅ | `src/ui/NodePage.svelte`, `src/ui/NoteBody.svelte` |
 | K-4 | A note can still own checklist children (heading + items pattern) | ✅ | The note's page renders its body and its children; `edit.test.ts` |
 | K-5 | Any row can be converted to any kind after the fact ("Turn into") | ✅ | `turnInto` in `src/core/edit.ts`, in the row menu. Two devices converting one row differently resolve by `(at, device id)`, with a notice — [§9 Conflict presentation](#9-conflict-presentation) |
-| K-6 | A note can be promoted to a checklist from its own page | ✅ | `src/ui/NodePage.svelte`; the body is kept, so it is reversible |
+| K-6 | ~~A note can be promoted to a checklist from its own page~~ | ✗ **Withdrawn** | Built in M1 and taken out again: it was a second control for the one op K-5 already offers, and the only one that changed a kind from outside the row menu. Nothing replaces it — `turnInto` is unchanged and the row menu still reaches every kind |
 | K-7 | Note body saves are debounced (1 s) so typing is not one op per keystroke | ✅ | `src/ui/NoteBody.svelte`. The 1 s debounce governs the store; an **op** is emitted on blur, on navigating away, or after 60 s of continuous editing — S-20 |
 | K-8 | Every list page opens with a line where typing a title and pressing Enter makes a **task** at the end of the list, and leaves the line ready for the next one | ✅ | `src/ui/QuickAdd.svelte`, over `createLastChild` with no kind — which is `task`, the default every other creation path already used. `src/ui/NodePage.svelte` gives it the page header, centred and above the breadcrumbs; the other three kinds keep their buttons under the list |
 | K-9 | A paste into that line carrying line breaks makes one row per line, all at the end of the list | ✅ | `src/core/paste.ts` is the only place the split is spelled, `createLastChildren` in `src/core/edit.ts` mints the keys, and `src/ui/QuickAdd.svelte` is the one caller. `paste.test.ts`, `edit.test.ts`, `scripts/ui-smoke.mjs` |
@@ -306,9 +295,9 @@ page, which tells deletion from absence because T-7 keeps the two distinguishabl
 
 Two navigations exist besides the routes: the sidebar (T-10, top-level folders and notes, and T-11 takes finished ones
 out of it) and breadcrumbs (T-9). Breadcrumbs climb the T-6-resolved parent, never the stored one, and the sidebar reads
-the same resolved set. `#/done` and `#/search` are permanent
-entries in the sidebar's nav and `#/settings` is a permanent entry in its footer, because a view that appeared only when
-it had something in it would be a view the user could not learn.
+the same resolved set. `#/done` and `#/search` are permanent entries in the sidebar's nav and `#/settings` is a
+permanent entry in its footer, because a view that appeared only when it had something in it would be a view the user
+could not learn.
 
 `#/conflicts` is the exception to that rule, and deliberately: its entry appears only when there is something in it,
 because a permanent one would be empty almost always — [§9 Conflict presentation](#9-conflict-presentation). It is

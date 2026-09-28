@@ -2,7 +2,7 @@
   // One node's page: its path, its title, its body if it is a note, and its
   // children. The root gets the same page with no node, which is why the tree
   // and the sidebar need no special case for the top level.
-  import { setTitle, turnInto } from '../core/edit';
+  import { setTitle } from '../core/edit';
   import { ROOT, type NodeId, type ParentId } from '../core/types';
   import type { Session } from '../app/Session.svelte';
   import type { ViewState } from '../app/view-state.svelte';
@@ -72,23 +72,12 @@
 
     <TagEditor {session} {id} />
 
+    <!-- K-4. A note's body, and then whatever it owns: the heading is the seam
+         between the two, so a note reads as one page rather than as a body with
+         a stray list under it. Changing what this row *is* is the row menu's
+         (K-5), one level up, and is the only place it ever was — K-6. -->
     {#if node.kind === 'note'}
       <NoteBody {session} {id} />
-      <div>
-        <!-- K-6: a note that has turned into a checklist keeps its body, so the
-             promotion is reversible from the same menu. -->
-        <button
-          type="button"
-          class="rounded-md border border-line px-2.5 py-1.5 text-sm text-ink-muted hover:border-accent hover:text-accent"
-          data-testid="promote-to-list"
-          onclick={() => session.run((tree, ctx) => turnInto(tree, ctx, id, 'list'))}
-        >
-          Promote to checklist
-        </button>
-      </div>
-    {/if}
-
-    {#if node.kind === 'note'}
       <h2 class="mt-2 text-sm font-medium text-ink-muted">Checklist</h2>
     {/if}
   {:else}

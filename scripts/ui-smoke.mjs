@@ -405,6 +405,11 @@ async function main() {
         .includes('Book the ferry'),
     );
     check('breadcrumbs name the path back up — T-9', await page.locator('[data-testid="breadcrumbs"]').isVisible());
+    check(
+      'and the only way to change what a row is, is the row menu — K-5, K-6 withdrawn',
+      (await page.locator('[data-testid="promote-to-list"]').count()) === 0,
+    );
+    await page.screenshot({ path: join(shots, 'note.png'), fullPage: true });
     await page.locator('[data-testid="note-body"]').click();
     await page.keyboard.press('End');
     await page.keyboard.type('\nTickets printed.');
