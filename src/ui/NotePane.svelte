@@ -244,7 +244,7 @@
   </div>
 
   <div
-    class="flex min-h-0 flex-1 flex-col gap-4 px-4 pt-1 pb-6 lg:overflow-y-auto
+    class="flex min-h-0 flex-1 flex-col gap-2 px-4 pt-1 pb-6 lg:overflow-y-auto
            {expanded ? 'overflow-y-auto' : 'overflow-hidden'}"
   >
     <PageTitle {session} {id} />

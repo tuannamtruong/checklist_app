@@ -1334,7 +1334,9 @@ A-1's line was taking a whole row of its own directly above them: two rows of fu
 line of the note, on the layout where the note is the point. So they share one row, the controls on the left and the
 tags filling what is left of it, and the note starts a row higher. It is a snippet the pane hands to the body rather
 than a tag line the body knows about, because what belongs in a row beside the controls is the caller's question — a
-page draws A-1's line where it always did.
+page draws A-1's line where it always did. What is left between that row and the field is the space between two lines
+rather than between two sections: the controls belong to the field they act on, and a gap wide enough to read as a break
+said on the way past that they were something else.
 
 **The pane is an editor, and only that — X-31.** The title and its flag, the tags, the body, and K-8's add line as the
 top row. No path, because the left column *is* where the note sits, drawn as the rows it sits among; and none of the

@@ -421,7 +421,7 @@
      empty and the tag line was taking a whole one of its own above them, so
      the two share it — and the caller keeps owning what the line *is*, which
      is why this is a snippet rather than a second component named here. -->
-<div class="mb-2 flex items-center gap-3">
+<div class="mb-1 flex items-center gap-3">
   <div class="shrink-0 gap-1 {preview ? 'hidden lg:flex' : 'flex'}" data-testid="note-controls">
     <button
       type="button"
