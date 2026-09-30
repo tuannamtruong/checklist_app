@@ -4,12 +4,12 @@ History of project's decision. The situation, its options and resolution.
 
 ## 1. Decision log
 
-| Decision | Chosen | Over | 
-| --- | --- | --- | 
-| [Tech stack](#2-tech-stack) | Vite + TypeScript + Svelte, in a browser | Kotlin, Dart, Rust, Go, C#/.NET, React Native; and vanilla ESM, React, Lit | 
+| Decision | Chosen | Over |
+| --- | --- | --- |
+| [Tech stack](#2-tech-stack) | Vite + TypeScript + Svelte, in a browser | Kotlin, Dart, Rust, Go, C#/.NET, React Native; and vanilla ESM, React, Lit |
 | [T-6 Cyclic tree state](sync-flow.md#62-the-repair) | Drop the cycle edge with the oldest `(parentSetAt, device id)` at read time, never written | - non-temporal tiebreak (node id)<br>- Prevention by limitting hierarchy level (flat groups)<br> -pre-defined hierarchy folder->list->item |
-| [Sync data model](#4-sync-data-model) | append-only op log per device | -  whole-tree snapshot per device<br>-  snapshot plus op tail<br>-  one file per node |  
-| [State Management](#3-state-management) | Materialised State Store, reactive views | -  prototype logic, scaled up<br>-  local database, folder as a sync target<br>-  event-driven<br>-  CRDT document | 
+| [Sync data model](#4-sync-data-model) | append-only op log per device | -  whole-tree snapshot per device<br>-  snapshot plus op tail<br>-  one file per node |
+| [State Management](#3-state-management) | Materialised State Store, reactive views | -  prototype logic, scaled up<br>-  local database, folder as a sync target<br>-  event-driven<br>-  CRDT document |
 | [Compaction](#6-compaction) | Drop a device's own superseded ops, in place | -  snapshot plus tail (option C)<br>-  note-body diffing against a checkpoint<br>-  reaping tombstones<br>-  a retention window in days |
 | [Undelete](#7-undelete) | A `restore` op, making `deleted` an ordinary contested field | -  a `set` carrying `deleted: false`<br>-  copying the subtree to a new id<br>-  delete-always-wins precedence |
 | [Device naming](#8-device-naming) | Each device names itself, in its own file's header line | -  a shared `devices.json`<br>-  a `device` op in the log<br>-  names kept only in `localStorage` |
@@ -751,7 +751,7 @@ depends on when it was ticked rather than on when it was due.
 | --- | --- | --- |
 | A | **Nothing new: the tick writes the day the item is next due, into G-2's `day`** — chosen | The two states are one comparison the app already makes — due is `day <= today`, waiting is `day > today` — so R-4's countdown is G-3's rollover with a third question asked of it. `done` is never written, which is what keeps a chore out of T-12's archive and out of T-11's filter for free |
 | B | A `lastTicked` field, with the due day computed from it and the period at render time | A second field for the same fact, and every reader has to do the arithmetic. It also makes "bring it back" (R-6) a write of a date in the past rather than a write of today |
-| C | `done` as usual, plus a job that un-ticks the item when its day comes | A write nobody made, fired by a clock — the thing [requirements.md §7.3 Fixed constraints](requirements.md#73-fixed-constraints) exists to keep out, and §18.2 B already refused for the same reason |
+| C | `done` as usual, plus a job that un-ticks the item when its day comes | A write nobody made, fired by a clock — the thing [requirements.md §7.3 Fixed constraints](requirements.md#73-fixed-constraints) exists to keep out, and [§18.2 What makes the day turn](#182-what-makes-the-day-turn) B already refused for the same reason |
 | D | A new op, `tick`, carrying the period | A fifth op for something four ops already express. The merge, compaction and the conflict rows would each learn a case, and the payload would stop being readable by a build that predates it |
 
 **A is what makes R-5 true by construction.** The next due day is `now + period`, and the day the item was carrying is

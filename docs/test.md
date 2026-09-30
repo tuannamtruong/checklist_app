@@ -273,16 +273,15 @@ so a real browser at 390px is the only thing that can see either.
 Three more claims hang off that same sheet and are checked in the same run, because all three are the breakpoint's
 answers rather than the model's. X-36 is read off one element: the way out sits at a smaller `x` than the add line
 beside it and reads `←` rather than `✕`, which is the whole of "the top left corner" and would fail on either half
-alone. X-37 is two states of one row — the peek draws a `Preview` tag and no controls, the opened sheet draws the
-controls and no tag — and it is asserted at both, since a rule that only ever hid them would pass on a build that had
-lost them. X-38 is driven as a real drag: `pointerdown`, three moves and `pointerup`, because one move would say the
-pointer had never travelled. A swipe down the grip returns the open sheet to exactly the peek's own height, a swipe up
-the peek reaches the same 844 the tap does, and a swipe *down* the peek leaves it peeked — the last one is the check
-that the drag did not fall through to X-22's tap layer, which is the one interaction the two features share.
-`sheet.test.ts` holds what a travel means, so the browser is only asked what the sheet did with it. The motion is the
-fourth: the collapse is sampled once a frame for 400ms and the claim is that one sample landed between the two heights,
-which is a check that does not depend on guessing when to look — reading one height at a fixed instant is what would
-have been flaky.
+alone. X-37 is two states of one row — the peek draws no controls, the opened sheet draws them — and it is asserted at
+both, since a rule that only ever hid them would pass on a build that had lost them. X-38 is driven as a real drag:
+`pointerdown`, three moves and `pointerup`, because one move would say the pointer had never travelled. A swipe down the
+grip returns the open sheet to exactly the peek's own height, a swipe up the peek reaches the same 844 the tap does, and
+a swipe *down* the peek leaves it peeked — the last one is the check that the drag did not fall through to X-22's tap
+layer, which is the one interaction the two features share. `sheet.test.ts` holds what a travel means, so the browser is
+only asked what the sheet did with it. The motion is the fourth: the collapse is sampled once a frame for 400ms and the
+claim is that one sample landed between the two heights, which is a check that does not depend on guessing when to look
+— reading one height at a fixed instant is what would have been flaky.
 
 X-30 is two halves and the unit half carries most of it. `panes.test.ts` is a table over the one derivation — which row
 the pane draws and which list is beside it, given a route and the row the caret is in — and `focus.svelte.test.ts` is

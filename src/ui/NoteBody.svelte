@@ -404,15 +404,9 @@
      row. B-7's pair is these same controls, at the selection.
 
      X-37 is the one place they are not drawn, and it is not an exception to
-     that argument: a peeked sheet cannot be typed into at all. -->
-{#if preview}
-  <!-- X-37. What stands in their place while the sheet is peeked: the word for
-       what the reader is looking at, rather than three controls over text the
-       tap layer above them will not let anyone select. -->
-  <div class="mb-2 flex lg:hidden" data-testid="note-preview-tag">
-    <span class="rounded border border-line px-2 py-1 text-xs text-ink-faint">Preview</span>
-  </div>
-{/if}
+     that argument: a peeked sheet cannot be typed into at all. Nothing stands
+     in their place: the sheet is the preview, and a tag saying so would cost a
+     line of the note to name a state the reader is looking at. -->
 <div class="mb-2 gap-1 {preview ? 'hidden lg:flex' : 'flex'}" data-testid="note-controls">
   <button
     type="button"

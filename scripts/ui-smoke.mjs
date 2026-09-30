@@ -2406,12 +2406,11 @@ async function main() {
     );
 
     // X-37. A peek cannot be typed into — the tap layer above it swallows every
-    // tap — so the row that carries B-4's three controls carries the word for
-    // what the reader is looking at instead.
+    // tap — so B-4's controls are not drawn on it, and nothing is drawn in
+    // their place either.
     check(
-      'a peeked sheet says Preview and draws no format controls — X-37',
-      (await sheet.locator('[data-testid="note-preview-tag"]').isVisible()) &&
-        !(await sheet.locator('[data-testid="note-controls"]').isVisible()),
+      'a peeked sheet draws no format controls — X-37',
+      !(await sheet.locator('[data-testid="note-controls"]').isVisible()),
     );
 
     // The tap that opens it, and the thing it must not do on the way: B-3 keeps
@@ -2433,9 +2432,8 @@ async function main() {
     );
     await page.screenshot({ path: join(shots, 'phone-note-open.png') });
     check(
-      'and an opened one has the controls back and no tag — X-37',
-      (await sheet.locator('[data-testid="note-controls"]').isVisible()) &&
-        (await sheet.locator('[data-testid="note-preview-tag"]').count()) === 0,
+      'and an opened one has the controls back — X-37',
+      await sheet.locator('[data-testid="note-controls"]').isVisible(),
     );
 
     // X-38. The other way in and the only way back: the grip takes a swipe down
