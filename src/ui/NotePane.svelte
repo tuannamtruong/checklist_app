@@ -249,7 +249,9 @@
   >
     <PageTitle {session} {id} />
 
-    <TagEditor {session} {id} />
+    <!-- X-37. A peek shows the tags a row has and never the line for typing
+         one: the tap layer above it would refuse the caret anyway. -->
+    <TagEditor {session} {id} preview={!expanded} />
 
     <!-- X-31. `fill` rather than the page's floor: the pane opened to be
          written in, and a five-line field under half a window of nothing is the

@@ -2409,8 +2409,9 @@ async function main() {
     // tap — so B-4's controls are not drawn on it, and nothing is drawn in
     // their place either.
     check(
-      'a peeked sheet draws no format controls — X-37',
-      !(await sheet.locator('[data-testid="note-controls"]').isVisible()),
+      'a peeked sheet draws no format controls and no tag line — X-37',
+      !(await sheet.locator('[data-testid="note-controls"]').isVisible()) &&
+        !(await sheet.locator('[data-testid="tag-input"]').isVisible()),
     );
 
     // The tap that opens it, and the thing it must not do on the way: B-3 keeps
@@ -2432,8 +2433,9 @@ async function main() {
     );
     await page.screenshot({ path: join(shots, 'phone-note-open.png') });
     check(
-      'and an opened one has the controls back — X-37',
-      await sheet.locator('[data-testid="note-controls"]').isVisible(),
+      'and an opened one has the controls and the tag line back — X-37',
+      (await sheet.locator('[data-testid="note-controls"]').isVisible()) &&
+        (await sheet.locator('[data-testid="tag-input"]').isVisible()),
     );
 
     // X-38. The other way in and the only way back: the grip takes a swipe down

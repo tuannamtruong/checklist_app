@@ -13,11 +13,20 @@
     session,
     id,
     autofocus = false,
+    preview = false,
     onclose,
   }: {
     session: Session;
     id: string;
     autofocus?: boolean;
+    /**
+     * X-37. The peeked sheet, where every tap is swallowed: the input cannot be
+     * typed into, so it is not drawn, and a row with no tags is not drawn at
+     * all — the space goes to the note. Like `NoteBody`'s own flag this is a
+     * `lg:` class rather than a measurement, because the pane above the
+     * breakpoint is a column and is never peeked.
+     */
+    preview?: boolean;
     onclose?: () => void;
   } = $props();
 
@@ -53,7 +62,10 @@
   }
 </script>
 
-<div class="flex flex-wrap items-center gap-1" data-testid="tag-editor">
+<div
+  class="flex-wrap items-center gap-1 {preview && tags.length === 0 ? 'hidden lg:flex' : 'flex'}"
+  data-testid="tag-editor"
+>
   {#each tags as tag (tag)}
     <span
       class="tag-chip flex shrink-0 items-center gap-1 rounded-full border px-1.5 text-xs"
@@ -76,7 +88,9 @@
     <input
       bind:this={input}
       bind:value={draft}
-      class="min-w-24 flex-1 bg-transparent px-1 py-0.5 text-xs outline-none placeholder:text-ink-faint"
+      class="min-w-24 flex-1 bg-transparent px-1 py-0.5 text-xs outline-none placeholder:text-ink-faint {preview
+        ? 'hidden lg:block'
+        : ''}"
       placeholder="Add a tag"
       aria-label="Add a tag"
       data-testid="tag-input"
