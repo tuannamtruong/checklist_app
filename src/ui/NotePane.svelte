@@ -66,9 +66,13 @@
    * X-36. Ordered by the breakpoint rather than by the markup: the header row
    * draws this first, which is the sheet's top left corner, and `lg:order-last`
    * puts it back on the right of the column where a ✕ belongs.
+   *
+   * The arrow is drawn at the size a phone draws a back arrow, and the padding
+   * comes off by what the glyph grew: the target stays the size the thumb
+   * already found, and only the mark in it is easier to see.
    */
   const CLOSE =
-    'row-control relative z-20 shrink-0 rounded px-2 py-1 text-lg leading-none text-ink-faint hover:text-ink lg:order-last lg:text-base';
+    'row-control relative z-20 shrink-0 rounded px-0.5 text-3xl leading-none text-ink-faint hover:text-ink lg:order-last lg:px-2 lg:py-1 lg:text-base';
 
   /**
    * X-38. How far the pointer may travel and still have been a tap. Smaller
