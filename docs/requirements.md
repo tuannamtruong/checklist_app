@@ -991,6 +991,7 @@ to empty, and a dismissal is only for a row the user is content to leave as it l
 | X-37 | A peeked sheet is a **preview**: the body's format controls and the line for typing a tag are not drawn on it, nothing is drawn in their place, and a row with no tags draws no tag line at all. Opening the sheet fully brings all of it back, and above `lg` the pane is never peeked, so it is always there | ✅ | `src/ui/NoteBody.svelte` and `src/ui/TagEditor.svelte` each take `preview`, which `src/ui/NotePane.svelte` passes for as long as the sheet is peeked; the rows are simply absent rather than carrying a word for a state the reader is looking at — X-22, B-4, A-1 |
 | X-38 | The sheet is dragged as well as tapped: a swipe **up** on the peek opens it fully, and a swipe **down** on the open sheet puts it back to the peek. Neither end jumps: the sheet slides between the two heights | ✅ | `src/ui/NotePane.svelte` over pointer events, for the reason T-14 and X-20's grip use them. What a travel *means* is `sheetSwipe` in `src/ui/sheet.ts`, unit-tested there rather than read off the markup; the grip is a button as well, so the collapse is reachable without a pointer, and `.sheet-height` in `src/app.css` is the one line that lets a content height and the viewport's interpolate. `sheet.test.ts`, `scripts/ui-smoke.mjs` |
 | X-39 | A task's body is reached from its own row by one link, drawn on every task: the checkbox holds the slot a folder's and a note's link sits in, so this one sits in the strip right of the title, beside A-1's tags and A-2's flag. It is one shade darker when there is text behind it | ✅ | `src/ui/BodyChip.svelte`, an `<a href="#/n/<id>">` and never a button — it navigates, so Back, a middle click and X-8's deep link all work without the component knowing they exist. On every task rather than only where there is text — [§10.3 A note beside the list](#103-a-note-beside-the-list). `scripts/ui-smoke.mjs` |
+| X-40 | In the note pane the tag line shares the row of the body's format controls, to their right, rather than taking a line of its own between the title and the field | ✅ | `src/ui/NoteBody.svelte` takes the line as a snippet and draws it beside the controls; `src/ui/NotePane.svelte` is its one caller, so a page's own layout is untouched — [§10.3 A note beside the list](#103-a-note-beside-the-list) |
 
 **A phone's top bar holds the add group rather than the application's name — X-27.** The bar existed to carry a `☰` and
 said `Checklist` beside it, which is a thing to read once on an application with one tree in it: every screen it
@@ -1327,6 +1328,13 @@ between; the peek's value is still `auto`, because its height is its content's a
 transition cross that keyword is one declaration, `.sheet-height`, and a browser without it arrives at the other height
 in one frame — which is what the sheet did before there was a gesture at all. The animation is therefore the gesture's
 appearance and never its meaning, and `prefers-reduced-motion` turns it off without turning anything else off.
+
+**The tag line rides with the format controls — X-40.** Four small buttons leave three quarters of their row empty, and
+A-1's line was taking a whole row of its own directly above them: two rows of furniture between the title and the first
+line of the note, on the layout where the note is the point. So they share one row, the controls on the left and the
+tags filling what is left of it, and the note starts a row higher. It is a snippet the pane hands to the body rather
+than a tag line the body knows about, because what belongs in a row beside the controls is the caller's question — a
+page draws A-1's line where it always did.
 
 **The pane is an editor, and only that — X-31.** The title and its flag, the tags, the body, and K-8's add line as the
 top row. No path, because the left column *is* where the note sits, drawn as the rows it sits among; and none of the

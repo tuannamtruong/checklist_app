@@ -30,6 +30,7 @@
     type Span,
     type Splice,
   } from '../core/markup';
+  import type { Snippet } from 'svelte';
   import type { NodeId } from '../core/types';
   import type { Session } from '../app/Session.svelte';
   import { textRect } from './text-rect';
@@ -53,6 +54,7 @@
     compact = false,
     fill = false,
     preview = false,
+    trailing,
   }: {
     session: Session;
     id: NodeId;
@@ -66,6 +68,12 @@
      * means anything at is CSS's question rather than this component's.
      */
     preview?: boolean;
+    /**
+     * X-40. What is drawn beside the format controls, in the room four small
+     * buttons leave in that row. The pane puts A-1's tag line there rather
+     * than on a line of its own between the title and the field.
+     */
+    trailing?: Snippet;
   } = $props();
 
   const floor = $derived(compact ? 'min-h-32' : 'min-h-64');
@@ -406,64 +414,78 @@
      X-37 is the one place they are not drawn, and it is not an exception to
      that argument: a peeked sheet cannot be typed into at all. Nothing stands
      in their place: the sheet is the preview, and a tag saying so would cost a
-     line of the note to name a state the reader is looking at. -->
-<div class="mb-2 gap-1 {preview ? 'hidden lg:flex' : 'flex'}" data-testid="note-controls">
-  <button
-    type="button"
-    class="row-control rounded border border-line px-2 py-1 text-xs font-bold text-ink-muted hover:border-accent hover:text-accent"
-    aria-label="Bold"
-    title="Bold — Ctrl-B"
-    data-testid="mark-bold"
-    onmousedown={keepCaret}
-    onclick={bold}
-  >
-    B
-  </button>
-  <button
-    type="button"
-    class="row-control rounded border border-line px-2 py-1 text-xs font-semibold text-ink-muted hover:border-accent hover:text-accent"
-    class:border-accent={level !== 0}
-    class:text-accent={level !== 0}
-    aria-label="Heading"
-    title="Heading — none, heading, subheading"
-    data-testid="mark-heading"
-    data-level={level}
-    onmousedown={keepCaret}
-    onclick={heading}
-  >
-    {headingLabel}
-  </button>
-  <!-- B-8, B-9. One control for two marks: what it writes is decided by what is
-       selected, which is `toggleCode`'s rule and not this button's. -->
-  <button
-    type="button"
-    class="row-control rounded border border-line px-2 py-1 font-mono text-xs text-ink-muted hover:border-accent hover:text-accent"
-    aria-label="Code"
-    title="Code — a run inside a line, or a box of its own"
-    data-testid="mark-code"
-    onmousedown={keepCaret}
-    onclick={code}
-  >
-    {'</>'}
-  </button>
-  <!-- B-12. The fourth, and the only one whose mark is a block rather than a
-       run: outside a table it writes two columns, inside one it takes the
-       pipes off. It is lit while the caret is in a table, which is the
-       heading control's way of saying which direction it would go. -->
-  <button
-    type="button"
-    class="row-control rounded border border-line px-2 py-1 text-xs text-ink-muted hover:border-accent hover:text-accent"
-    class:border-accent={inTable}
-    class:text-accent={inTable}
-    aria-label="Table"
-    title="Table — two columns, or the pipes off again"
-    data-testid="mark-table"
-    data-in-table={inTable}
-    onmousedown={keepCaret}
-    onclick={table}
-  >
-    ▦
-  </button>
+     line of the note to name a state the reader is looking at.
+
+     X-40 gives the row a passenger: A-1's tag line, handed in as a snippet by
+     whoever has one to put there. Four small controls leave most of a row
+     empty and the tag line was taking a whole one of its own above them, so
+     the two share it — and the caller keeps owning what the line *is*, which
+     is why this is a snippet rather than a second component named here. -->
+<div class="mb-2 flex items-center gap-3">
+  <div class="shrink-0 gap-1 {preview ? 'hidden lg:flex' : 'flex'}" data-testid="note-controls">
+    <button
+      type="button"
+      class="row-control rounded border border-line px-2 py-1 text-xs font-bold text-ink-muted hover:border-accent hover:text-accent"
+      aria-label="Bold"
+      title="Bold — Ctrl-B"
+      data-testid="mark-bold"
+      onmousedown={keepCaret}
+      onclick={bold}
+    >
+      B
+    </button>
+    <button
+      type="button"
+      class="row-control rounded border border-line px-2 py-1 text-xs font-semibold text-ink-muted hover:border-accent hover:text-accent"
+      class:border-accent={level !== 0}
+      class:text-accent={level !== 0}
+      aria-label="Heading"
+      title="Heading — none, heading, subheading"
+      data-testid="mark-heading"
+      data-level={level}
+      onmousedown={keepCaret}
+      onclick={heading}
+    >
+      {headingLabel}
+    </button>
+    <!-- B-8, B-9. One control for two marks: what it writes is decided by what is
+         selected, which is `toggleCode`'s rule and not this button's. -->
+    <button
+      type="button"
+      class="row-control rounded border border-line px-2 py-1 font-mono text-xs text-ink-muted hover:border-accent hover:text-accent"
+      aria-label="Code"
+      title="Code — a run inside a line, or a box of its own"
+      data-testid="mark-code"
+      onmousedown={keepCaret}
+      onclick={code}
+    >
+      {'</>'}
+    </button>
+    <!-- B-12. The fourth, and the only one whose mark is a block rather than a
+         run: outside a table it writes two columns, inside one it takes the
+         pipes off. It is lit while the caret is in a table, which is the
+         heading control's way of saying which direction it would go. -->
+    <button
+      type="button"
+      class="row-control rounded border border-line px-2 py-1 text-xs text-ink-muted hover:border-accent hover:text-accent"
+      class:border-accent={inTable}
+      class:text-accent={inTable}
+      aria-label="Table"
+      title="Table — two columns, or the pipes off again"
+      data-testid="mark-table"
+      data-in-table={inTable}
+      onmousedown={keepCaret}
+      onclick={table}
+    >
+      ▦
+    </button>
+  </div>
+  <!-- X-40. Whatever the caller puts beside them — the pane's tag line. It
+       takes the rest of the row, so a row with many tags wraps inside its own
+       box rather than pushing the controls off the edge. -->
+  {#if trailing}
+    <div class="min-w-0 flex-1">{@render trailing()}</div>
+  {/if}
 </div>
 
 <!-- X-31's `fill` grows this box to the pane's height, and the floor is what

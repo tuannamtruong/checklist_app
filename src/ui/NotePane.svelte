@@ -249,10 +249,6 @@
   >
     <PageTitle {session} {id} />
 
-    <!-- X-37. A peek shows the tags a row has and never the line for typing
-         one: the tap layer above it would refuse the caret anyway. -->
-    <TagEditor {session} {id} preview={!expanded} />
-
     <!-- X-31. `fill` rather than the page's floor: the pane opened to be
          written in, and a five-line field under half a window of nothing is the
          one thing it must not be. On the sheet it changes nothing — there is no
@@ -262,7 +258,17 @@
       <!-- X-37. `preview` for as long as the sheet is peeked: the tap layer
            over it swallows every tap, so a control there is one that cannot be
            used on text that cannot be selected. -->
-      <NoteBody {session} {id} compact fill preview={!expanded} />
+      <NoteBody {session} {id} compact fill preview={!expanded}>
+        {#snippet trailing()}
+          <!-- X-40. A-1's line, beside the format controls rather than on a
+               line of its own: four small buttons leave the rest of that row
+               empty, and the row it used to have is the note instead.
+
+               X-37. A peek shows the tags a row has and never the line for
+               typing one: the tap layer above it would refuse the caret. -->
+          <TagEditor {session} {id} preview={!expanded} />
+        {/snippet}
+      </NoteBody>
     {/if}
   </div>
 
