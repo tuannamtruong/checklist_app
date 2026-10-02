@@ -1137,7 +1137,11 @@ async function main() {
       Math.abs(editingBox.height - bodyBox.height) <= 2,
       `${Math.round(bodyBox.height)} reading, ${Math.round(editingBox.height)} editing`,
     );
-    await body.fill(Array.from({ length: 40 }, (_, i) => `Line ${i + 1}.`).join('\n'));
+    // Headings every few lines, because they are what make the rendered half
+    // taller than the text in the field over it.
+    await body.fill(
+      Array.from({ length: 40 }, (_, i) => (i % 5 === 0 ? `# Part ${i / 5 + 1}` : `Line ${i + 1}.`)).join('\n'),
+    );
     const longBox = await body.boundingBox();
     const scrolls = await body.evaluate((el) => el.scrollHeight > el.clientHeight + 1);
     check(
@@ -1150,18 +1154,24 @@ async function main() {
     // sit frozen while the text scrolled invisibly behind it.
     await pane.locator('[data-testid="page-title"]').click();
     await page.waitForSelector('[data-testid="note-rendered"]');
+    // By proportion, so the field's last line is the view's last line too.
     await body.evaluate((el) => {
-      el.scrollTop = 120;
+      el.scrollTop = el.scrollHeight;
     });
     await page.waitForTimeout(100);
-    const bothBoxes = await pane.evaluate((el) => ({
-      field: el.querySelector('[data-testid="note-body"]').scrollTop,
-      view: el.querySelector('[data-testid="note-rendered"]').scrollTop,
-    }));
+    const bothBoxes = await pane.evaluate((el) => {
+      const left = (box) => box.scrollHeight - box.clientHeight - box.scrollTop;
+      const view = el.querySelector('[data-testid="note-rendered"]');
+      return {
+        field: el.querySelector('[data-testid="note-body"]').scrollTop,
+        view: view.scrollTop,
+        left: left(view),
+      };
+    });
     check(
-      'and the rendered view scrolls with the field over it — X-31, B-3',
-      bothBoxes.field > 0 && Math.abs(bothBoxes.view - bothBoxes.field) <= 1,
-      `field ${Math.round(bothBoxes.field)}, view ${Math.round(bothBoxes.view)}`,
+      'and the rendered view scrolls with the field over it, to its own end — X-31, B-3',
+      bothBoxes.field > 0 && bothBoxes.left <= 1,
+      `field ${Math.round(bothBoxes.field)}, view ${Math.round(bothBoxes.view)}, ${Math.round(bothBoxes.left)}px short`,
     );
     // Put the note back, and *blur* it: a body becomes an op on blur or after
     // K-7's second of quiet, so a restore typed a moment before the pane closes

@@ -171,9 +171,28 @@
    * the one on top, so it is the one the wheel reaches: the rendered view under
    * it is moved to match, or a note longer than the pane would sit frozen while
    * the field scrolled invisibly behind it.
+   *
+   * By proportion rather than by pixel: a heading's size and margins, a code
+   * box and a table all make the rendered half taller than the text it draws,
+   * so a pixel copy stopped short of the end — the field at its last line, the
+   * view a heading or two above it.
    */
   function syncScroll(): void {
-    if (rendered && field) rendered.scrollTop = field.scrollTop;
+    if (!rendered || !field) return;
+    const travel = field.scrollHeight - field.clientHeight;
+    if (travel > 0) {
+      rendered.scrollTop =
+        (field.scrollTop / travel) * (rendered.scrollHeight - rendered.clientHeight);
+    }
+  }
+
+  // The same difference read the other way: a note whose text fits the field
+  // but whose rendered half does not gives the wheel nothing to scroll, so it
+  // is handed to the view directly.
+  function onWheel(event: WheelEvent): void {
+    if (rendered && field && field.scrollHeight <= field.clientHeight) {
+      rendered.scrollTop += event.deltaY;
+    }
   }
 
   // And once more when the rendered half comes back, since the caret leaving
@@ -625,6 +644,7 @@
     onkeydown={onKeyDown}
     onselect={readSelection}
     onscroll={onScroll}
+    onwheel={onWheel}
     onfocus={() => {
       editing = true;
       readSelection();
