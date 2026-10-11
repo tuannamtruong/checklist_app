@@ -197,6 +197,38 @@
     }
   }
 
+  /**
+   * The other direction, for the one scrollbar a reader can see: the view's.
+   * Dragging its thumb scrolls the view, and the field under the next click
+   * has to be at the same place in the text. The 1px is what stops the two
+   * proportions answering each other's rounding.
+   */
+  function syncField(): void {
+    if (!rendered || !field) return;
+    const travel = rendered.scrollHeight - rendered.clientHeight;
+    if (travel <= 0) return;
+    const top = (rendered.scrollTop / travel) * (field.scrollHeight - field.clientHeight);
+    if (Math.abs(top - field.scrollTop) > 1) field.scrollTop = top;
+  }
+
+  /**
+   * The view's scrollbar and its right border, in px. The transparent field is
+   * clipped off that strip so the thumb under it can be grabbed — without the
+   * clip the press focused the field and the note flipped to editing a few
+   * pixels into the drag. A clip rather than a narrower field, because a
+   * narrower field would wrap its lines somewhere else than the view does.
+   */
+  let gutter = $state(0);
+  $effect(() => {
+    const view = rendered;
+    if (!view) return;
+    const observer = new ResizeObserver(() => {
+      gutter = view.offsetWidth - view.clientWidth - view.clientLeft;
+    });
+    observer.observe(view);
+    return () => observer.disconnect();
+  });
+
   // And once more when the rendered half comes back, since the caret leaving
   // mounts a fresh element at the top of a body the reader had scrolled.
   $effect(() => {
@@ -574,6 +606,7 @@
         : floor}"
       aria-hidden="true"
       data-testid="note-rendered"
+      onscroll={syncField}
     >
       {#each blocks as block, index (index)}
         {#if block.kind === 'code'}
@@ -678,6 +711,7 @@
     class:inset-0={!editing}
     class:resize-none={!editing || fill}
     class:opacity-0={!editing}
+    style:clip-path={!editing && gutter > 0 ? `inset(0 ${gutter}px 0 0)` : undefined}
     aria-label="Note body"
     data-testid="note-body"
     oninput={onInput}

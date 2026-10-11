@@ -287,7 +287,10 @@ expression in the class string and never a `class:h-full` beside it, because a `
 when the condition is false whatever the string said — that is what made the field two rows tall the moment the caret
 arrived. And `syncScroll` puts the rendered half under the field's own `scrollTop` on every scroll, because B-3's two
 boxes each have a scrollbar now and the transparent one is on top: the wheel reaches the field, and the view that stays
-put is the one the reader is looking at.
+put is the one the reader is looking at. The one scrollbar a reader can *see* is the view's, though, and the field lay
+over it too, so grabbing the thumb focused the field and flipped to editing a few pixels down. The field is
+`clip-path`ed off the view's scrollbar gutter while it is transparent — clipping hit-testing without moving a line of
+its wrap — and the view's own scroll moves the field back by the same proportion.
 
 **The caret is a second way in, and it moves nothing — X-30.** Putting the caret in the title of a row that has a body
 raises that body in the pane; the route, the history and the left column stay exactly where the reader left them.

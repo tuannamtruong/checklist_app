@@ -2823,6 +2823,43 @@ async function main() {
       await midnight.close();
     }
 
+    // --- the view's scrollbar is dragged, not the field over it — X-31 ------
+    // Its own browser, because headless Chromium draws no scrollbars at all and
+    // this is a question about the one a desktop draws. The field lay over it,
+    // so the press focused the field and the note flipped to editing ~20px in.
+    const barred = await chromium.launch({ headless: true, ignoreDefaultArgs: ['--hide-scrollbars'] });
+    try {
+      const barredContext = await barred.newContext({ viewport: { width: 1280, height: 600 } });
+      await seedInto(barredContext);
+      const bar = await barredContext.newPage();
+      await bar.goto(`${BASE_URL}#/n/n_seed0008`);
+      const barBody = bar.locator('[data-testid="note-body"]');
+      await barBody.fill(Array.from({ length: 30 }, (_, i) => (i % 6 === 0 ? `# Part ${i}` : `Line ${i}.`)).join('\n'));
+      await bar.locator('[data-testid="page-title"]').first().click();
+      await barBody.evaluate((el) => (el.scrollTop = 0));
+      const view = await bar.locator('[data-testid="note-rendered"]').boundingBox();
+      await bar.mouse.move(view.x + view.width - 6, view.y + 20);
+      await bar.mouse.down();
+      await bar.mouse.move(view.x + view.width - 6, view.y + view.height - 2, { steps: 10 });
+      await bar.mouse.up();
+      const dragged = await bar.evaluate(() => {
+        const field = document.querySelector('[data-testid="note-body"]');
+        const box = document.querySelector('[data-testid="note-rendered"]');
+        return {
+          editing: field === document.activeElement,
+          left: box && Math.round(box.scrollHeight - box.clientHeight - box.scrollTop),
+          field: Math.round(field.scrollHeight - field.clientHeight - field.scrollTop),
+        };
+      });
+      check(
+        "dragging the view's scrollbar reaches the end, and the field follows without being focused — X-31",
+        !dragged.editing && dragged.left !== null && dragged.left <= 1 && dragged.field <= 2,
+        JSON.stringify(dragged),
+      );
+    } finally {
+      await barred.close();
+    }
+
     // --- first run, in a browser with nothing in it — architecture.md §4 -----
     // Its own context, because the question is what a device with no folder and
     // no op log does, and the seeded one has both.
