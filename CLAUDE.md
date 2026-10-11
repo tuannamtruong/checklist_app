@@ -196,7 +196,10 @@ becomes `` `inline` ``, a caret or a selection crossing a line break becomes a f
 box takes the fences off; and one `▦` that writes B-12's starter table outside a table and takes the pipes off inside
 one, lit while the caret is in a table. They sit in a row above the field with A-1's tag line beside them (X-40 — a
 snippet the pane hands in, so the four buttons and the tags cost one row rather than two), and **selecting a run of text
-raises the same controls beside the selection** (B-7).
+raises the same controls beside the selection** (B-7). A fifth button in that row, `↶`, is not a mark: it is the field's
+own `execCommand('undo')`, for a phone with no Ctrl-Z (B-13). It can take a control's edit back because every control
+*types* its change — `spliceOf` narrows the new body to the range that changed and `insertText` writes it — and an
+assigned `value` would have emptied the undo stack.
 
 **A list is typed and Enter is the whole of it (B-10).** `- ` or `1. ` opens one; Enter carries the marker onto the next
 line and counts the numbers up, and Enter on an item with nothing in it takes the marker off, which is the way out.

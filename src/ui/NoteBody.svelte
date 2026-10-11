@@ -21,12 +21,14 @@
     parseBody,
     setHeading,
     spliced,
+    spliceOf,
     tableAt,
     tableEnter,
     toggleBold,
     toggleCode,
     toggleTable,
     type Cell,
+    type Edited,
     type Span,
     type Splice,
   } from '../core/markup';
@@ -236,11 +238,20 @@
   }
 
   /**
-   * B-4. A control writes marks into the text and puts the caret back where the
-   * edit left it, so it costs the field's own undo nothing: what a button did,
-   * `Ctrl-Z` undoes, because it is only typing.
+   * B-4, B-13. A control writes marks into the text and puts the caret back
+   * where the edit left it, and it *types* them: `spliceOf` narrows the new body
+   * to the range that changed, so what a button did, `Ctrl-Z` undoes. Assigning
+   * the whole body would empty the field's undo stack instead.
    */
-  async function apply(edit: { text: string; start: number; end: number }): Promise<void> {
+  function apply(edit: Edited): void {
+    if (field && document.activeElement === field) {
+      if (typed(spliceOf(draft, edit.text), edit.start, edit.end)) return;
+    }
+    void assign(edit);
+  }
+
+  /** The edit without the browser's editing stack — no caret to type at, or a browser that refuses. */
+  async function assign(edit: Edited): Promise<void> {
     draft = edit.text;
     onInput();
     await tick();
@@ -260,7 +271,7 @@
 
   function bold(): void {
     if (!field) return;
-    void apply(toggleBold(draft, field.selectionStart, field.selectionEnd));
+    apply(toggleBold(draft, field.selectionStart, field.selectionEnd));
   }
 
   /**
@@ -270,7 +281,7 @@
    */
   function code(): void {
     if (!field) return;
-    void apply(toggleCode(draft, field.selectionStart, field.selectionEnd));
+    apply(toggleCode(draft, field.selectionStart, field.selectionEnd));
   }
 
   /**
@@ -298,13 +309,13 @@
    */
   function table(): void {
     if (!field) return;
-    void apply(toggleTable(draft, field.selectionStart, field.selectionEnd));
+    apply(toggleTable(draft, field.selectionStart, field.selectionEnd));
   }
 
   /** One control, three states — `nextHeading` is the cycle, A-2's flag the precedent. */
   function heading(): void {
     if (!field) return;
-    void apply(setHeading(draft, field.selectionStart, field.selectionEnd, nextHeading(level)));
+    apply(setHeading(draft, field.selectionStart, field.selectionEnd, nextHeading(level)));
   }
 
   function onKeyDown(event: KeyboardEvent): void {
@@ -335,22 +346,38 @@
    * which is the rule B-4's controls follow for the same reason.
    */
   function typeInto(splice: Splice): void {
-    if (!field) return;
-    field.setSelectionRange(splice.from, splice.to);
-    if (document.execCommand('insertText', false, splice.insert)) {
-      // Where the caret goes is said rather than left to the browser: an empty
-      // insert — which is how the list *ends* — leaves Chromium's caret one
-      // short, in front of the newline the line above it ends with, so the next
-      // thing typed lands back on the item that was just closed.
-      const at = splice.caret ?? splice.from + splice.insert.length;
-      field.setSelectionRange(at, at);
-      draft = field.value;
-      onInput();
-      readSelection();
-      return;
-    }
+    const at = splice.caret ?? splice.from + splice.insert.length;
     // A browser that refuses it still gets the marker, and pays one undo step.
-    void apply(spliced(draft, splice));
+    if (!typed(splice, at, at)) void assign(spliced(draft, splice));
+  }
+
+  /**
+   * The splice typed through `insertText`, then the selection put at
+   * `start`..`end`. Where the caret goes is said rather than left to the
+   * browser: an empty insert — which is how a list *ends* — leaves Chromium's
+   * caret one short, in front of the newline the line above it ends with, so
+   * the next thing typed lands back on the item that was just closed.
+   */
+  function typed(splice: Splice, start: number, end: number): boolean {
+    if (!field) return false;
+    field.setSelectionRange(splice.from, splice.to);
+    if (!document.execCommand('insertText', false, splice.insert)) return false;
+    field.setSelectionRange(start, end);
+    draft = field.value;
+    onInput();
+    readSelection();
+    return true;
+  }
+
+  /**
+   * B-13. `Ctrl-Z` on a screen with no Ctrl key: the field's own undo, so it
+   * takes back exactly what the shortcut would. It needs the caret in the
+   * field, which is where the reader is going next anyway.
+   */
+  function undo(): void {
+    if (!field) return;
+    field.focus();
+    document.execCommand('undo');
   }
 
   /**
@@ -497,6 +524,19 @@
       onclick={table}
     >
       ▦
+    </button>
+    <!-- B-13. Not a mark: the field's own undo, for a phone that has no
+         Ctrl-Z. It takes back typing and a control's edit alike. -->
+    <button
+      type="button"
+      class="row-control rounded border border-line px-2 py-1 text-xs text-ink-muted hover:border-accent hover:text-accent"
+      aria-label="Undo"
+      title="Undo — Ctrl-Z"
+      data-testid="body-undo"
+      onmousedown={keepCaret}
+      onclick={undo}
+    >
+      ↶
     </button>
   </div>
   <!-- X-40. Whatever the caller puts beside them — the pane's tag line. It

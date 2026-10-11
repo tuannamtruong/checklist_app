@@ -480,6 +480,7 @@ over.
 | B-9 | And a run of code inside a line: one backtick each side | ✅ | `spansOf` in `src/core/markup.ts`. The same control writes it: `toggleCode` reads the selection to decide which of the two marks it means |
 | B-11 | `**bold**` reads inside code, in the box and in an inline run | ✅ | `boldRuns` in `src/core/markup.ts`, called by both code paths, so a code span carries `bold` like any other span; `src/ui/NoteBody.svelte` draws it as `<strong>` inside the `<code>` |
 | B-12 | A line fenced by a pipe at each end is a row of a table, consecutive rows are one table, and it draws with its columns lined up. A line of dashes under the first row makes that row the header, Enter opens the next row with the same cells in it, and one control writes a starter table and takes the pipes off again | ✅ | `TABLE_ROW`, `parseBody`, `tableEnter` and `toggleTable` in `src/core/markup.ts`, drawn by `src/ui/NoteBody.svelte`; `markup.test.ts`. The second construct that spans lines, and the first that spans them without a mark saying where it ends: the table is over when the pipes are |
+| B-13 | Every change to a body is undone by the field's own undo — typing, a mark a control wrote, a marker Enter wrote — and an on-screen `↶` control does what `Ctrl-Z` does | ✅ | `spliceOf` in `src/core/markup.ts` turns a control's edit into the one range it changed, which `src/ui/NoteBody.svelte` types in with `insertText`; the `↶` button is `execCommand('undo')` on the same field. A phone has no Ctrl key — B-4's argument for its buttons, applied to the undo that takes them back |
 
 **The marks live in the body, and that is the whole design.** `body` stays a string, so every rule already written about
 it still holds without a word changed: one field, last-writer-wins, a conflict row when two devices raced (C-4), a whole
@@ -534,9 +535,12 @@ because it is a second presentation of a value the field beneath it already carr
 textarea, which holds the text itself, and one value announced twice is one value too many.
 
 **A control writes marks and nothing else, which is what makes them undoable.** `Ctrl-B` and the two buttons produce
-exactly the characters a person could have typed, so the field's own undo reverses them — there is no editing state to
-keep in step. A button must not take the focus while it does that, or the blur would commit the body and move the caret
-out of the text the button is about to edit.
+exactly the characters a person could have typed, and they are *typed*: `spliceOf` narrows the edit to the one range it
+changed and the field takes it through `insertText`, so the field's own undo reverses them — there is no editing state
+to keep in step. Assigning the new value instead was the first cut, and it emptied Chromium's undo stack on every click,
+so `Ctrl-Z` after a bold took back nothing at all (B-13). An edit made while the caret is elsewhere is still assigned,
+since there is no focused field to type into, and it commits its own op. A button must not take the focus while it does
+that, or the blur would commit the body and move the caret out of the text the button is about to edit.
 
 **Four controls for eight marks, and B-10 has none of them.** A list is *typed* — `- ` or `1. ` are two characters
 anywhere there is a keyboard, which is the reach a control exists to give — and what a control would have to add is a

@@ -1553,6 +1553,18 @@ async function main() {
       cycled === '2' && (await headingButton.getAttribute('data-level')) === '0',
       `${cycled} then ${await headingButton.getAttribute('data-level')}`,
     );
+    // B-13. A control's edit is typed, so the field's own undo takes it back —
+    // and `↶` is that undo for a screen with no Ctrl key. Redo puts it back so
+    // the checks below see the body they expect.
+    const lastLine = async () => (await page.locator('[data-testid="note-body"]').inputValue()).split('\n').at(-1);
+    await page.locator('[data-testid="body-undo"]').click();
+    const undone = await lastLine();
+    await page.keyboard.press('Control+Shift+z');
+    check(
+      'the undo control takes back what a format control wrote — B-13',
+      undone.startsWith('## ') && !(await lastLine()).startsWith('#'),
+      `${undone} then ${await lastLine()}`,
+    );
     await pane.locator('[data-testid="page-title"]').click();
     await page.waitForSelector('[data-testid="note-rendered"]');
     check(

@@ -9,6 +9,7 @@ import {
   tableAt,
   tableEnter,
   spliced,
+  spliceOf,
   toggleBold,
   toggleCode,
   toggleTable,
@@ -493,5 +494,22 @@ describe('toggleTable — B-12', () => {
     expect(tableAt('| a | b |', 3)).toBe(true);
     expect(tableAt('plain\n| a | b |', 3)).toBe(false);
     expect(tableAt('```\n| a | b |\n```', 6)).toBe(false);
+  });
+});
+
+describe('spliceOf — B-13', () => {
+  it('is the one range a control changed, and applying it gives the control\'s body back', () => {
+    const before = 'Pack the boots';
+    const after = toggleBold(before, 9, 14).text;
+    expect(spliceOf(before, after)).toEqual({ from: 9, to: 14, insert: '**boots**' });
+    for (const [a, b] of [
+      [before, after],
+      [after, before],
+      ['aaa', 'aa'],
+      ['', 'x'],
+      ['same', 'same'],
+    ] as const) {
+      expect(spliced(a, spliceOf(a, b)).text).toBe(b);
+    }
   });
 });

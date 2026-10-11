@@ -859,6 +859,26 @@ export function tableEnter(text: string, start: number, end: number): Splice | n
   };
 }
 
+/**
+ * B-13. The one range `before` and `after` differ in — the common head and
+ * tail are left out. A control returns a whole body, and a whole body assigned
+ * to the field empties its undo stack; this splice is what is typed instead, so
+ * `Ctrl-Z` takes the control's edit back like any other typing.
+ */
+export function spliceOf(before: string, after: string): Splice {
+  let from = 0;
+  while (from < before.length && from < after.length && before[from] === after[from]) from += 1;
+  let tail = 0;
+  while (
+    tail < before.length - from &&
+    tail < after.length - from &&
+    before[before.length - 1 - tail] === after[after.length - 1 - tail]
+  ) {
+    tail += 1;
+  }
+  return { from, to: before.length - tail, insert: after.slice(from, after.length - tail) };
+}
+
 /** The splice applied, for a field that cannot be typed into — and for the tests. */
 export function spliced(text: string, splice: Splice): Edited {
   const at = splice.caret ?? splice.from + splice.insert.length;
