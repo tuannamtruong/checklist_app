@@ -73,6 +73,20 @@ describe('creating rows', () => {
     expect(childrenOf(session.tree, ROOT)).toEqual([a, ops[0]!.id, b, c]);
   });
 
+  it('gives a new sibling the kind of the row it came from — §3.1', () => {
+    const [a] = threeRows();
+    ctx.tick();
+    session.apply(turnInto(session.tree, ctx, a, 'note'));
+    ctx.tick();
+    const ops = createSiblingBelow(session.tree, ctx, a);
+    session.apply(ops);
+    expect(session.tree.nodes[ops[0]!.id]!.kind).toBe('note');
+    ctx.tick();
+    const asked = createSiblingBelow(session.tree, ctx, a, { kind: 'folder' });
+    session.apply(asked);
+    expect(session.tree.nodes[asked[0]!.id]!.kind).toBe('folder');
+  });
+
   it('puts Enter-on-a-parent at the top of its children', () => {
     const [a] = threeRows();
     ctx.tick();

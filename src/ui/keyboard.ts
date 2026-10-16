@@ -46,7 +46,7 @@ export interface KeyHelp {
 }
 
 export const KEY_HELP: readonly KeyHelp[] = [
-  { keys: 'Enter', label: 'New row below', action: 'new-below' },
+  { keys: 'Enter', label: 'New row below, of the same kind', action: 'new-below' },
   { keys: 'Enter on an open parent', label: 'New row inside it', action: 'new-inside' },
   { keys: 'Tab', label: 'Indent, under the row above', action: 'indent' },
   { keys: 'Shift-Tab', label: 'Outdent, out to the grandparent', action: 'outdent' },

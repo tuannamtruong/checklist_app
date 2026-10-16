@@ -1470,6 +1470,19 @@ async function main() {
       await turned.getAttribute('data-kind'),
     );
 
+    // §3.1: Enter carries the row's kind on, so a note's Enter is a note.
+    await turned.locator('[data-testid="title"]').click();
+    await page.keyboard.press('End');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(100);
+    const enterKind = await page.evaluate(
+      () => document.activeElement?.closest('[data-testid="row"]')?.dataset.kind,
+    );
+    check('Enter on a note makes a note below it — §3.1', enterKind === 'note', enterKind);
+    // Named rather than deleted: a delete would put a row in T-12's archive,
+    // which a later check counts.
+    await page.keyboard.type('Freezer inventory');
+
     await page.goto(`${BASE_URL}#/n/n_seed0012`);
     await page.waitForSelector('[data-testid="note-pane"]');
 

@@ -212,12 +212,17 @@ menu renders.
 
 | Key | Behaviour | Where |
 | --- | --- | --- |
-| `Enter` | New sibling below — or a **first child** if the row is an expanded parent | ✅ `new-below` / `new-inside` |
+| `Enter` | New sibling below, **of the row's own kind** — or a **first child** if the row is an expanded parent | ✅ `new-below` / `new-inside`; the kind is `createSiblingBelow`'s default in `src/core/edit.ts` — `edit.test.ts` |
 | `Tab` / `Shift-Tab` | Indent / outdent | ✅ `indent` / `outdent` |
 | `Alt-↑` / `Alt-↓` | Move among siblings | ✅ `move-up` / `move-down` |
 | `↑` / `↓` | Move the caret between rows | ✅ over the flattened visible rows, `src/ui/rows.ts` |
 | `Backspace` on an empty row | Delete it — **refused if it has children** | ✅ `canBackspaceDelete`, against the typed title |
 | `Escape` | Discard the in-progress title edit | ✅ the row's draft, never a written op |
+
+**`Enter` carries the kind on.** A note's `Enter` makes a note and a folder's a folder, so a run of one kind is typed as
+that kind rather than as tasks to be turned one by one. The first child an expanded parent's `Enter` makes is still a
+task: what goes inside a row is K-4's checklist, not more of the row. The row menu's "New row below" is the same action
+and does the same.
 
 **The keys are written down in one place, and it is the settings screen — X-33.** `KEY_HELP` in `src/ui/keyboard.ts` is
 that list: every editing binding above in the words a person reads, beside the bindings themselves, so the reference

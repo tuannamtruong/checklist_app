@@ -98,7 +98,11 @@ export interface CreateOptions {
   every?: string | null;
 }
 
-/** A new row directly below `id`, among its siblings — `Enter` on a leaf row. */
+/**
+ * A new row directly below `id`, among its siblings — `Enter` on a leaf row.
+ * It is the kind `id` is unless asked otherwise: a run of notes is typed as
+ * notes, exactly as a run of tasks always was — §3.1.
+ */
 export function createSiblingBelow(
   tree: ResolvedTree,
   ctx: EditContext,
@@ -109,7 +113,10 @@ export function createSiblingBelow(
   const siblings = siblingNodes(tree, parent);
   const index = siblings.findIndex((node) => node.id === id);
   if (index === -1) return [];
-  return createAt(ctx, parent, keyAfter(siblings, index), options);
+  return createAt(ctx, parent, keyAfter(siblings, index), {
+    kind: siblings[index]!.kind,
+    ...options,
+  });
 }
 
 /** `Enter` on an expanded parent means the user is filling it, not following it. */
