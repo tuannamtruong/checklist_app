@@ -254,6 +254,7 @@ reaches it. `KEY_BOUND_ACTIONS` stays the list of *row* actions, which is what m
 | K-10 | The line and the two kind buttons are one group, at the top of the list rather than an input above it and buttons under it | ✅ | `src/ui/QuickAdd.svelte` draws all three and owns the one draft between them; `src/ui/NodePage.svelte` puts the group in the page header and `src/ui/NotePane.svelte` in the pane's top row — X-31. `src/ui/TreeView.svelte` draws rows and nothing else. Pinned there rather than scrolling with the list — X-26 |
 | K-11 | Whatever is typed in the line is the title of the row a kind button makes: a title and `+ Note` is one **note** carrying it, rather than a task and an untitled note | ✅ | `addKind` in `src/ui/QuickAdd.svelte` — the `createLastChild` the line already calls, with the kind named. An empty line still makes an untitled row and hands it the caret. `scripts/ui-smoke.mjs` |
 | K-12 | A **task** carries a body too, and it is the note's: the same field, the same editor, the same marks | ✅ | `hasBody` in `src/core/types.ts` is the one place the two kinds are named and `src/core/materialise.ts` is its only caller — a `create` of either kind opens with `''`, and a `set kind` into either gives the row a body to open on without touching what is already there, so K-5 stays reversible. Where it is drawn is X-21's pane, reached by X-39's chip or by X-30's caret. `materialise.test.ts`, `panes.test.ts` |
+| K-13 | A task row carries one button that turns it into a note, and no row carries the way back: a note becomes a task through K-5's menu, as every other kind change does | ✅ | `src/ui/Row.svelte`, beside X-39's chip, over the same `turnInto` K-5 writes. Drawn while the row is hovered or holds the caret, and not in Timely, which holds tasks and nothing else — R-1. `scripts/ui-smoke.mjs` |
 
 **There were four kinds and there are three — `list` is gone.** Three kinds are three answers to three different
 questions: something that holds things, something that holds text, something that gets ticked. `list` answered none of
@@ -270,6 +271,12 @@ so that turning back restores the tick — which is also why T-11's filter reads
 op, the same `src/ui/NoteBody.svelte` with B-1 to B-11 in it, the same K-7 debounce and the same S-20 op timing.
 [past_decision.md §21 A task's body](past_decision.md#21-a-tasks-body) says why it is that field rather than a second
 one.
+
+**A task that turned out to be a note is one click — K-13.** A line typed into K-8's add line is a task, and the line
+that was really a heading or a paragraph is common enough to deserve a button rather than a menu. It goes one way only:
+a note turned into a task is rare, and K-5's menu already reaches it, so a second button would be a control on every
+note for an edit almost nobody makes. The button is the row menu's own `turnInto`, so nothing about the op or its
+conflict row is new.
 
 **Only a folder has none.** A folder is a place rather than a thing and its page already draws what is inside it; a body
 there would be a note that is also a list, which is the distinction the three kinds exist to make. So `hasBody` names

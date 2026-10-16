@@ -5,7 +5,7 @@
   // The title in the input is a draft, not the node's title. An op is emitted
   // when the edit is committed, so a rename costs one write rather than one per
   // keystroke — and Escape can put the row back without ever having written.
-  import { canDrop, dropOnto, setTitle, tickTimely, toggleDone } from '../core/edit';
+  import { canDrop, dropOnto, setTitle, tickTimely, toggleDone, turnInto } from '../core/edit';
   import { childrenOf, rootOf } from '../core/tree';
   import { isDue } from '../core/timely';
   import { TIMELY, type NodeId } from '../core/types';
@@ -268,6 +268,22 @@
          its checkbox — requirements.md §10.3. -->
     {#if node.kind === 'task'}
       <BodyChip {id} title={node.title} filled={(node.body ?? '') !== ''} />
+      <!-- K-13. One way only: a task that turned out to be a note is common, and
+           the way back is K-5's menu like every other kind change. Not in
+           Timely, which holds tasks and nothing else — R-1. Drawn while the row
+           is hovered or holds the caret, which a tap on a phone gives too. -->
+      {#if !inTimely}
+        <button
+          type="button"
+          class="row-control row-icon shrink-0 text-ink-faint opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 hover:text-accent focus-visible:opacity-100"
+          aria-label="Turn {node.title || 'untitled'} into a note"
+          title="Turn into note"
+          data-testid="to-note"
+          onclick={() => session.run((tree, c) => turnInto(tree, c, id, 'note'))}
+        >
+          <KindIcon kind="note" class="size-[1rem]" />
+        </button>
+      {/if}
     {/if}
 
     <!-- A-1 and A-2, right of the title: what the row is for, after what it is. -->

@@ -1455,6 +1455,21 @@ async function main() {
     );
     await page.screenshot({ path: join(shots, 'task-body.png'), fullPage: true });
 
+    // --- K-13: a task is one click from a note, and not back ----------------
+    await listAdd(page, 'quick-add').fill('Fridge inventory');
+    await listAdd(page, 'quick-add').press('Enter');
+    const fridge = await rowByTitle(page, 'Fridge inventory');
+    await fridge.hover();
+    await fridge.locator('[data-testid="to-note"]').click();
+    await page.waitForTimeout(100);
+    const turned = await rowByTitle(page, 'Fridge inventory');
+    check(
+      'a task turns into a note from its own row, and a note carries no button back — K-13',
+      (await turned.getAttribute('data-kind')) === 'note' &&
+        (await turned.locator('[data-testid="to-note"]').count()) === 0,
+      await turned.getAttribute('data-kind'),
+    );
+
     await page.goto(`${BASE_URL}#/n/n_seed0012`);
     await page.waitForSelector('[data-testid="note-pane"]');
 
