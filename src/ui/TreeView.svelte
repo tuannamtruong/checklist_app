@@ -19,6 +19,7 @@
     parent,
     now,
     only = null,
+    open = null,
   }: {
     session: Session;
     view: ViewState;
@@ -40,6 +41,8 @@
      * Nothing narrows the tree now but the day — §4.2.
      */
     only?: ReadonlySet<NodeId> | null;
+    /** X-41. The row whose body is open in the pane, which its row says. */
+    open?: NodeId | null;
   } = $props();
 
   // T-14. One drag at a time, and it belongs to the list being dragged within:
@@ -53,7 +56,7 @@
 
 <div class="flex flex-col" data-testid="tree">
   {#each rows as row (row.id)}
-    <Row ctx={{ session, view, focus, rows, now, id: row.id }} depth={row.depth} {drag} />
+    <Row ctx={{ session, view, focus, rows, now, id: row.id }} depth={row.depth} {drag} open={row.id === open} />
   {/each}
 </div>
 

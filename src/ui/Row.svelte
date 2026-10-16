@@ -23,7 +23,18 @@
   import { nodeHref } from '../app/router.svelte';
   import type { RowDrag } from './drag.svelte';
 
-  let { ctx, depth, drag }: { ctx: RowActionContext; depth: number; drag: RowDrag } = $props();
+  let {
+    ctx,
+    depth,
+    drag,
+    open = false,
+  }: {
+    ctx: RowActionContext;
+    depth: number;
+    drag: RowDrag;
+    /** X-41. Whether this row's body is the one the pane draws. */
+    open?: boolean;
+  } = $props();
 
   const id: NodeId = $derived(ctx.id);
   const session = $derived(ctx.session);
@@ -161,11 +172,13 @@
 
 {#if node}
   <div
-    class="group flex items-center gap-1 rounded-md border-y-2 border-transparent pr-1 hover:bg-surface-sunken"
+    class="group flex items-center gap-1 rounded-md border-y-2 border-transparent pr-1 {open
+      ? ''
+      : 'hover:bg-surface-sunken focus-within:bg-surface-sunken'}"
     class:opacity-50={drag.id === id || waiting}
     class:border-t-accent={drop?.where === 'before' && !refused}
     class:border-b-accent={drop?.where === 'after' && !refused}
-    class:bg-accent-soft={drop?.where === 'inside' && !refused}
+    class:bg-accent-soft={(drop?.where === 'inside' && !refused) || open}
     class:outline-2={refused}
     class:outline-danger={refused}
     data-testid="row"
@@ -176,6 +189,7 @@
     data-drop-refused={refused}
     data-dragging={drag.id === id}
     data-waiting={waiting}
+    data-open={open}
     role="group"
     aria-label={node.title || 'Untitled'}
     onpointerdown={onRowPointerDown}

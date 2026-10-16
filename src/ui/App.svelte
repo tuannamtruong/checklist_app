@@ -282,7 +282,7 @@
            the last rows out from under the peeked sheet — §10.3. -->
       <div class="flex flex-col lg:flex-row lg:items-start">
         <div class="min-w-0 flex-1 {noteId !== null && !panes.fromCaret ? 'pb-[60dvh] lg:pb-0' : ''}">
-          <NodePage {session} {view} {focus} id={listId} {now} />
+          <NodePage {session} {view} {focus} id={listId} {now} open={noteId} />
         </div>
         {#if noteId !== null}
           <!-- X-30. The ✕ is the only thing that differs by how the pane was

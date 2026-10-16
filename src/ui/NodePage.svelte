@@ -24,6 +24,7 @@
     focus,
     id,
     now,
+    open = null,
   }: {
     session: Session;
     view: ViewState;
@@ -31,6 +32,8 @@
     id: NodeId | null;
     /** Handed down to the rows, which is where a day is asked about — TreeView. */
     now: number;
+    /** X-41. The row whose body the pane beside this page draws. */
+    open?: NodeId | null;
   } = $props();
 
   const node = $derived(id === null ? null : session.tree.nodes[id]);
@@ -79,5 +82,5 @@
     <h1 class="text-2xl font-semibold" data-testid="page-title">All</h1>
   {/if}
 
-  <TreeView {session} {view} {focus} {parent} {now} />
+  <TreeView {session} {view} {focus} {parent} {now} {open} />
 </div>

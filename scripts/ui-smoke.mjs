@@ -1440,6 +1440,19 @@ async function main() {
       `${chipOpened.list} | ${chipOpened.note} | ${chipOpened.hash}`,
     );
 
+    // X-41: the row whose body is open is marked in the list, and only it.
+    const openRows = await page.evaluate(() =>
+      [...document.querySelectorAll('[data-testid="row"][data-open="true"]')].map(
+        (row) => row.querySelector('[data-testid="title"]').value,
+      ),
+    );
+    check(
+      'the row whose body is open is the one marked in the list — X-41',
+      openRows.length === 1 && openRows[0] === 'Descale the kettle',
+      openRows.join('|'),
+    );
+    await page.screenshot({ path: join(shots, 'open-row.png') });
+
     // The same editor, in the same pane: what is typed here is one `set body`
     // on a task — K-12 — and the chip on the row behind it says so.
     await page.locator('[data-testid="note-pane"] [data-testid="note-body"]').click();
