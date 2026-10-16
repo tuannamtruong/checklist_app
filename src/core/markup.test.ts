@@ -494,6 +494,18 @@ describe('cell breaks — B-15', () => {
   });
 });
 
+describe('escaped pipes — B-16', () => {
+  it('reads \\| as a pipe inside its cell rather than the edge of one', () => {
+    const [block] = parseBody('| a \\| b | c |');
+    expect(block!.table!.rows[0]!.cells.map((cell) => cell.spans[0]!.text)).toEqual(['a | b', 'c']);
+    expect(plainText('| a \\| b | c |')).toBe('a | b c');
+  });
+
+  it('does not close a row with one', () => {
+    expect(parseBody('| a \\|')[0]!.kind).toBe('paragraph');
+  });
+});
+
 describe('toggleTable — B-12', () => {
   it('writes a starter table on an empty line, with the caret in the first cell', () => {
     const made = toggleTable('Ferry\n\nafter', 6, 6);

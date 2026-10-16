@@ -225,11 +225,11 @@ end is a row, consecutive rows are one table, and `| --- | --- |` directly under
 alignment colons read and drawn with nothing, which is the fence's language word again. It is the first construct with
 no mark saying where it *ends*: every line is read on its own and the table stops at the first line that is not a row,
 so a table being typed can never swallow the note under it. A cell is a line's worth of marks — bold and an inline run
-read in one, `# ` and `- ` are characters — and `<br>` is the one line break a cell can hold (B-15). Nothing pads the
-string: the columns are the renderer's, which is what keeps B-3's promise that the field holds what was typed.
-`tableEnter` is Enter's whole part in it, and it never splits a row — it opens the next one with the same cells under
-the line, and takes a row with nothing in it off. `toggleTable` is the `▦` control: a starter table outside one, the
-pipes off inside one, and `tableAt` is what lights the button.
+read in one, `# ` and `- ` are characters — and `<br>` is the one line break a cell can hold (B-15) and `\|` a pipe
+inside one (B-16). Nothing pads the string: the columns are the renderer's, which is what keeps B-3's promise that the
+field holds what was typed. `tableEnter` is Enter's whole part in it, and it never splits a row — it opens the next one
+with the same cells under the line, and takes a row with nothing in it off. `toggleTable` is the `▦` control: a starter
+table outside one, the pipes off inside one, and `tableAt` is what lights the button.
 
 `src/ui/NoteBody.svelte` holds one textarea that is never unmounted. When the caret is elsewhere it lies transparent
 over the rendered blocks, so the click that reaches it is the click that focuses it; swapping two elements would drop

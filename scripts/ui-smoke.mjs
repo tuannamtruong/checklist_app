@@ -1794,11 +1794,11 @@ async function main() {
     // opens `3. ` is an item whatever else is typed on it.
     await page.keyboard.press('Enter');
     await page.keyboard.press('Enter');
-    await page.keyboard.type('| Day | Ferry |');
+    await page.keyboard.type('| Day | Ferry \\| bus |');
     await page.keyboard.press('Enter');
     check(
       'Enter opens the next row with the cells the row had — B-12',
-      (await codeField.inputValue()).endsWith('| Day | Ferry |\n|  |  |'),
+      (await codeField.inputValue()).endsWith('| Day | Ferry \\| bus |\n|  |  |'),
       (await codeField.inputValue()).split('\n').slice(-2).join(' / '),
     );
     // The caret is left between the two spaces of the first cell, so the row is
@@ -1813,7 +1813,7 @@ async function main() {
     check(
       'and the caret lands in the first cell, so the row is typed straight in — B-12',
       (await codeField.inputValue()).endsWith(
-        '| Day | Ferry |\n| --- | --- |\n| Mon | 07:40<br>08:10 |',
+        '| Day | Ferry \\| bus |\n| --- | --- |\n| Mon | 07:40<br>08:10 |',
       ),
       (await codeField.inputValue()).split('\n').slice(-3).join(' / '),
     );
@@ -1822,9 +1822,9 @@ async function main() {
     await page.waitForSelector('[data-testid="note-rendered"]');
     const table = noteView.locator('[data-testid="table-block"]');
     check(
-      'the rows draw as one table, with the dashes taken as its header and <br> as a line break in a cell — B-12, B-15',
+      'the rows draw as one table, with the dashes taken as its header, <br> as a line break in a cell and \\| as a pipe — B-12, B-15, B-16',
       (await table.count()) === 1 &&
-        (await table.locator('th').allInnerTexts()).join('/') === 'Day/Ferry' &&
+        (await table.locator('th').allInnerTexts()).join('/') === 'Day/Ferry | bus' &&
         (await table.locator('tbody td').allInnerTexts()).join('/') === 'Mon/07:40\n08:10',
       `${await table.count()} tables, ${(await table.locator('th').allInnerTexts()).join('/')}`,
     );

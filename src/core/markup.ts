@@ -54,6 +54,9 @@ const TABLE_RULE = /^:?-+:?$/;
  */
 const CELL_BREAK = /<br\s*\/?>/gi;
 
+/** B-16. A pipe inside a cell, which the bare one would cut in two. */
+const ESCAPED_PIPE = '\\|';
+
 /** B-12. What Enter opens: a cell with room to type in, and a caret between the two spaces. */
 const EMPTY_CELL = '  |';
 
@@ -168,10 +171,10 @@ export function parseBody(body: string): Block[] {
   return blocks;
 }
 
-/** B-12. A line fenced by pipes, whatever it carries between them. */
+/** B-12. A line fenced by pipes, whatever it carries between them — and B-16's `\|` fences nothing. */
 function isTableRow(line: string): boolean {
   const bare = line.trimEnd();
-  return bare.length > 1 && TABLE_ROW.test(bare);
+  return bare.length > 1 && TABLE_ROW.test(bare) && !bare.endsWith(ESCAPED_PIPE);
 }
 
 /** The line after the last row of the table opened at `from`. */
@@ -183,14 +186,15 @@ function tableEnd(lines: readonly string[], from: number): number {
 
 /**
  * B-12. The cells of one row: the text between the pipes, each trimmed, because
- * the pipes a person lines up are spaces they do not mean.
+ * the pipes a person lines up are spaces they do not mean. B-16: a pipe behind
+ * a backslash is a character in its cell rather than the edge of one.
  */
 function cellsOf(line: string): string[] {
   const bare = line.trimEnd();
   return bare
     .slice(1, -1)
-    .split('|')
-    .map((cell) => cell.trim());
+    .split(/(?<!\\)\|/)
+    .map((cell) => cell.replaceAll(ESCAPED_PIPE, '|').trim());
 }
 
 /** B-12. Whether the line is the dashes that make the row above it the header. */

@@ -495,6 +495,7 @@ over.
 | B-13 | Every change to a body is undone by the field's own undo — typing, a mark a control wrote, a marker Enter wrote — and an on-screen `↶` control does what `Ctrl-Z` does | ✅ | `spliceOf` in `src/core/markup.ts` turns a control's edit into the one range it changed, which `src/ui/NoteBody.svelte` types in with `insertText`; the `↶` button is `execCommand('undo')` on the same field. A phone has no Ctrl key — B-4's argument for its buttons, applied to the undo that takes them back |
 | B-14 | Lines already written become a list from the selection: two more controls beside it make every filled line it touches a bulleted or a numbered item, counted down the run, and pressed again on a run that already is one they take the markers off | ✅ | `toggleList` in `src/core/markup.ts`, drawn by B-7's controls in `src/ui/NoteBody.svelte` and nowhere else — a list is still typed (B-10), and these are for the lines a selection can point at; `markup.test.ts`, `scripts/ui-smoke.mjs` |
 | B-15 | `<br>` inside a table cell is a line break in that cell — `<br/>` and `<br />` too, in any case — and search reads it as a space. Outside a table it is four characters | ✅ | `CELL_BREAK` in `src/core/markup.ts`, read by `tableBlock` and by `plainText`; the cell's `whitespace-pre-wrap` in `src/ui/NoteBody.svelte` draws it. A row is a line, so a cell cannot hold a typed one: HTML's spelling is what a table pasted from elsewhere already carries. `markup.test.ts`, `scripts/ui-smoke.mjs` |
+| B-16 | A pipe with a backslash before it, inside a table row, is a pipe in its cell rather than the edge of one, and a row whose last pipe is escaped is not closed | ✅ | `cellsOf` and `isTableRow` in `src/core/markup.ts` — the one split every table reader goes through, so drawing, search, Enter and the `▦` control all read it alike. `markup.test.ts`, `scripts/ui-smoke.mjs` |
 
 **The marks live in the body, and that is the whole design.** `body` stays a string, so every rule already written about
 it still holds without a word changed: one field, last-writer-wins, a conflict row when two devices raced (C-4), a whole
@@ -623,10 +624,10 @@ are the renderer's, and the ragged text under the caret is the price, paid once 
 looked at as text.
 
 **A cell is a line's worth of marks and no more.** Bold and an inline run read inside one; `# ` and `- ` are characters
-in there, which is B-11's rule for a box arrived at from the other side. The pipe is the separator and there is no
-escape for it: a cell that needs a pipe in it is a cell that wants a line of its own, and an escape is one more thing to
-teach, to render and to strip before matching. Search reads a table as its cells with a space between them (B-5), so
-`plainText` takes the pipes off like every other mark.
+in there, which is B-11's rule for a box arrived at from the other side. The pipe is the separator, and `\|` is a pipe
+inside a cell (B-16) — Markdown's own escape, which a pasted table already carries. `<br>` is the one line break a cell
+holds (B-15), since a row is a line. Search reads a table as its cells with a space between them (B-5), so `plainText`
+takes the pipes off like every other mark.
 
 **Enter carries the row, and it never splits one.** On a table row it opens the next row with the same number of empty
 cells and puts the caret in the first of them, and on a row with nothing in any cell it takes the row off, which is the
