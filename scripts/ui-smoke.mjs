@@ -1809,11 +1809,11 @@ async function main() {
     await page.keyboard.press('Enter');
     await page.keyboard.type('Mon');
     for (const _ of [0, 1, 2]) await page.keyboard.press('ArrowRight');
-    await page.keyboard.type('07:40');
+    await page.keyboard.type('07:40<br>08:10');
     check(
       'and the caret lands in the first cell, so the row is typed straight in — B-12',
       (await codeField.inputValue()).endsWith(
-        '| Day | Ferry |\n| --- | --- |\n| Mon | 07:40 |',
+        '| Day | Ferry |\n| --- | --- |\n| Mon | 07:40<br>08:10 |',
       ),
       (await codeField.inputValue()).split('\n').slice(-3).join(' / '),
     );
@@ -1822,10 +1822,10 @@ async function main() {
     await page.waitForSelector('[data-testid="note-rendered"]');
     const table = noteView.locator('[data-testid="table-block"]');
     check(
-      'the rows draw as one table, with the dashes taken as its header — B-12',
+      'the rows draw as one table, with the dashes taken as its header and <br> as a line break in a cell — B-12, B-15',
       (await table.count()) === 1 &&
         (await table.locator('th').allInnerTexts()).join('/') === 'Day/Ferry' &&
-        (await table.locator('tbody td').allInnerTexts()).join('/') === 'Mon/07:40',
+        (await table.locator('tbody td').allInnerTexts()).join('/') === 'Mon/07:40\n08:10',
       `${await table.count()} tables, ${(await table.locator('th').allInnerTexts()).join('/')}`,
     );
     const column = await table.evaluate((el) => {
@@ -1847,7 +1847,7 @@ async function main() {
     await page.keyboard.press('Enter');
     check(
       'and Enter on a row with nothing in it ends the table — B-12',
-      (await codeField.inputValue()).endsWith('| Mon | 07:40 |\n'),
+      (await codeField.inputValue()).endsWith('| Mon | 07:40<br>08:10 |\n'),
       (await codeField.inputValue()).split('\n').slice(-2).join(' / '),
     );
 
@@ -1871,7 +1871,7 @@ async function main() {
     await page.locator('[data-testid="mark-table"]').click();
     check(
       'and pressing it from inside takes the pipes off again — B-12',
-      (await codeField.inputValue()).endsWith('| Mon | 07:40 |\n\nTue\n'),
+      (await codeField.inputValue()).endsWith('| Mon | 07:40<br>08:10 |\n\nTue\n'),
       (await codeField.inputValue()).split('\n').slice(-3).join(' / '),
     );
 

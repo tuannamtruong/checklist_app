@@ -47,6 +47,13 @@ const TABLE_ROW = /^\|.*\|$/;
  */
 const TABLE_RULE = /^:?-+:?$/;
 
+/**
+ * B-15. A line break inside a cell, which a row cannot hold because a row is a
+ * line. It is HTML's spelling, which is what a table pasted from elsewhere
+ * already carries.
+ */
+const CELL_BREAK = /<br\s*\/?>/gi;
+
 /** B-12. What Enter opens: a cell with room to type in, and a caret between the two spaces. */
 const EMPTY_CELL = '  |';
 
@@ -209,7 +216,7 @@ function tableBlock(lines: readonly string[]): Block {
     table: {
       header,
       rows: drawn.map((line) => ({
-        cells: cellsOf(line).map((cell) => ({ spans: spansOf(cell) })),
+        cells: cellsOf(line).map((cell) => ({ spans: spansOf(cell.replace(CELL_BREAK, '\n')) })),
       })),
     },
   };
@@ -393,7 +400,7 @@ export function plainText(body: string): string {
           block.table.rows
             .map((row) =>
               row.cells
-                .map((cell) => cell.spans.map((span) => span.text).join(''))
+                .map((cell) => cell.spans.map((span) => span.text.replaceAll('\n', ' ')).join(''))
                 .join(' '),
             )
             .join('\n'),

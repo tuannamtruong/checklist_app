@@ -479,6 +479,21 @@ describe('tables — B-12', () => {
   });
 });
 
+describe('cell breaks — B-15', () => {
+  it('draws <br> in a cell as a line break, and searches it as a space', () => {
+    const [block] = parseBody('| Mon<br>Tue | 07:40<br/>08:10 <BR /> |');
+    expect(block!.table!.rows[0]!.cells.map((cell) => cell.spans[0]!.text)).toEqual([
+      'Mon\nTue',
+      '07:40\n08:10 \n',
+    ]);
+    expect(plainText('| Mon<br>Tue |')).toBe('Mon Tue');
+  });
+
+  it('is four characters outside a table', () => {
+    expect(plainText('Mon<br>Tue')).toBe('Mon<br>Tue');
+  });
+});
+
 describe('toggleTable — B-12', () => {
   it('writes a starter table on an empty line, with the caret in the first cell', () => {
     const made = toggleTable('Ferry\n\nafter', 6, 6);
