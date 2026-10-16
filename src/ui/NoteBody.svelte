@@ -26,6 +26,7 @@
     tableEnter,
     toggleBold,
     toggleCode,
+    toggleList,
     toggleTable,
     type Cell,
     type Edited,
@@ -342,6 +343,12 @@
   function table(): void {
     if (!field) return;
     apply(toggleTable(draft, field.selectionStart, field.selectionEnd));
+  }
+
+  /** B-14. The selected lines as one list, or the markers off again. */
+  function list(kind: 'bullet' | 'number'): void {
+    if (!field) return;
+    apply(toggleList(draft, field.selectionStart, field.selectionEnd, kind));
   }
 
   /** One control, three states — `nextHeading` is the cycle, A-2's flag the precedent. */
@@ -781,6 +788,28 @@
       onclick={table}
     >
       ▦
+    </button>
+    <!-- B-14. At the selection only: a list is typed (B-10), and these exist for
+         the lines already written, which only a selection can point at. -->
+    <button
+      type="button"
+      class="row-control rounded px-2 py-1 text-xs text-ink hover:bg-surface-sunken hover:text-accent"
+      aria-label="Bulleted list"
+      data-testid="selection-bullets"
+      onmousedown={keepCaret}
+      onclick={() => list('bullet')}
+    >
+      •
+    </button>
+    <button
+      type="button"
+      class="row-control rounded px-2 py-1 text-xs tabular-nums text-ink hover:bg-surface-sunken hover:text-accent"
+      aria-label="Numbered list"
+      data-testid="selection-numbers"
+      onmousedown={keepCaret}
+      onclick={() => list('number')}
+    >
+      1.
     </button>
   </div>
 {/if}

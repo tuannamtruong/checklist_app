@@ -12,6 +12,7 @@ import {
   spliceOf,
   toggleBold,
   toggleCode,
+  toggleList,
   toggleTable,
   type Block,
   type Span,
@@ -365,6 +366,25 @@ describe('lists — B-10', () => {
     expect(listEnter('- Socks', 3, 7)).toBe(null);
     expect(listEnter('- Socks', 1, 1)).toBe(null);
     expect(listEnter('```\n- Socks\n```', 11, 11)).toBe(null);
+  });
+});
+
+describe('toggleList — B-14', () => {
+  it('makes every filled line it touches an item, counting the numbers down the run', () => {
+    const text = 'top\nmilk\n\n- eggs\n  bread\nend';
+    const from = text.indexOf('milk');
+    const to = text.indexOf('bread') + 2;
+    const numbered = toggleList(text, from, to, 'number');
+    expect(numbered.text).toBe('top\n1. milk\n\n2. eggs\n  3. bread\nend');
+    expect(numbered.text.slice(numbered.start, numbered.end)).toBe('1. milk\n\n2. eggs\n  3. bread');
+    expect(toggleList(text, from, to, 'bullet').text).toBe('top\n- milk\n\n- eggs\n  - bread\nend');
+  });
+
+  it('takes the markers off when every line already is that kind of item', () => {
+    const text = '1. milk\n2. eggs';
+    expect(toggleList(text, 0, text.length, 'number').text).toBe('milk\neggs');
+    // The other kind is a swap rather than an undo.
+    expect(toggleList(text, 0, text.length, 'bullet').text).toBe('- milk\n- eggs');
   });
 });
 

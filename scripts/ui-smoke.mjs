@@ -1562,6 +1562,27 @@ async function main() {
       (await page.locator('[data-testid="note-body"]').inputValue()).split('\n').at(-1),
     );
 
+    // --- B-14: the selected lines become a list, and back ------------------
+    const beforeList = await page.locator('[data-testid="note-body"]').inputValue();
+    await page.keyboard.press('Control+End');
+    await page.keyboard.type('\nMilk\nEggs');
+    await page.keyboard.press('Shift+ArrowUp');
+    await page.locator('[data-testid="selection-numbers"]').click();
+    const numbered = await page.locator('[data-testid="note-body"]').inputValue();
+    await page.locator('[data-testid="selection-numbers"]').click();
+    const unnumbered = await page.locator('[data-testid="note-body"]').inputValue();
+    check(
+      'the selected lines become a numbered list, and the same control takes it off — B-14',
+      numbered.endsWith('\n1. Milk\n2. Eggs') && unnumbered.endsWith('\nMilk\nEggs'),
+      JSON.stringify(numbered.split('\n').slice(-2)),
+    );
+    await page.keyboard.press('Backspace');
+    await page.keyboard.press('Backspace');
+    check(
+      'and the two lines go again, leaving the body as it was',
+      (await page.locator('[data-testid="note-body"]').inputValue()) === beforeList,
+    );
+
     await pane.locator('[data-testid="page-title"]').click();
     await page.waitForSelector('[data-testid="note-rendered"]');
     const rendered = page.locator('[data-testid="note-rendered"]');

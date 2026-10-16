@@ -203,10 +203,12 @@ assigned `value` would have emptied the undo stack.
 
 **A list is typed and Enter is the whole of it (B-10).** `- ` or `1. ` opens one; Enter carries the marker onto the next
 line and counts the numbers up, and Enter on an item with nothing in it takes the marker off, which is the way out.
-Nothing renumbers — the number drawn is the number in the string — and there is no control for it, because two typed
-characters already reach every keyboard. `listEnter` returns a *splice* rather than a body so `NoteBody` can type it in
-with `insertText`: a marker the app wrote is then undone by the field's own `Ctrl-Z`, and the caret is placed explicitly
-afterwards because Chromium leaves it one short on an empty insert.
+Nothing renumbers — the number drawn is the number in the string — and there is no control for *opening* one, because
+two typed characters already reach every keyboard. Lines already written are the exception (B-14): `•` and `1.` in B-7's
+selection controls, and only there, run `toggleList` over every line the selection touches. `listEnter` returns a
+*splice* rather than a body so `NoteBody` can type it in with `insertText`: a marker the app wrote is then undone by the
+field's own `Ctrl-Z`, and the caret is placed explicitly afterwards because Chromium leaves it one short on an empty
+insert.
 
 **A fenced block spans lines, and every mark but bold is a character inside it** — `# ` is a comment and `- ` is a flag,
 but `**` is bold (B-11), read a line at a time, because the reason a long box is on screen is usually one line in it.

@@ -708,6 +708,44 @@ export function listEnter(text: string, start: number, end: number): Splice | nu
   return { from: start, to: start, insert: `\n${indent}${nextMarker(marker)}` };
 }
 
+/**
+ * B-14. The lines a selection touches, made one list: every line with
+ * something on it gets the marker — `- `, or `1. `, `2. ` counted down the run —
+ * in place of any marker it carried, after its own indent. When every such line
+ * already is that kind of item the markers come off instead, so one control is
+ * both directions, which is `toggleCode`'s shape.
+ *
+ * The whole run is left selected, so the controls stay beside it and a second
+ * press takes back the first.
+ */
+export function toggleList(
+  text: string,
+  start: number,
+  end: number,
+  kind: 'bullet' | 'number',
+): Edited {
+  const from = lineStart(text, start);
+  const to = lineEnd(text, end);
+  const lines = text.slice(from, to).split('\n');
+  const items = lines.map((line) => LIST.exec(line));
+  const ofKind = (item: RegExpExecArray | null): boolean =>
+    item !== null && (item[2] === '-') === (kind === 'bullet');
+  const off = lines.every((line, at) => line.trim() === '' || ofKind(items[at]!));
+  let count = 0;
+  const next = lines
+    .map((line, at) => {
+      if (line.trim() === '') return line;
+      const item = items[at]!;
+      const indent = item ? item[1]! : /^[ \t]*/.exec(line)![0];
+      const rest = item ? item[3]! : line.slice(indent.length);
+      if (off) return indent + rest;
+      count += 1;
+      return indent + (kind === 'bullet' ? '- ' : `${count}. `) + rest;
+    })
+    .join('\n');
+  return { text: text.slice(0, from) + next + text.slice(to), start: from, end: from + next.length };
+}
+
 /** The marker the next item carries: the same bullet, or the next number. */
 function nextMarker(marker: string): string {
   if (marker === '-') return '- ';
