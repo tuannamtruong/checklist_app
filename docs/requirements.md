@@ -953,6 +953,14 @@ reverse it (C-1), and it is why nothing in the app ever asks before merging.
 
 C-2 and C-3 need no resolution path — the user drags the node back, and that corrective move is an ordinary edit.
 
+**The two values are two boxes, never one sentence.** A field row draws what was kept and what was not side by side,
+each headed by the device that wrote it, line breaks kept and a long value scrolling inside its box. The restore button
+sits under the value it restores and reads "Use this instead" rather than repeating it: a note body is a paragraph, and
+inlining two of them into "Kept … over …" left nothing to tell where one ended and the next began. The words one side
+has and the other lacks are highlighted in both boxes — `src/core/word-diff.ts`, a longest common subsequence over words
+after the shared head and tail are cut, because two bodies a few words apart are the common race and the eye cannot find
+the few words in a paragraph unaided. Display only: the merge never reads it.
+
 **T-13 made `deleted` a contested field, and the row says so.** Before M3 a tombstone was final, so a delete could not
 lose and never raised a row. `restore` is now the other writer of that field, so one device deleting a row while another
 restores it settles by `(at, device id)` like every other field, and the losing write is offered back exactly the same

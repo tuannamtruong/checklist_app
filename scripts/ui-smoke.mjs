@@ -2740,6 +2740,8 @@ async function main() {
       detail.includes('Coffee') && detail.includes('Coffee beans') && detail.includes('5eed0002'),
       detail.replace(/\s+/g, ' '),
     );
+    const marked = await page.locator('[data-testid="conflict-changed"]').allInnerTexts();
+    check('only the word the two values differ by is highlighted — §9', marked.join('|') === 'beans', marked.join('|'));
     await page.screenshot({ path: join(shots, 'conflicts.png'), fullPage: true });
 
     // C-6: only the dismissal persists, and only on this device.

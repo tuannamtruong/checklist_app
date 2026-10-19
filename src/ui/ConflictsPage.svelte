@@ -14,6 +14,7 @@
   } from '../core/conflicts';
   import { nameOf } from '../core/devices';
   import { restoreValue } from '../core/edit';
+  import { wordDiff } from '../core/word-diff';
   import type { Session } from '../app/Session.svelte';
   import type { Dismissals } from '../app/dismissals.svelte';
   import { nodeHref } from '../app/router.svelte';
@@ -40,6 +41,18 @@
   function useDropped(row: FieldConflict): void {
     session.run((tree, ctx) => restoreValue(tree, ctx, row.node, row.field, row.dropped));
   }
+
+  /** Kept, then not kept, each with the words the other lacks marked. */
+  function sidesOf(row: FieldConflict) {
+    const diff = wordDiff(
+      describeValue(row.field, row.kept, session.tree),
+      describeValue(row.field, row.dropped, session.tree),
+    );
+    return [
+      { label: 'Kept', by: row.keptBy, spans: diff.a },
+      { label: 'Not kept', by: row.droppedBy, spans: diff.b },
+    ];
+  }
 </script>
 
 <div class="mx-auto flex max-w-3xl flex-col gap-4 px-4 py-6" data-testid="conflicts-page">
@@ -65,12 +78,36 @@
             — two devices set the {describeField(row.field)} at once.
           </span>
         </p>
-        <p class="text-sm text-ink-muted" data-testid="conflict-detail">
-          Kept <b class="text-ink">{describeValue(row.field, row.kept, session.tree)}</b>
-          from {deviceLabel(row.keptBy)}, over
-          <b class="text-ink">{describeValue(row.field, row.dropped, session.tree)}</b>
-          from {deviceLabel(row.droppedBy)}.
-        </p>
+        <!-- Two boxes rather than one sentence: a note body is a paragraph, and
+             two paragraphs inlined into "Kept … over …" could not be told apart. -->
+        <div class="grid gap-2 md:grid-cols-2" data-testid="conflict-detail">
+          {#each sidesOf(row) as side, i (i)}
+            <section class="flex min-w-0 flex-col gap-1 rounded border border-line bg-surface px-2 py-2">
+              <h2 class="text-xs text-ink-muted">
+                <span class="font-medium {i === 0 ? 'text-ink' : ''}">{side.label}</span>
+                · from {deviceLabel(side.by)}
+              </h2>
+              <p
+                class="max-h-48 overflow-y-auto whitespace-pre-wrap text-sm [overflow-wrap:anywhere] {i === 0
+                  ? 'text-ink'
+                  : 'text-ink-muted'}"
+              >{#each side.spans as span, k (k)}{#if span.changed}<mark
+                      class="rounded-sm bg-accent-soft text-ink"
+                      data-testid="conflict-changed">{span.text}</mark
+                    >{:else}{span.text}{/if}{/each}</p>
+              {#if i === 1 && row.field !== 'parent'}
+                <button
+                  type="button"
+                  class="row-control self-start rounded border border-line px-2 py-1 text-sm hover:bg-surface-sunken"
+                  data-testid="conflict-restore"
+                  onclick={() => useDropped(row)}
+                >
+                  Use this instead
+                </button>
+              {/if}
+            </section>
+          {/each}
+        </div>
       {:else if row.kind === 'cycle'}
         <p class="text-sm">
           <a href={nodeHref(row.node)} class="font-medium hover:text-accent">{titleOf(row.node)}</a>
@@ -98,16 +135,6 @@
       {/if}
 
       <div class="flex gap-2">
-        {#if row.kind === 'field' && row.field !== 'parent'}
-          <button
-            type="button"
-            class="row-control rounded border border-line px-2 py-1 text-sm hover:bg-surface-sunken"
-            data-testid="conflict-restore"
-            onclick={() => useDropped(row)}
-          >
-            Use {describeValue(row.field, row.dropped, session.tree)}
-          </button>
-        {/if}
         <a
           href={nodeHref(row.node)}
           class="row-control rounded border border-line px-2 py-1 text-sm hover:bg-surface-sunken"
