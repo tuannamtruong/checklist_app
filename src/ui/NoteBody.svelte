@@ -799,7 +799,14 @@
       onmousedown={keepCaret}
       onclick={() => list('bullet')}
     >
-      •
+      <svg class="size-[1rem]" viewBox="0 0 20 20" aria-hidden="true">
+        <g class="text-accent" fill="currentColor">
+          <rect x="2.5" y="3.5" width="3" height="3" />
+          <rect x="2.5" y="8.5" width="3" height="3" />
+          <rect x="2.5" y="13.5" width="3" height="3" />
+        </g>
+        <path d="M8 5h9.5M8 10h9.5M8 15h9.5" stroke="currentColor" stroke-width="1.6" />
+      </svg>
     </button>
     <button
       type="button"
@@ -809,7 +816,14 @@
       onmousedown={keepCaret}
       onclick={() => list('number')}
     >
-      1.
+      <svg class="size-[1rem]" viewBox="0 0 20 20" aria-hidden="true">
+        <g class="text-accent" fill="currentColor" font-size="6.5" font-weight="700" font-family="sans-serif">
+          <text x="2" y="7.3">1</text>
+          <text x="2" y="12.3">2</text>
+          <text x="2" y="17.3">3</text>
+        </g>
+        <path d="M8 5h9.5M8 10h9.5M8 15h9.5" stroke="currentColor" stroke-width="1.6" />
+      </svg>
     </button>
   </div>
 {/if}
