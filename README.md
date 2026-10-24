@@ -11,7 +11,7 @@ The sync prototype that proved folder-based sync between Windows and Android is 
 
 ```bash
 npm install
-npm run dev        # http://127.0.0.1:38531
+npm run dev        # http://127.0.0.1:38532
 npm test           # the logic layer
 npm run ui-smoke   # the built app, driven in Chromium   (needs Playwright on NODE_PATH)
 ```
@@ -20,10 +20,10 @@ Or through the Makefile, which wraps the same scripts and supplies Playwright's 
 every target:
 
 ```bash
-make dev           # http://127.0.0.1:38531
+make dev           # http://127.0.0.1:38532
 make build         # production bundle -> dist/
 make verify        # check + test + ui-smoke + docs
-make stop          # free port 38531 when a leftover server holds it
+make stop          # free port 38532 when a leftover server holds it
 ```
 
 The two platform bundles land in `bundles/` — [docs/architecture.md §7](./docs/architecture.md#7-packaging) says which

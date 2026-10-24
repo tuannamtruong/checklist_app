@@ -309,6 +309,10 @@ Two costs come with running both:
 `localStorage` is per-origin, so the device id too. One machine used through both bundles is two devices, writing two
 files. The identity model has to tolerate that, or offer to adopt an existing id when a second origin starts up.
 
+Development is a third origin on purpose: every server this repository runs binds `127.0.0.1:38532`, so a test session
+on the machine running the bundle is a device of its own rather than the bundle's, and the two run side by side —
+[past_decision.md §22 Development on its own port](past_decision.md#22-development-on-its-own-port).
+
 Firefox on the desktop does not install PWAs, so the bundle's shortcut is what puts the app on the taskbar there.
 Chromium installs it properly.
 

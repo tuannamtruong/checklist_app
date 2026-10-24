@@ -4,14 +4,14 @@ import type { Plugin } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import { defineConfig } from 'vitest/config';
 
-// Port 38531 is this project's, and the loopback helper the Firefox bundle ships
-// binds it too — the two are never run together, and pinning it keeps the
-// http-folder adapter's origin the same in development as in that bundle.
-const PORT = 38531;
+// 38532 is this repository's, and never the Firefox bundle's 38531: two ports
+// are two origins, so a test session is not the bundle's device and both run at
+// once — past_decision.md §22.
+const PORT = 38532;
 
-// A service worker installed by the bundle or by `make preview` is still in
-// charge in development, because all three are the same origin — the port is
-// pinned for exactly that reason. It answers navigations out of its precache,
+// A service worker installed by `make preview` is still in charge in
+// development, because the two are the same origin — the port is pinned for
+// exactly that reason. It answers navigations out of its precache,
 // so the dev server runs and the browser never asks it anything: the app looks
 // frozen at whatever was last built, which is X-6's "next launch" promise being
 // kept about the wrong thing.

@@ -1,19 +1,20 @@
 # The app.
 #
-#   make dev               the app on 127.0.0.1:38531, hot reload
+#   make dev               the app on 127.0.0.1:38532, hot reload
 #   make build             production bundle -> dist/
 #
 # `make help` lists the rest.
 
 .PHONY: help install dev build preview test check verify seed ui-smoke perf docs clean \
-        stop port-check win-port-note win-port-stop windows apk apk-clean
+        stop port-check windows apk apk-clean
 .DEFAULT_GOAL := help
 
-# Port 38531 is this project's, pinned in vite.config.ts for dev and preview
-# alike. strictPort is deliberate — the http-folder adapter's origin has to be
-# the same in development as in the bundle — so a leftover server is a hard
-# failure rather than a silent move to another port. Hence port-check and stop.
-PORT ?= 38531
+# Port 38532 is this repository's, pinned in vite.config.ts for dev and preview
+# alike; 38531 is the Windows bundle's helper, and keeping off it is what lets
+# the two run at once — past_decision.md §22. strictPort is deliberate, so a
+# leftover server is a hard failure rather than a silent move to another port.
+# Hence port-check and stop.
+PORT ?= 38532
 
 # The PIDs listening on $(PORT), or empty. Both branches are read-only, and ss
 # covers a machine without lsof. Used inside recipes, so the $$ is make's.
@@ -44,7 +45,6 @@ help:
 	  "  make apk-clean     - drop the Android build output and the Gradle cache" \
 	  "" \
 	  "  make stop          - free port $(PORT): kill whatever is listening on it" \
-	  "  make win-port-stop - WSL: close the Checklist helper on the Windows side" \
 	  "  make install       - npm ci" \
 	  "  make clean         - remove dist/, ui-smoke/ and bundles/"
 
@@ -55,8 +55,8 @@ install:
 
 # Every target below that binds the port runs this first, so an orphaned server
 # — usually one a seed or ui-smoke run left behind — is named here rather than
-# reaching you as vite's bare "Port 38531 is already in use".
-port-check: win-port-note
+# reaching you as vite's bare "Port 38532 is already in use".
+port-check:
 	@pids=$(PORT_PIDS); \
 	if [ -n "$$pids" ]; then \
 	  printf 'port %s is already taken, and vite pins it:\n' '$(PORT)'; \
@@ -65,19 +65,9 @@ port-check: win-port-note
 	  exit 1; \
 	fi
 
-# The Windows half of the port, which lsof and ss cannot see — scripts/win-port.sh
-# says why. `note` only names a holder; `stop` closes our own helper and names
-# anything else. Both are silent and successful off WSL, so every target below
-# can depend on them unconditionally.
-win-port-note:
-	@PORT=$(PORT) sh scripts/win-port.sh note
-
-win-port-stop:
-	@PORT=$(PORT) sh scripts/win-port.sh stop
-
 # SIGTERM first, and only then SIGKILL: a vite preview holding the port has
 # nothing unsaved, but the same target will happily be pointed at a dev server.
-stop: win-port-note
+stop:
 	@pids=$(PORT_PIDS); \
 	if [ -z "$$pids" ]; then printf 'port %s is already free\n' '$(PORT)'; exit 0; fi; \
 	for pid in $$pids; do \
@@ -98,12 +88,7 @@ stop: win-port-note
 	if [ -n "$$pids" ]; then printf 'port %s is still taken by: %s\n' '$(PORT)' "$$pids"; exit 1; fi; \
 	printf 'port %s is free\n' '$(PORT)'
 
-# win-port-stop first, and only then port-check: the Windows listener has to be
-# gone before vite binds, or WSL's forwarder never takes the port over on the
-# Windows side and the browser there keeps being served the bundle. Closing it is
-# `dev` alone — `preview` and `ui-smoke` are watched from inside WSL, and the app
-# on the Windows taskbar is not theirs to shut.
-dev: win-port-stop port-check
+dev: port-check
 	npm run dev
 
 build:

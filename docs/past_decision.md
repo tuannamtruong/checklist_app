@@ -22,6 +22,7 @@ History of project's decision. The situation, its options and resolution.
 | [The caret opens the note pane](#144-the-caret-opens-the-pane-too) | The caret raises the pane and the route does not move | -  the caret navigating like the icon<br>-  a route carrying both ids<br>-  remembering the list beside the route<br>-  the icon as the only way in |
 | [What the note pane draws](#146-what-the-pane-draws--x-31) | The title, the tags and the body, with the body filling the pane | -  the note's page redrawn in a column<br>-  keeping the children under the body<br>-  dropping the tree's nesting under a note instead |
 | [Retiring the cloud-app launcher](#16-retiring-the-cloud-app-launcher) | Remove X-17 outright — no catalog, no stored provider, no launch capability | -  keeping the button and dropping only the picker<br>-  a free-text command instead of a catalog<br>-  detecting the provider from the folder's path |
+| [Development on its own port](#22-development-on-its-own-port) | Every server this repository runs on `38532`, the bundle's helper alone on `38531` | -  one shared port, with `make dev` closing the helper<br>-  `make dev` alone moved, preview left on `38531`<br>-  a dev-only prefix on every `localStorage` key |
 
 ---
 
@@ -870,3 +871,28 @@ broke anything about which kinds have one.
 
 Option B returns if a task ever needs *both* — a description and a note — which is a request for two fields rather than
 for one on a second kind, and would be answered by asking why the tree cannot hold the second one as a child.
+
+## 22. Development on its own port
+
+Until 2026-10-24 every server this repository runs — `make dev`, `make preview`, `seed`, `ui-smoke`, `perf` — bound
+`127.0.0.1:38531`, the port the Windows bundle's helper binds, so that the app had one origin in development and in the
+bundle. One origin is one `localStorage`, so on the machine running the bundle a test session *was* the bundle's device:
+the same id, the same folder choice, the same service worker, writing a second log of that id into `localStorage` while
+the real one sat in the synced folder. Under WSL the two could not run at once either — the helper held the Windows half
+of the port, `make dev` closed it to take the port over, and Firefox showed the test log at the bundle's address until
+the helper was started again.
+
+| # | Option | What it costs |
+| --- | --- | --- |
+| A | **Every server this repository runs on `38532`, the helper alone on `38531`** — chosen | A second number. Development and the bundle become two origins and so two devices, each with its own storage, and both run at once; `scripts/win-port.sh` and the targets that closed or named the helper go with the clash they existed for |
+| B | `make dev` alone on `38532`, preview and the browser runs left on `38531` | Preview's service worker lands on the bundle's origin again, and `scripts/win-port.sh` stays to say who holds the Windows half, for servers that are only ever watched from inside WSL |
+| C | One port, and a dev build that prefixes every `localStorage` key | A development branch in shipped code reaching every key, and the two still cannot run at once |
+| D | One port, and the helper started at login | It brings the bundle back after a reboot and not while `make dev` holds the port, which is exactly when the test log is shown as the real one |
+
+D is what the machine the bundle runs on does as well, and the two combine: the helper starts at login on `38531`, and
+development no longer has a reason to stop it.
+
+### 22.1 What reopens it
+
+A development workflow that needs the bundle's origin — the dev server driving `http-folder` against a running helper,
+say. The helper takes `--port`, so even that can run on a port of its own before it needs this one.

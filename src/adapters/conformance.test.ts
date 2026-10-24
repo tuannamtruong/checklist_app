@@ -58,8 +58,8 @@ function fakeBridge(): AndroidBridge {
  * wire — a 404 read answering null, a PUT round-tripping, `list` returning
  * FileMeta whose `path` is a name.
  *
- * Port 0, not this project's 38531: that port belongs to the helper and to the
- * dev server, and a test that took it would fail whenever one was running.
+ * Port 0, not 38531 or 38532: those belong to the helper and to the dev
+ * server, and a test that took one would fail whenever its owner was running.
  */
 async function startHelper(): Promise<{ base: string; server: Server; clear: () => void }> {
   const files = new Map<string, string>();

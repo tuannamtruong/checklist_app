@@ -33,8 +33,8 @@ export function playwright() {
 
 export const ROOT_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
-/** Port 38531 is this project's, in development as in the Windows bundle. */
-export const PORT = 38531;
+/** Port 38532 is this repository's; 38531 is the Windows bundle's — past_decision.md §22. */
+export const PORT = 38532;
 export const BASE_URL = `http://127.0.0.1:${PORT}/`;
 
 function run(command, args, options = {}) {
@@ -76,7 +76,7 @@ async function waitForServer(url, timeoutMs = 30_000) {
  *
  * Its own process group, because `npx` is a shell wrapper that does not pass a
  * signal to the vite it spawned: killing the wrapper alone leaves the server
- * holding port 38531, and the next run fails on `strictPort` for a reason that
+ * holding port 38532, and the next run fails on `strictPort` for a reason that
  * has nothing to do with the change being tested.
  */
 export async function startPreview() {

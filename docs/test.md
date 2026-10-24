@@ -415,7 +415,7 @@ Production, as of M3:
 ```bash
 npm test              # Vitest over src/**/*.test.ts — the logic layer, the merge, the adapters, the row-action parity
 npm run check         # svelte-check, in strict TypeScript
-npm run ui-smoke      # builds, serves dist/ on 38531, drives Chromium, screenshots to ui-smoke/
+npm run ui-smoke      # builds, serves dist/ on 38532, drives Chromium, screenshots to ui-smoke/
 npm run seed          # the same app with a small tree in it, in a window, to look at
 npm run make-icons    # re-render the PWA PNGs from public/icons/*.svg
 npm run perf          # long tasks on a big tree — `--rows 3000 --profile` to see where they went
