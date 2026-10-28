@@ -20,12 +20,20 @@ export interface AdapterUnderTest {
   /** A folder with nothing in it. Every case builds its own — test.md §4. */
   open: () => Promise<FolderAdapter> | FolderAdapter;
   close?: () => Promise<void> | void;
+  /** False for `local-folder`, which refuses to write a picture at all — P-8. */
+  pictures?: boolean;
 }
 
 /** A device file name, since that is the only shape any adapter has to carry. */
 const FILE = 'checklist.1111aaaa.ops.jsonl';
 
-export function folderContract({ name, open, close }: AdapterUnderTest): void {
+/** P-4's shape, as a pasted picture is named. */
+const PICTURE = 'pictures/0123456789abcdef0123456789abcdef.webp';
+
+/** Every byte value, so an adapter that passes a picture through text is caught. */
+const BYTES = Uint8Array.from({ length: 256 }, (_, i) => i);
+
+export function folderContract({ name, open, close, pictures = true }: AdapterUnderTest): void {
   const withFolder = async (run: (folder: FolderAdapter) => Promise<void>) => {
     const folder = await open();
     try {
@@ -92,5 +100,40 @@ export function folderContract({ name, open, close }: AdapterUnderTest): void {
     withFolder(async (folder) => {
       await folder.write(FILE, '');
       expect(await folder.read(FILE)).toBe('');
+    }));
+
+  test(`${name}: a picture round-trips byte for byte, or is refused`, () =>
+    withFolder(async (folder) => {
+      const write = folder.write(PICTURE, new Blob([BYTES]));
+      if (!pictures) {
+        await expect(write).rejects.toThrow();
+        expect(await folder.list()).toEqual([]);
+        return;
+      }
+      await write;
+      const back = await folder.read(PICTURE);
+      expect(back).toBeInstanceOf(Blob);
+      expect(new Uint8Array(await (back as Blob).arrayBuffer())).toEqual(BYTES);
+      expect(await folder.list()).toEqual([PICTURE]);
+    }));
+
+  if (pictures) {
+    test(`${name}: remove takes a picture out of the folder`, () =>
+      withFolder(async (folder) => {
+        await folder.write(PICTURE, new Blob([BYTES]));
+        await folder.remove(PICTURE);
+        expect(await folder.list()).toEqual([]);
+        expect(await folder.read(PICTURE)).toBe(null);
+        // Absent is the normal state of a picture a peer already took away.
+        await folder.remove(PICTURE);
+      }));
+  }
+
+  test(`${name}: remove refuses anything that is not a picture`, () =>
+    withFolder(async (folder) => {
+      // The whole safety argument, S-3: no device may take a log away.
+      await folder.write(FILE, 'x\n');
+      await expect(folder.remove(FILE)).rejects.toThrow();
+      expect(await folder.read(FILE)).toBe('x\n');
     }));
 }

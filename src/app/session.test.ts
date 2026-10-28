@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import { memoryFolder } from '../adapters/memory-folder';
 import { deviceFileName, encodeLog, LOG_VERSION } from '../core/op-log';
-import type { FolderAdapter } from '../core/folder';
+import { readLog, type FolderAdapter } from '../core/folder';
 import { Session } from './Session.svelte';
 
 const DEVICE = 'a3f19c02';
@@ -23,7 +23,7 @@ async function seeded(name?: string): Promise<FolderAdapter> {
 /** The name reaches the folder on the write debounce, not on the call. */
 async function nameInFolder(session: Session, folder: FolderAdapter): Promise<string | undefined> {
   await session.flush();
-  const text = await folder.read(deviceFileName(DEVICE));
+  const text = await readLog(folder, deviceFileName(DEVICE));
   return JSON.parse(text!.split('\n')[0]!).name;
 }
 

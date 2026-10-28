@@ -10,7 +10,7 @@
 // could run different helpers, or none, and converge identically, because the
 // only thing they share is the folder.
 
-import type { FolderAdapter } from '../core/folder';
+import { isPictureName, refuseUnlessPicture, type FolderAdapter } from '../core/folder';
 
 /** The helper's own prefix, on the origin that served the page. */
 const BASE = '/folder';
@@ -71,7 +71,7 @@ export function httpFolder(base = BASE): FolderAdapter {
       const response = await fetch(fileUrl(name));
       if (response.status === 404) return null;
       if (!response.ok) throw new HttpFolderError('reading', name, response.status);
-      return await response.text();
+      return isPictureName(name) ? await response.blob() : await response.text();
     },
 
     async write(name, content) {
@@ -81,6 +81,14 @@ export function httpFolder(base = BASE): FolderAdapter {
         body: content,
       });
       if (!response.ok) throw new HttpFolderError('writing', name, response.status);
+    },
+
+    async remove(name) {
+      refuseUnlessPicture(name);
+      const response = await fetch(fileUrl(name), { method: 'DELETE' });
+      if (!response.ok && response.status !== 404) {
+        throw new HttpFolderError('removing', name, response.status);
+      }
     },
   };
 }

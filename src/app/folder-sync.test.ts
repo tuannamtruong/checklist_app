@@ -43,6 +43,7 @@ function watched(seed: Record<string, string>) {
       return inner.read(name);
     },
     write: (name, content) => inner.write(name, content),
+    remove: (name) => inner.remove(name),
   };
   return {
     folder,
@@ -155,6 +156,7 @@ describe('one sync cycle', () => {
       list: () => Promise.reject(new Error('the folder is gone')),
       read: () => Promise.resolve(null),
       write: () => Promise.resolve(),
+      remove: () => Promise.resolve(),
     };
     const sync = new FolderSync(folder, OURS, { onError: (error) => errors.push(error) });
 

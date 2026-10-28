@@ -17,7 +17,7 @@ import {
   LOG_VERSION,
 } from '../core/op-log';
 import { dominates, join } from '../core/sclock';
-import type { FolderAdapter } from '../core/folder';
+import { readLog, type FolderAdapter } from '../core/folder';
 import type { DeviceId, Op, SClock } from '../core/types';
 
 /** Long enough to swallow a burst of keystrokes, short enough to survive a tab close. */
@@ -65,7 +65,7 @@ export class DeviceLog {
   ): Promise<{ log: DeviceLog; ops: readonly Op[] }> {
     const log = new DeviceLog(folder, device, events);
     try {
-      const text = await folder.read(deviceFileName(device));
+      const text = await readLog(folder, deviceFileName(device));
       const decoded = text === null ? null : decodeLog(text);
       if (decoded !== null) {
         log.entries = decoded.ops;

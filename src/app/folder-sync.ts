@@ -10,7 +10,7 @@
 
 import type { DeviceOps } from '../core/merge';
 import type { DeviceHeader } from '../core/devices';
-import type { FolderAdapter } from '../core/folder';
+import { readLog, type FolderAdapter } from '../core/folder';
 import { clockOf, decodeLog, deviceOfFileName } from '../core/op-log';
 import type { DeviceId, Op } from '../core/types';
 
@@ -44,6 +44,8 @@ export class FolderSync {
   private readonly headers = new Map<DeviceId, DeviceHeader>();
   /** What each peer's file cost, which is the S-14 trigger's other input. */
   private readonly sizes = new Map<DeviceId, number>();
+  /** Every name the last cycle listed — the pictures among them are P-7's to tidy. */
+  listed: readonly string[] = [];
 
   constructor(folder: FolderAdapter, device: DeviceId, events: FolderSyncEvents = {}) {
     this.folder = folder;
@@ -72,6 +74,7 @@ export class FolderSync {
     let names: string[];
     try {
       names = await this.folder.list();
+      this.listed = names;
     } catch (error) {
       this.events.onError?.(error);
       return { peers: 0, skipped: [], changed: false, described: false };
@@ -102,7 +105,7 @@ export class FolderSync {
     const nothing = { changed: false, described: false };
     let text: string | null;
     try {
-      text = await this.folder.read(name);
+      text = await readLog(this.folder, name);
     } catch (error) {
       // A read that throws is the provider's client holding the file, not a bug
       // here. Next cycle, on the same terms as a file that half-arrived.

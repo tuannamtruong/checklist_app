@@ -4,12 +4,15 @@
 // already decided: the app writes the real `checklist.<device-id>.ops.jsonl`
 // here, and M2 replaces this object with one that reaches a folder the
 // provider's client syncs. Nothing above this file knows the difference, which
-// is the whole point of holding the contract at three methods.
+// is the whole point of holding the contract at four methods.
+//
+// It holds no pictures (P-8): `localStorage` takes strings and about 5 MB in
+// all, and a device that syncs with nothing has no peer to show one to.
 //
 // It is not a sync adapter. `localStorage` is per-origin and nothing mirrors it
 // anywhere — architecture.md §4.
 
-import type { FolderAdapter } from '../core/folder';
+import { isPictureName, refuseUnlessPicture, type FolderAdapter } from '../core/folder';
 
 const PREFIX = 'checklist:folder:';
 
@@ -50,6 +53,9 @@ export function localFolder(storage: Storage = window.localStorage): FolderAdapt
     },
 
     async write(name, content) {
+      if (isPictureName(name) || typeof content !== 'string') {
+        throw new LocalFolderError(name, 'local browser storage holds no pictures');
+      }
       try {
         storage.setItem(PREFIX + name, content);
       } catch (cause) {
@@ -58,6 +64,12 @@ export function localFolder(storage: Storage = window.localStorage): FolderAdapt
         // it diagnosable — code-standard.md §4.
         throw new LocalFolderError(name, cause);
       }
+    },
+
+    async remove(name) {
+      // Nothing to take away — no picture was ever written here — but the
+      // refusal is still the contract's.
+      refuseUnlessPicture(name);
     },
   };
 }

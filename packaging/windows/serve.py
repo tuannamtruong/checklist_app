@@ -20,9 +20,10 @@ Two reasons this process exists at all:
      browser the folder must be handed over by something already trusted with
      it -- which is the process the user launched.
 
-The folder API is exactly the three methods of architecture.md 4, spelled as
-HTTP because that is what a page can call: list, read, write. It is the other
-side of src/adapters/http-folder.ts and it grows no fourth method.
+The folder API is exactly the four methods of architecture.md 4, spelled as
+HTTP because that is what a page can call: list, read, write, and a remove that
+refuses everything outside pictures/. It is the other side of
+src/adapters/http-folder.ts and it grows no fifth method.
 
 /shell/open is beside that API rather than part of it -- architecture.md 4.1. It
 opens the folder in the desktop's file manager, which is a thing a page cannot
@@ -67,6 +68,11 @@ MIME = {
 # asks of a folder.
 SEGMENT = re.compile(r"^[A-Za-z0-9._-]{1,120}$")
 
+# P-8. The one directory the page may list into and the only place a file may
+# be removed from: a remove that could reach a log would undo one writer per
+# file (S-3) outright -- architecture.md 4.
+PICTURES = "pictures"
+
 # --------------------------------------------------------------- the shell
 
 # X-15 -- architecture.md 4.1. The page may ask for one thing beyond the folder
@@ -107,7 +113,7 @@ class FolderError(Exception):
 
 
 class Folder:
-    """list / read / write over one directory, and nothing else.
+    """list / read / write / remove over one directory, and nothing else.
 
     Every name is validated segment by segment, and the resolved result is then
     checked to be inside the root -- which catches what the segment rules miss,
@@ -137,6 +143,11 @@ class Folder:
                 continue
             if path.name.startswith(prefix):
                 out.append({"path": path.name})
+        pictures = self.root / PICTURES
+        if pictures.is_dir():
+            for path in sorted(pictures.iterdir()):
+                if path.is_file() and not path.name.startswith("."):
+                    out.append({"path": f"{PICTURES}/{path.name}"})
         return out
 
     def read(self, rel: str) -> bytes | None:
@@ -159,6 +170,11 @@ class Folder:
         tmp = path.with_name(f".{path.name}.tmp")
         tmp.write_bytes(data)
         os.replace(tmp, path)
+
+    def remove(self, rel: str) -> None:
+        if not rel.startswith(f"{PICTURES}/"):
+            raise FolderError(400, f"refused, not a picture: {rel!r}")
+        self.resolve(rel).unlink(missing_ok=True)
 
 
 # -------------------------------------------------------------- the handler
@@ -255,6 +271,10 @@ class Handler(BaseHTTPRequestHandler):
             folder.write(rel, self.rfile.read(length) if length else b"")
             return self._json(200, {"ok": True})
 
+        if self.command == "DELETE":
+            folder.remove(rel)
+            return self._json(200, {"ok": True})
+
         self._json(405, {"error": "method not allowed"})
 
     def _open(self) -> None:
@@ -292,7 +312,7 @@ class Handler(BaseHTTPRequestHandler):
         ctype = MIME.get(target.suffix, "application/octet-stream")
         self._send(200, ctype, target.read_bytes())
 
-    do_GET = do_HEAD = do_PUT = do_POST = _route
+    do_GET = do_HEAD = do_PUT = do_POST = do_DELETE = _route
 
 
 # ------------------------------------------------------------------ startup

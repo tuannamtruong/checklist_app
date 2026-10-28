@@ -49,20 +49,26 @@ function fakeBridge(): AndroidBridge {
       files.set(name, content);
       return '';
     },
+    // The Java side's refusal, which the adapter must not depend on: it refuses first.
+    remove: (name) => {
+      if (!name.startsWith('pictures/')) return `refused: ${name}`;
+      files.delete(name);
+      return '';
+    },
   };
 }
 
 /**
  * The helper's four routes, over a Map. The helper itself is Python and is the
  * subject of test.md §3.4; what is under test here is the adapter's half of the
- * wire — a 404 read answering null, a PUT round-tripping, `list` returning
- * FileMeta whose `path` is a name.
+ * wire — a 404 read answering null, a PUT round-tripping bytes, a DELETE, and
+ * `list` returning FileMeta whose `path` is a name.
  *
  * Port 0, not 38531 or 38532: those belong to the helper and to the dev
  * server, and a test that took one would fail whenever its owner was running.
  */
 async function startHelper(): Promise<{ base: string; server: Server; clear: () => void }> {
-  const files = new Map<string, string>();
+  const files = new Map<string, Buffer>();
   const server = createServer((request, response) => {
     const url = new URL(request.url ?? '/', 'http://127.0.0.1');
     const send = (status: number, body: string, type = 'application/json') => {
@@ -82,14 +88,20 @@ async function startHelper(): Promise<{ base: string; server: Server; clear: () 
         const chunks: Buffer[] = [];
         request.on('data', (chunk: Buffer) => chunks.push(chunk));
         request.on('end', () => {
-          files.set(name, Buffer.concat(chunks).toString('utf8'));
+          files.set(name, Buffer.concat(chunks));
           send(200, JSON.stringify({ path: name }));
         });
         return;
       }
+      if (request.method === 'DELETE') {
+        if (!name.startsWith('pictures/')) return send(400, '{}');
+        files.delete(name);
+        return send(200, '{}');
+      }
       const content = files.get(name);
       if (content === undefined) return send(404, '{}');
-      return send(200, content, 'text/plain; charset=utf-8');
+      response.writeHead(200, { 'content-type': 'application/octet-stream' });
+      return response.end(content);
     }
     send(404, '{}');
   });
@@ -103,7 +115,11 @@ async function startHelper(): Promise<{ base: string; server: Server; clear: () 
 describe('folder adapter contract', () => {
   folderContract({ name: 'memory-folder', open: () => memoryFolder() });
 
-  folderContract({ name: 'local-folder', open: () => localFolder(new FakeStorage()) });
+  folderContract({
+    name: 'local-folder',
+    open: () => localFolder(new FakeStorage()),
+    pictures: false,
+  });
 
   folderContract({ name: 'android-folder', open: () => androidFolder(fakeBridge()) });
 

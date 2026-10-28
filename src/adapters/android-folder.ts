@@ -9,8 +9,12 @@
 // The bridge is synchronous on the Java side — a @JavascriptInterface call runs
 // on the WebView's binder thread rather than the UI thread, so blocking file
 // I/O there is correct. These wrappers are async only because the contract is.
+//
+// The bridge carries strings, so a picture crosses it as base64 both ways —
+// architecture.md §7.2. If that is ever too slow to draw with, the shell
+// serves `pictures/` through a path handler instead — past_decision.md §23.5.
 
-import type { FolderAdapter } from '../core/folder';
+import { isPictureName, refuseUnlessPicture, type FolderAdapter } from '../core/folder';
 
 export interface AndroidBridge {
   hasFolder(): boolean;
@@ -28,9 +32,12 @@ export interface AndroidBridge {
    */
   openFolder?(): string;
   list(): string;
+  /** A picture's content is base64 — see the header. */
   read(name: string): string | null;
   /** An error message, or an empty string. The bridge cannot throw across it. */
   write(name: string, content: string): string;
+  /** P-8. An error message, or an empty string; the Java side refuses a log too. */
+  remove(name: string): string;
 }
 
 export class AndroidFolderError extends Error {
@@ -54,12 +61,34 @@ export function androidFolder(android: AndroidBridge): FolderAdapter {
 
     async read(name) {
       // Absent arrives as JS null through the bridge already.
-      return android.read(name);
+      const content = android.read(name);
+      return content !== null && isPictureName(name) ? fromBase64(content) : content;
     },
 
     async write(name, content) {
-      const failure = android.write(name, content);
+      const text = typeof content === 'string' ? content : await toBase64(content);
+      const failure = android.write(name, text);
       if (failure) throw new AndroidFolderError('writing', name, failure);
     },
+
+    async remove(name) {
+      refuseUnlessPicture(name);
+      const failure = android.remove(name);
+      if (failure) throw new AndroidFolderError('removing', name, failure);
+    },
   };
+}
+
+/** A `String.fromCharCode` per chunk, since one call over 300 KB of arguments overflows the stack. */
+async function toBase64(blob: Blob): Promise<string> {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let binary = '';
+  for (let at = 0; at < bytes.length; at += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(at, at + 0x8000));
+  }
+  return btoa(binary);
+}
+
+function fromBase64(text: string): Blob {
+  return new Blob([Uint8Array.from(atob(text), (char) => char.charCodeAt(0))]);
 }

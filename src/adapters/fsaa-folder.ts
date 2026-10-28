@@ -11,7 +11,7 @@
 // the user learns to dread. Chrome still re-checks permission on every visit,
 // which is why `ensurePermission` exists and why it will not prompt unasked.
 
-import type { FolderAdapter } from '../core/folder';
+import { isPictureName, PICTURES, refuseUnlessPicture, type FolderAdapter } from '../core/folder';
 
 const DB_NAME = 'checklist';
 const STORE = 'handles';
@@ -90,17 +90,40 @@ export async function ensurePermission(
 }
 
 export function fsaaFolder(handle: FileSystemDirectoryHandle): FolderAdapter {
+  /**
+   * The directory a name lives in, and its name there. A picture is one level
+   * down, in `pictures/` — the only directory this adapter ever opens.
+   */
+  const place = async (
+    name: string,
+    create: boolean,
+  ): Promise<[FileSystemDirectoryHandle, string]> =>
+    isPictureName(name)
+      ? [await handle.getDirectoryHandle(PICTURES.slice(0, -1), { create }), name.slice(PICTURES.length)]
+      : [handle, name];
+
   return {
     async list() {
       const names: string[] = [];
-      for await (const name of handle.keys()) names.push(name);
+      for await (const [name, entry] of handle.entries()) {
+        if (entry.kind === 'file') names.push(name);
+      }
+      try {
+        const pictures = await handle.getDirectoryHandle(PICTURES.slice(0, -1));
+        for await (const [name, entry] of pictures.entries()) {
+          if (entry.kind === 'file') names.push(PICTURES + name);
+        }
+      } catch {
+        // No picture has been written yet, which is a folder and not an error.
+      }
       return names;
     },
 
     async read(name) {
       try {
-        const file = await handle.getFileHandle(name);
-        return await (await file.getFile()).text();
+        const [dir, file] = await place(name, false);
+        const content = await (await dir.getFileHandle(file)).getFile();
+        return isPictureName(name) ? content : await content.text();
       } catch {
         // Absent, or being rewritten by the provider's client right now. Both
         // are "nothing to read this cycle" rather than errors — S-7.
@@ -110,7 +133,8 @@ export function fsaaFolder(handle: FileSystemDirectoryHandle): FolderAdapter {
 
     async write(name, content) {
       try {
-        const file = await handle.getFileHandle(name, { create: true });
+        const [dir, fileName] = await place(name, true);
+        const file = await dir.getFileHandle(fileName, { create: true });
         // The writable is a swap file until `close`, which is what keeps a
         // reader from ever seeing half of this — S-8.
         const writable = await file.createWritable();
@@ -118,6 +142,17 @@ export function fsaaFolder(handle: FileSystemDirectoryHandle): FolderAdapter {
         await writable.close();
       } catch (cause) {
         throw new FsaaFolderError('writing', name, cause);
+      }
+    },
+
+    async remove(name) {
+      refuseUnlessPicture(name);
+      try {
+        const [dir, file] = await place(name, false);
+        await dir.removeEntry(file);
+      } catch (cause) {
+        if (cause instanceof DOMException && cause.name === 'NotFoundError') return;
+        throw new FsaaFolderError('removing', name, cause);
       }
     },
   };

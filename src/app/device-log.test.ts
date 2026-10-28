@@ -6,6 +6,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { memoryFolder } from '../adapters/memory-folder';
+import { readLog, type FolderAdapter } from '../core/folder';
 import { decodeLog, deviceFileName } from '../core/op-log';
 import { ROOT, type DeviceId, type Op } from '../core/types';
 import { DeviceLog } from './device-log';
@@ -27,8 +28,8 @@ async function opened(seed: Record<string, string> = {}) {
   return { folder, log };
 }
 
-async function written(folder: { read: (name: string) => Promise<string | null> }) {
-  const text = await folder.read(FILE);
+async function written(folder: FolderAdapter) {
+  const text = await readLog(folder, FILE);
   expect(text).not.toBeNull();
   return decodeLog(text!)!;
 }
@@ -73,10 +74,10 @@ describe('what reaches the file', () => {
     const { folder, log } = await opened();
     log.rename('the laptop');
     await log.flush();
-    const before = await folder.read(FILE);
+    const before = await readLog(folder, FILE);
     log.rename('the laptop');
     await log.flush();
-    expect(await folder.read(FILE)).toBe(before);
+    expect(await readLog(folder, FILE)).toBe(before);
   });
 });
 
@@ -92,11 +93,11 @@ describe('compaction — S-14', () => {
     const { folder, log } = await opened();
     log.append(repeated());
     await log.flush();
-    const before = (await folder.read(FILE))!;
+    const before = (await readLog(folder, FILE))!;
 
     expect(log.compact()).toBe(true);
     await log.flush();
-    const after = (await folder.read(FILE))!;
+    const after = (await readLog(folder, FILE))!;
 
     expect(after.length).toBeLessThan(before.length);
     const kept = decodeLog(after)!;
@@ -118,11 +119,11 @@ describe('compaction — S-14', () => {
     const { folder, log } = await opened();
     log.append([create(1, 1_000), create(2, 1_001)]);
     await log.flush();
-    const before = await folder.read(FILE);
+    const before = await readLog(folder, FILE);
 
     expect(log.compact()).toBe(false);
     await log.flush();
-    expect(await folder.read(FILE)).toBe(before);
+    expect(await readLog(folder, FILE)).toBe(before);
   });
 
   it('leaves a compacted file loadable on the next launch', async () => {

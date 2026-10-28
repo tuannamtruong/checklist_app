@@ -2,10 +2,10 @@
 // mode. It is reachable only by explicit opt-in (`?uitest`), because a folder
 // that forgets everything on reload is a bug everywhere else.
 
-import type { FolderAdapter } from '../core/folder';
+import { refuseUnlessPicture, type FolderAdapter } from '../core/folder';
 
 export function memoryFolder(seed: Readonly<Record<string, string>> = {}): FolderAdapter {
-  const files = new Map<string, string>(Object.entries(seed));
+  const files = new Map<string, string | Blob>(Object.entries(seed));
   return {
     async list() {
       return [...files.keys()];
@@ -15,6 +15,10 @@ export function memoryFolder(seed: Readonly<Record<string, string>> = {}): Folde
     },
     async write(name, content) {
       files.set(name, content);
+    },
+    async remove(name) {
+      refuseUnlessPicture(name);
+      files.delete(name);
     },
   };
 }
