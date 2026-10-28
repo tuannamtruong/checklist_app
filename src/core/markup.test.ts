@@ -3,6 +3,8 @@ import {
   headingAt,
   nextHeading,
   parseBody,
+  pictureNames,
+  pictureSplice,
   plainText,
   listEnter,
   setHeading,
@@ -558,5 +560,51 @@ describe('spliceOf — B-13', () => {
     ] as const) {
       expect(spliced(a, spliceOf(a, b)).text).toBe(b);
     }
+  });
+});
+
+describe('pictures — P-1, P-2', () => {
+  const NAME = 'pictures/0123456789abcdef0123456789abcdef.webp';
+
+  it('draws a line that is only the mark, with its alt text as the one span', () => {
+    expect(parseBody(`![the receipt](${NAME})`)).toEqual([
+      {
+        kind: 'picture',
+        spans: [{ text: 'the receipt', bold: false, code: false }],
+        picture: { name: NAME },
+      },
+    ]);
+    expect(parseBody(`![](${NAME})`)[0]).toMatchObject({ kind: 'picture', spans: [] });
+  });
+
+  it('is characters anywhere else, and outside pictures/', () => {
+    expect(parseBody(`see ![](${NAME})`)[0]?.kind).toBe('paragraph');
+    expect(parseBody('![](elsewhere/x.webp)')[0]?.kind).toBe('paragraph');
+    expect(parseBody('![](pictures/../checklist.1111aaaa.ops.jsonl)')[0]?.kind).toBe('paragraph');
+  });
+
+  it('is found by its words, never by its file name — B-5', () => {
+    expect(plainText(`Paid\n![the receipt](${NAME})`)).toBe('Paid\nthe receipt');
+  });
+
+  it('names every picture a body points at, and none inside a code box', () => {
+    const body = `![](${NAME})\n\`\`\`\n![](pictures/in-code.webp)\n\`\`\`\n![b](pictures/b.png)`;
+    expect(pictureNames(body)).toEqual([NAME, 'pictures/b.png']);
+    expect(pictureNames('no pictures here')).toEqual([]);
+  });
+
+  it('types the mark on a line of its own, and leaves the caret under it', () => {
+    const mark = `![](${NAME})`;
+    expect(spliced('', pictureSplice('', 0, 0, NAME))).toEqual({
+      text: `${mark}\n`,
+      start: mark.length + 1,
+      end: mark.length + 1,
+    });
+    // Mid-line: the line is split around it.
+    expect(spliced('ab', pictureSplice('ab', 1, 1, NAME)).text).toBe(`a\n${mark}\nb`);
+    // At the end of a line that has a next: the newline already there is used.
+    const edited = spliced('a\nb', pictureSplice('a\nb', 1, 1, NAME));
+    expect(edited.text).toBe(`a\n${mark}\nb`);
+    expect(edited.start).toBe(`a\n${mark}\n`.length);
   });
 });

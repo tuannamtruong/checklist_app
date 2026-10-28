@@ -2954,6 +2954,105 @@ async function main() {
       await fresh.close();
     }
 
+    // --- P-1 to P-5: a picture in a body ----------------------------------
+    // On `?uitest`, because the seeded device is on `local-folder` and that
+    // holds no pictures (P-8). The in-memory folder starts empty, so the note
+    // is made here.
+    const pictureContext = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    try {
+      const pic = await pictureContext.newPage();
+      pic.on('pageerror', (error) => consoleErrors.push(String(error)));
+      pic.on('console', (message) => {
+        if (message.type() === 'error' && !message.location()?.url?.includes('/folder/info')) {
+          consoleErrors.push(message.text());
+        }
+      });
+      await pic.goto(`${BASE_URL}?uitest`);
+      await pic.waitForSelector('[data-testid="tree"]', { state: 'attached' });
+      await listAdd(pic, 'quick-add').fill('Receipts');
+      await listAdd(pic, 'add-note').click();
+      await (await rowByTitle(pic, 'Receipts')).locator('[data-testid="open"]').click();
+      const picBody = pic.locator('[data-testid="note-pane"] [data-testid="note-body"]');
+      await picBody.waitFor();
+      await picBody.click();
+      await pic.keyboard.type('Paid at the desk');
+
+      // A real paste event carrying a file, which is what a screenshot on the
+      // clipboard is. 3000 px wide, so P-3's shrink has something to do.
+      await picBody.evaluate(async (field) => {
+        const canvas = new OffscreenCanvas(3000, 1000);
+        const draw = canvas.getContext('2d');
+        draw.fillStyle = '#c33';
+        draw.fillRect(0, 0, 3000, 1000);
+        draw.fillStyle = '#33c';
+        draw.fillRect(0, 0, 1500, 500);
+        const png = await canvas.convertToBlob({ type: 'image/png' });
+        const data = new DataTransfer();
+        data.items.add(new File([png], 'image.png', { type: 'image/png' }));
+        field.dispatchEvent(
+          new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }),
+        );
+      });
+      const MARK = /^!\[\]\(pictures\/[0-9a-f]{32}\.webp\)$/;
+      await pic.waitForFunction(
+        (source) =>
+          document
+            .querySelector('[data-testid="note-pane"] [data-testid="note-body"]')
+            .value.split('\n')
+            .some((line) => new RegExp(source).test(line)),
+        MARK.source,
+      );
+      const pasted = (await picBody.inputValue()).split('\n');
+      check(
+        'a pasted picture is named by its bytes and its mark typed on a line of its own — P-2, P-4',
+        pasted[0] === 'Paid at the desk' && MARK.test(pasted[1] ?? ''),
+        pasted.join(' / '),
+      );
+
+      await pic.keyboard.type('Kept for the claim.');
+      await pic.locator('[data-testid="note-pane"] [data-testid="page-title"]').first().click();
+      const drawn = pic.locator('[data-testid="note-pane"] [data-testid="picture"]');
+      await drawn.waitFor();
+      const size = await drawn.evaluate(async (img) => {
+        await img.decode();
+        return [img.naturalWidth, img.naturalHeight];
+      });
+      check(
+        'and the line draws as the picture, shrunk to 2048 px on its long edge — P-1, P-3',
+        size[0] === 2048 && size[1] === 683,
+        size.join('×'),
+      );
+      await pic.screenshot({ path: join(shots, 'note-picture.png'), fullPage: true });
+
+      await picBody.click();
+      await pic.keyboard.press('Control+End');
+      await pic.keyboard.type('\n![](pictures/00000000000000000000000000000000.webp)');
+      await pic.locator('[data-testid="note-pane"] [data-testid="page-title"]').first().click();
+      await pic.locator('[data-testid="note-pane"] [data-testid="picture-missing"]').waitFor();
+      await pic.screenshot({ path: join(shots, 'note-picture-missing.png'), fullPage: true });
+      check(
+        'a mark whose file is not in the folder draws the symbol instead — P-5',
+        (await pic.locator('[data-testid="note-pane"] [data-testid="picture-missing"]').innerText())
+          .includes('Picture not found'),
+      );
+
+      await pic
+        .locator('[data-testid="note-pane"] [data-testid="body-picture-input"]')
+        .setInputFiles(join(ROOT_DIR, 'public', 'icons', 'icon-192.png'));
+      await pic.waitForFunction(
+        () => document.querySelectorAll('[data-testid="note-pane"] [data-testid="picture"]').length === 2,
+      );
+      // Three marks by now — pasted, missing, chosen — and the chosen one a name of its own.
+      const marks = (await picBody.inputValue()).split('\n').filter((line) => MARK.test(line));
+      check(
+        'and a chosen picture lands the same way a pasted one does — P-2',
+        marks.length === 3 && new Set(marks).size === 3,
+        marks.join(' / '),
+      );
+    } finally {
+      await pictureContext.close();
+    }
+
     check('no console errors', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '));
   } finally {
     await context.close();

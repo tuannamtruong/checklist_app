@@ -1,5 +1,5 @@
-// B-1 to B-12. The only place a mark in a note body is spelled — requirements.md
-// §4.3, past_decision.md §12.
+// B-1 to B-16 and P-1. The only place a mark in a note body is spelled —
+// requirements.md §4.3 and §4.6, past_decision.md §12 and §23.
 //
 // The marks are stored in `body` itself, so this module is a reader of a string
 // and never a second format: `body` is one field with one merge rule before and
@@ -63,6 +63,14 @@ const EMPTY_CELL = '  |';
 /** B-12. What the control writes: two columns, which is what "split this in two" means. */
 const TABLE_COLUMNS = 2;
 
+/**
+ * P-1. A picture is a line that is nothing but Markdown's image mark, pointing
+ * into `pictures/` — anywhere else in a line the mark is characters, for the
+ * reason a fence is only a fence on a line of its own. The name is the
+ * helper's segment rule, minus a leading dot, so a mark can never name `..`.
+ */
+const PICTURE = /^!\[([^\]]*)\]\((pictures\/[A-Za-z0-9_-][A-Za-z0-9._-]*)\)$/;
+
 export type BlockKind =
   | 'heading1'
   | 'heading2'
@@ -70,7 +78,8 @@ export type BlockKind =
   | 'code'
   | 'bullet'
   | 'number'
-  | 'table';
+  | 'table'
+  | 'picture';
 
 export interface Span {
   text: string;
@@ -114,6 +123,11 @@ export interface Block {
   list?: { marker: string; indent: string };
   /** B-12. The rows, when this block is a table. */
   table?: Table;
+  /**
+   * P-1. The file a picture block draws. Its alt text is the block's one span,
+   * so `plainText` — and with it search — reads a picture as its words.
+   */
+  picture?: { name: string };
 }
 
 /** A line of the body, and where it sits in the string. */
@@ -244,6 +258,15 @@ function opensFence(line: string): boolean {
 }
 
 function lineBlock(line: string): Block {
+  const picture = PICTURE.exec(line);
+  if (picture !== null) {
+    const [, alt, name] = picture as unknown as [string, string, string];
+    return {
+      kind: 'picture',
+      spans: alt === '' ? [] : [{ text: alt, bold: false, code: false }],
+      picture: { name },
+    };
+  }
   if (line.startsWith(HEADING_2)) {
     return { kind: 'heading2', spans: spansOf(line.slice(HEADING_2.length)) };
   }
@@ -936,4 +959,24 @@ export function spliced(text: string, splice: Splice): Edited {
     start: at,
     end: at,
   };
+}
+
+/** P-6. Every picture a body points at — what taking one away is weighed against. */
+export function pictureNames(body: string): string[] {
+  // Most bodies hold no picture, and this runs over every body in the tree.
+  if (!body.includes('](pictures/')) return [];
+  return parseBody(body).flatMap((block) => (block.picture ? [block.picture.name] : []));
+}
+
+/**
+ * P-2. The mark for a picture, typed over the selection on a line of its own —
+ * P-1 draws nothing else — with the caret after it, on the line below.
+ */
+export function pictureSplice(text: string, start: number, end: number, name: string): Splice {
+  const before = start > 0 && text[start - 1] !== '\n' ? '\n' : '';
+  const after = end < text.length && text[end] === '\n' ? '' : '\n';
+  const insert = `${before}![](${name})${after}`;
+  // Past a newline that was already there, so the next thing typed is not
+  // typed onto the mark's line and does not turn the picture back into text.
+  return { from: start, to: end, insert, caret: start + insert.length + (after === '' ? 1 : 0) };
 }

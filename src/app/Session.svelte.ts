@@ -19,6 +19,7 @@ import type { DeviceId, EditContext, NodeId, NodeMap, Op, SClock } from '../core
 import { DeviceLog } from './device-log';
 import { FolderSync, type SyncResult } from './folder-sync';
 import { mintNodeId } from './device';
+import { Pictures } from './pictures.svelte';
 
 /** An edit, as edit.ts writes them: tree and context in, ops out. */
 export type Edit = (tree: ResolvedTree, ctx: EditContext) => Op[];
@@ -27,6 +28,8 @@ export class Session {
   readonly deviceId: DeviceId;
   private readonly log: DeviceLog;
   private readonly folderSync: FolderSync;
+  /** P-1 to P-8. The bytes a body's picture marks name, beside the log and never in it. */
+  readonly pictures: Pictures;
   private nodeMap = $state<NodeMap>({});
   /** The body each staged node last had *in the log* — see stageBody. */
   private stagedBodies = new Map<NodeId, string | null>();
@@ -91,9 +94,15 @@ export class Session {
     return this.log.clock;
   });
 
-  private constructor(log: DeviceLog, folderSync: FolderSync, ops: readonly Op[]) {
+  private constructor(
+    log: DeviceLog,
+    folderSync: FolderSync,
+    pictures: Pictures,
+    ops: readonly Op[],
+  ) {
     this.log = log;
     this.folderSync = folderSync;
+    this.pictures = pictures;
     this.deviceId = log.device;
     this.nodeMap = foldOps(ops);
   }
@@ -130,7 +139,7 @@ export class Session {
     // device that has never been named costs one header write to arrive with a
     // name — and a device that has one is left exactly as its file holds it.
     if (suggestedName !== '' && log.name === '') log.rename(suggestedName);
-    session = new Session(log, folderSync, ops);
+    session = new Session(log, folderSync, new Pictures(folder, problem), ops);
     return session;
   }
 
@@ -199,6 +208,7 @@ export class Session {
     // device list is derived off the same revision, so it has to be told.
     if (result.changed || result.described) this.revision++;
     this.maybeCompact();
+    await this.pictures.tidy(this.folderSync.listed, this.nodeMap, Date.now());
     return result;
   }
 
@@ -290,6 +300,18 @@ export class Session {
     ]);
     this.revision++;
     this.onWrote?.();
+    if (written !== null) void this.pictures.commit(written, this.nodeMap, Date.now());
+  }
+
+  /** P-2. The name to type into the body, or null once the failure is on screen. */
+  async addPicture(file: Blob): Promise<string | null> {
+    try {
+      return await this.pictures.add(file);
+    } catch (error) {
+      console.error(`device ${this.deviceId}: picture`, error);
+      this.problem = String(error);
+      return null;
+    }
   }
 
   commitAllBodies(): void {

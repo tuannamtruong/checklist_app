@@ -19,6 +19,7 @@
     listEnter,
     nextHeading,
     parseBody,
+    pictureSplice,
     setHeading,
     spliced,
     spliceOf,
@@ -37,6 +38,7 @@
   import type { NodeId } from '../core/types';
   import type { Session } from '../app/Session.svelte';
   import { textRect } from './text-rect';
+  import Picture from './Picture.svelte';
 
   /**
    * `compact` is the note pane's floor rather than the page's — X-21. The
@@ -95,6 +97,8 @@
   /** Whether the caret is in the field, which is what B-3 swaps the view on. */
   let editing = $state(false);
   let field = $state<HTMLTextAreaElement | null>(null);
+  /** P-2's file input — the phone's camera and gallery, and the desktop's file picker. */
+  let chooser = $state<HTMLInputElement | null>(null);
   /** B-3's rendered half, which `syncScroll` keeps under the field's own scroll. */
   let rendered = $state<HTMLDivElement | null>(null);
   let debounce: ReturnType<typeof setTimeout> | null = null;
@@ -409,6 +413,37 @@
   }
 
   /**
+   * P-2. A pasted picture is written to the folder and its mark typed over the
+   * selection, on a line of its own — through `apply`, so `Ctrl-Z` takes the
+   * mark back like any other typing (B-13). Text on the clipboard beside it is
+   * the browser's, as every other paste is.
+   */
+  function onPaste(event: ClipboardEvent): void {
+    const file = [...(event.clipboardData?.files ?? [])].find((f) => f.type.startsWith('image/'));
+    if (file === undefined) return;
+    event.preventDefault();
+    void addPicture(file);
+  }
+
+  function onChoose(): void {
+    const file = chooser?.files?.[0];
+    if (chooser) chooser.value = '';
+    if (file !== undefined) void addPicture(file);
+  }
+
+  /**
+   * The selection is read after the write, since the reader may have moved it
+   * meanwhile — and nothing is typed if they moved to another note, whose body
+   * the mark was never meant for.
+   */
+  async function addPicture(file: Blob): Promise<void> {
+    const into = id;
+    const name = await session.addPicture(file);
+    if (name === null || !field || id !== into) return;
+    apply(spliced(draft, pictureSplice(draft, field.selectionStart, field.selectionEnd, name)));
+  }
+
+  /**
    * B-13. `Ctrl-Z` on a screen with no Ctrl key: the field's own undo, so it
    * takes back exactly what the shortcut would. It needs the caret in the
    * field, which is where the reader is going next anyway.
@@ -564,6 +599,32 @@
     >
       ▦
     </button>
+    <!-- P-2. Not a mark either: it puts a picture in the folder and types the
+         mark that names it. A file input, so a phone offers its camera and
+         gallery, and the desktop its file picker; pasting is the other way. -->
+    <button
+      type="button"
+      class="row-control rounded border border-line px-2 py-1 text-xs text-ink-muted hover:border-accent hover:text-accent"
+      aria-label="Picture"
+      title="Picture — or paste one"
+      data-testid="body-picture"
+      onmousedown={keepCaret}
+      onclick={() => chooser?.click()}
+    >
+      <svg class="size-[1rem]" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+        <rect x="2.5" y="3.5" width="15" height="13" rx="1.5" />
+        <circle cx="7" cy="8" r="1.5" />
+        <path d="m2.5 14.5 4.5-4.5 3.5 3.5 2-2 5 5" />
+      </svg>
+    </button>
+    <input
+      bind:this={chooser}
+      type="file"
+      accept="image/*"
+      class="hidden"
+      data-testid="body-picture-input"
+      onchange={onChoose}
+    />
     <!-- B-13. Not a mark: the field's own undo, for a phone that has no
          Ctrl-Z. It takes back typing and a control's edit alike. -->
     <button
@@ -645,6 +706,10 @@
                 >{@render codeRuns(block.spans)}</code
               ></pre>
           </div>
+        {:else if block.picture}
+          <!-- P-1. A line of its own, drawn as the picture it names: the mark
+               is what the field holds, and B-3 swaps to it on a click. -->
+          <Picture pictures={session.pictures} name={block.picture.name} alt={textOf(block.spans)} />
         {:else if block.kind === 'heading1'}
           <h3
             class="mt-3 mb-1 text-base font-semibold whitespace-pre-wrap first:mt-0"
@@ -723,6 +788,7 @@
     data-testid="note-body"
     oninput={onInput}
     onkeydown={onKeyDown}
+    onpaste={onPaste}
     onselect={readSelection}
     onscroll={onScroll}
     onwheel={onWheel}
