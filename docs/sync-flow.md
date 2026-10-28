@@ -30,9 +30,11 @@ see [architecture.md](architecture.md).
 Two things synchronise, and only one of them is ours.
 
 **Files in the Sync Folder.** The provider's client moves bytes between devices. It happens while the app is closed, it
-offers no completion signal, and the application has no code for it. The one rule the application obeys is that a device
-writes only paths carrying its own device id, which means no two devices ever write one path and the provider's
-conflict-copy behaviour never triggers.
+offers no completion signal, and the application has no code for it. The one rule the application obeys is that a file
+is written by one device, or its name is its content. A device writes only paths carrying its own device id, and a
+picture is named by the hash of its bytes, so no two devices ever write one path with different contents and the
+provider's conflict-copy behaviour never costs a file —
+[past_decision.md §23.2 What the name has to be](past_decision.md#232-what-the-name-has-to-be).
 
 **Application content.** The tree the user sees. This is where concurrent edits meet, and where the whole design
 question lives.
@@ -298,9 +300,9 @@ the Sync Folder.
 3. `parentSetAt` on the parent field, separate from the vector —
    [§6.4 What the payload owes](#64-what-the-payload-owes).
 4. The store materialises the tree once at load, never a projection per read.
-5. Compaction, when it arrives, overwrites a device's own file in place. There is no `delete()` —
-   [architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter) fixes the adapter at three methods — so
-   versioned snapshot filenames would accumulate with nothing able to reap them.
+5. Compaction, when it arrives, overwrites a device's own file in place. The adapter's one `remove` refuses every name
+   outside `pictures/` — [architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter) — so versioned
+   snapshot filenames would accumulate with nothing able to reap them.
 6. A tail is never truncated below what the *previous* published snapshot covers. Snapshot and tail sync independently,
    and the ordering "old snapshot, new tail" silently loses ops.
 

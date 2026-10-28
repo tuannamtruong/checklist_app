@@ -4,7 +4,8 @@
 | --- | --- |
 | Device id | Eight hex characters, generated on a device's first run and never typed by the user. It names the file that device writes. It lives in `localStorage`, so it is per-origin: one machine reached through two origins is two devices. "Clear site data" in Browser resets it. |
 | Root | A parent that is not a node. There are three — `root`, `agenda` and `timely` — and every walk that climbs a parent chain stops at one of them. They are the application's three lists: the tree (`All`), the two day lists (Today and Tomorrow), and the repeating check items (Timely). Nothing moves between them — [requirements.md §4.4 Today and Tomorrow](requirements.md#44-today-and-tomorrow), [requirements.md §4.5 Timely](requirements.md#45-timely). |
-| Folder adapter | Exactly three methods: `list()`, `read(name)`, `write(name, content)`. The only route from the logic layer to storage. |
+| Folder adapter | Exactly four methods: `list()`, `read(name)`, `write(name, content)`, `remove(name)` — the last refusing every name outside `pictures/`. The only route from the logic layer to storage. |
+| Picture | A file in the folder's `pictures/`, named by the hash of its bytes and written by whichever device pasted it. A body points at it with `![alt](pictures/<name>)`. Taken away, it is renamed `del_<YYYY-MM-DD>_<name>` and removed 30 days later — [requirements.md §4.6 Pictures in a body](requirements.md#46-pictures-in-a-body). |
 | Local Folder | The folder on the device's own storage. The cloud provider's client mirrors its contents to the Sync Folder. The application reads and writes here. |
 | Sync Folder | The one shared folder in the cloud provider's directory holding all of the application's state. No device writes to it directly. |
 | Device file | What one device writes into Local Folder, named with its own device id: `checklist.<device-id>.ops.jsonl`. |

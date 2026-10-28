@@ -46,8 +46,10 @@ Follow `docs/code-standard.md`.
 
 - The logic layer has no I/O, no clock and no `window`. Time is a `now()` parameter, the folder is an adapter object,
   the UI is a callback.
-- A folder adapter is exactly three methods: `list()`, `read(name)`, `write(name, content)`.
-- A device writes only paths carrying its own device id. This is the entire safety argument for sync.
+- A folder adapter is exactly four methods: `list()`, `read(name)`, `write(name, content)`, `remove(name)`. `remove`
+  refuses every name outside `pictures/`, inside the adapter.
+- A device writes only paths carrying its own device id, or a picture whose name is the hash of its bytes. This is the
+  entire safety argument for sync.
 
 ## Commands
 
@@ -127,6 +129,15 @@ it. Never a peer's file: one writer per file, and that is also why the cut needs
 lower this device's top counter, or every peer reads the file as a partial download and skips it forever. sync-flow.md
 §4.8.
 
+**Pictures are the one shared path** — P-1 to P-8, requirements.md §4.6. A pasted or chosen picture is shrunk to
+2048px WebP and written once to `pictures/<hash>.webp`, the name being the first 32 hex digits of its
+SHA-256, so two devices writing one name write the same bytes; the body carries `![alt](pictures/<hash>.webp)` and
+never the bytes. Dropping the last mark renames it `del_<YYYY-MM-DD>_<hash>.webp`, and any device's cycle renames it
+back if a body points at it again or removes it after 30 days. A missing picture draws a "cannot be found" symbol.
+`src/core/pictures.ts` is every name and plan, `src/app/pictures.svelte.ts` the bytes (`Session.pictures`),
+`src/ui/Picture.svelte` the drawing; `FolderSync.listed` is the listing the cycle hands to `Pictures.tidy`.
+past_decision.md §23.
+
 Never in a file, always `localStorage`: the device id, collapse state, which sidebar rows are open, the drawer's state,
 the sidebar's and the note pane's widths, which folder this device chose, which cloud app it belongs to, the chosen
 theme and the two colours picked over it, how large the sidebar's type is, and dismissed conflict rows. The File System
@@ -184,10 +195,11 @@ becomes `` `inline` ``, a caret or a selection crossing a line break becomes a f
 box takes the fences off; and one `▦` that writes B-12's starter table outside a table and takes the pipes off inside
 one, lit while the caret is in a table. They sit in a row above the field with A-1's tag line beside them (X-40 — a
 snippet the pane hands in, so the four buttons and the tags cost one row rather than two), and **selecting a run of text
-raises the same controls beside the selection** (B-7). A fifth button in that row, `↶`, is not a mark: it is the field's
-own `execCommand('undo')`, for a phone with no Ctrl-Z (B-13). It can take a control's edit back because every control
-*types* its change — `spliceOf` narrows the new body to the range that changed and `insertText` writes it — and an
-assigned `value` would have emptied the undo stack.
+raises the same controls beside the selection** (B-7). Two more buttons in that row are not marks. The picture
+control (P-2) is a file input that writes a picture to the folder and types its mark — pasting one does the same — and
+`↶` is the field's own `execCommand('undo')`, for a phone with no Ctrl-Z (B-13). It can take a control's edit back
+because every control *types* its change — `spliceOf` narrows the new body to the range that changed and
+`insertText` writes it — and an assigned `value` would have emptied the undo stack.
 
 **A list is typed and Enter is the whole of it (B-10).** `- ` or `1. ` opens one; Enter carries the marker onto the next
 line and counts the numbers up, and Enter on an item with nothing in it takes the marker off, which is the way out.

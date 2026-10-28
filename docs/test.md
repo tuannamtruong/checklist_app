@@ -30,7 +30,7 @@ vectors rather than approximations.
 | --- | --- | --- | --- |
 | Merge properties | the logic layer, generated inputs | is the merge commutative, associative, idempotent | partly — `scenario.mjs` check 10 |
 | Scenario | the logic layer plus an in-memory folder | do N devices converge across a scripted sequence of edits, races and joins | `scenario.mjs` checks 1–9, against temp directories rather than memory |
-| Adapter conformance | each adapter in turn | does every adapter honour the same three-method contract | — |
+| Adapter conformance | each adapter in turn | does every adapter honour the same four-method contract | — |
 | Integration | real files, real processes | does a device reach a real folder through the path its platform forces on it | `bridge.mjs` |
 | UI | the page in a browser | does an edit produce exactly one write, does a race raise the panel, does the keyboard model work | `ui.mjs`, and `android-bridge.mjs` for the Android startup path |
 | Platform | the WebView shell, the installed PWA | does startup, the folder grant, and a cold offline launch work on the device | — |
@@ -110,8 +110,10 @@ Production adds the tree cases, and these are the ones that will find bugs:
 
 One suite, run against every adapter, asserting the contract rather than the implementation: `list` returns names and
 not paths, `read` of an absent name returns `null` rather than throwing, `write` followed by `read` round-trips exactly,
-a write is never observable in a partial state, and names with awkward characters survive. The prototype has no such
-suite; each adapter is exercised only by the test that happens to use it, which is how adapters drift apart.
+a write is never observable in a partial state, and names with awkward characters survive. For P-8 it adds three more: a
+`Blob` written under `pictures/` reads back byte for byte, or is refused by `local-folder`; `remove` takes a picture out
+of `list`; and `remove` of any name outside `pictures/` is refused and leaves the file where it was. The prototype has
+no such suite; each adapter is exercised only by the test that happens to use it, which is how adapters drift apart.
 
 `src/adapters/conformance.ts` is that suite, and `conformance.test.ts` runs it over four of the six: `memory-folder`,
 `local-folder` against a fake `Storage`, `android-folder` against a stubbed bridge, and `http-folder` against a loopback

@@ -34,8 +34,10 @@ grant, and it grants them by being a folder. No API, no OAuth, no account, no se
 client is the only thing on the network.
 
 **One writer per file removes every race at the file layer.** A device writes only paths carrying its own device id, so
-two devices never write one path and the provider's conflict-copy behaviour never fires. Races move up into the
-application content, where a version vector detects them.
+two devices never write one path and the provider's conflict-copy behaviour never fires. A picture is the one exception,
+and it keeps the property rather than the letter: its name is the hash of its bytes, so two devices writing one name
+write the same file — [past_decision.md §23.2 What the name has to be](past_decision.md#232-what-the-name-has-to-be).
+Races move up into the application content, where a version vector detects them.
 
 **The folder never announces anything.** No provider client offers a change event a web page can subscribe to, so the
 app polls — every 3 s and on window focus in the prototype. Any production design inherits the poll.
@@ -69,13 +71,20 @@ which is why a headless test and the browser run the same code.
 
 ## 4. The folder adapter
 
-An adapter is three methods and nothing else:
+An adapter is four methods and nothing else:
 
 ```
 list()               -> Promise<string[]>
-read(name)           -> Promise<string | null>
+read(name)           -> Promise<string | Blob | null>
 write(name, content) -> Promise<void>
+remove(name)         -> Promise<void>
 ```
+
+`remove` exists for pictures (P-7) and refuses every name outside `pictures/`, inside each adapter rather than only in
+its one caller: a remove that could reach a log would undo one writer per file outright. The logs are never removed;
+compaction rewrites them in place. `read` and `write` carry a `Blob` for a name under `pictures/` and a string for every
+other name, and `list` names a picture as `pictures/<name>` beside the logs — the one directory any adapter opens.
+`local-folder` holds no pictures and refuses to write one — P-8.
 
 Every storage that can hold a folder can offer them. The prototype ships five:
 
@@ -89,14 +98,14 @@ Every storage that can hold a folder can offer them. The prototype ships five:
 | `local-folder` | any browser | `localStorage`, one key per file name |
 
 `local-folder` is the sixth, and it exists because M1 had one device and no Sync Folder while the payload was already
-decided. It keeps the op log the only persistence and the three methods the only route to it, so M2 replaced an adapter
-rather than a write path — requirement S-21. It is not a sync adapter: `localStorage` is per-origin and nothing mirrors
-it anywhere, which is why the app names it "Local storage" in the sidebar and "local browser storage" where the settings
-screen shows the folder.
+decided. It keeps the op log the only persistence and the adapter's methods the only route to it, so M2 replaced an
+adapter rather than a write path — requirement S-21. It is not a sync adapter: `localStorage` is per-origin and nothing
+mirrors it anywhere, which is why the app names it "Local storage" in the sidebar and "local browser storage" where the
+settings screen shows the folder.
 
 The production app needs the prototype's five for the same reasons. M1 shipped `memory-folder` and `local-folder`; M2
 added `fsaa-folder`, `http-folder` and `android-folder`, which is every browser-side one. `node-folder` has no caller in
-the app — nothing production runs in Node — so it stays the prototype's. Keeping the interface at three methods is what
+the app — nothing production runs in Node — so it stays the prototype's. Keeping the interface at four methods is what
 lets the merge logic be tested against a plain object and shipped against a phone.
 
 **Adapter selection at startup.** On every page load, "How can this browser reach a local folder?" is asked.
@@ -170,8 +179,8 @@ this design must never produce silently. It is the only thing that footer says b
 
 ### 4.1 Shell actions, beside the adapter
 
-The adapter answers "what is in the folder". It does not answer "show me the folder", and it must not learn to: three
-methods is what lets the merge be tested against a plain object and shipped against a phone, and a fourth method exists
+The adapter answers "what is in the folder". It does not answer "show me the folder", and it must not learn to: four
+methods is what lets the merge be tested against a plain object and shipped against a phone, and a fifth method exists
 for one adapter and is a stub in the other five —
 [code-standard.md §3 Module boundaries](code-standard.md#3-module-boundaries).
 
@@ -189,7 +198,7 @@ There was a third action, `openApp`, which started the cloud client whose folder
 — and it took the provider catalog, the Android `<queries>` block and the helper's command runner with it. What is left
 is about the folder, which is the only thing this app has an opinion on.
 
-Three properties keep this from being the fourth method by another name:
+Three properties keep this from being the fifth method by another name:
 
 **Nothing in the sync path calls any of it.** A device with no shell actions at all syncs identically. They are
 convenience, and the merge cannot tell whether they exist.
@@ -326,7 +335,8 @@ Already written and tested in the prototype, four Java files and no framework:
 - `FolderStore.java` calls `takePersistableUriPermission` on the granted tree and keeps the URI in `SharedPreferences`.
   A plain SAF grant dies with the process; the persistable one survives reboots, which is why later launches go straight
   to the folder.
-- The `android-folder` adapter wraps the bridge in the same three methods every other adapter offers.
+- The `android-folder` adapter wraps the bridge in the same four methods every other adapter offers. The bridge carries
+  strings, so a picture crosses it as base64.
 
 Built inside Docker, with the web assets copied in at build time so the phone cannot drift from the laptop. Nothing is
 installed on the host: `make apk` builds the image, runs one `gradle assembleDebug` in it as the invoking user, and

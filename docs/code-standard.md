@@ -27,12 +27,14 @@ Names carry the domain vocabulary from [Glossary](glossary.md).
 adapter object, the UI enters as a callback. A module that imports `fs`, reads `Date.now()` or touches `document` is not
 part of the logic layer, whatever folder it sits in.
 
-**A folder adapter is exactly three methods** — `list()`, `read(name)`, `write(name, content)` — and nothing else, per
-[architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter). Adding a fourth method to solve one
-adapter's problem breaks the other four.
+**A folder adapter is exactly four methods** — `list()`, `read(name)`, `write(name, content)`, `remove(name)` — and
+nothing else, per [architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter). `remove` refuses every
+name outside `pictures/`, inside the adapter. Adding a fifth method to solve one adapter's problem breaks the other
+four.
 
-**One writer per file.** A device writes only paths carrying its own device id. This is the entire safety argument for
-the sync design, and it is a code rule, not a convention.
+**One writer per file, or a name that is the content.** A device writes only paths carrying its own device id, and the
+one exception is a picture, whose name is the hash of its bytes. This is the entire safety argument for the sync design,
+and it is a code rule, not a convention.
 
 ## 4. Error handling
 

@@ -480,7 +480,7 @@ over.
 
 | ID | Requirement | State | Where |
 | --- | --- | --- | --- |
-| B-1 | A note body carries **bold**, two levels of heading, code, list items and a table, and no other formatting | ✅ | `src/core/markup.ts` — the one place a mark is spelled, beside `tags.ts` and `paste.ts`; `markup.test.ts` |
+| B-1 | A note body carries **bold**, two levels of heading, code, list items and a table, and no other formatting. A picture is not formatting — [§4.6 Pictures in a body](#46-pictures-in-a-body) | ✅ | `src/core/markup.ts` — the one place a mark is spelled, beside `tags.ts` and `paste.ts`; `markup.test.ts` |
 | B-2 | The marks are Markdown's — `**bold**`, `# ` and `## ` — and they are stored in `body` itself | ✅ | Nothing changed in `Node`, the op, the merge, the conflict rows or compaction: `body` is a string before and after |
 | B-3 | The body is edited as text and read as rendered: the marks are visible while the caret is in it, the formatting when it is not | ✅ | `src/ui/NoteBody.svelte`. One textarea, never unmounted — transparent over the rendered blocks when the caret is elsewhere, so the click that reaches it is the click that focuses it |
 | B-4 | `Ctrl-B` wraps the selection, and two on-screen controls do the same: bold, and a heading that cycles heading, subheading, none | ✅ | `toggleBold`, `setHeading` and `nextHeading` in `src/core/markup.ts`, driven by `src/ui/NoteBody.svelte`. A phone has no Ctrl key, which is [§3.1 Keyboard (desktop)](#31-keyboard-desktop)'s rule applied to a body rather than to a row |
@@ -735,6 +735,27 @@ the 15th stays the 15th, and a day of the month the target month does not have i
 **A timely item is otherwise an ordinary row**, in the way an agenda item is — and `every` is an ordinary
 last-writer-wins field, in the way `day` is. `edit.ts`'s `setEvery` is the one writer.
 
+### 4.6 Pictures in a body
+
+A body (K-3, K-12) shows a picture: the bytes are a file in the folder's `pictures/`, and the body carries a mark naming
+it. [past_decision.md §23 Pictures in a body](past_decision.md#23-pictures-in-a-body) is what this was chosen over.
+
+| ID | Requirement | State | Where |
+| --- | --- | --- | --- |
+| P-1 | A line that is only `![alt](pictures/<name>)` draws the picture there, with `alt` as its text alternative. Anywhere else in a line the mark is characters | ✅ | `PICTURE` and `lineBlock` in `src/core/markup.ts`, drawn by `src/ui/Picture.svelte` inside `NoteBody.svelte`'s rendered half — B-3's rule: the mark while the caret is in the body, the picture when it is not. `markup.test.ts`, `scripts/ui-smoke.mjs` |
+| P-2 | Pasting a picture into a body, or choosing one, writes it to `pictures/` and types the mark at the caret | ✅ | `onPaste` and the picture control in `src/ui/NoteBody.svelte`, `pictureSplice` in `src/core/markup.ts`, `Session.addPicture`. Typed through `apply`, so `Ctrl-Z` and `↶` take the mark back — B-13. Choosing is a file input, which is the phone's camera and gallery. `scripts/ui-smoke.mjs` |
+| P-3 | A picture is shrunk on the way in, to 2048 px on its long edge, as WebP | ✅ | `shrink` in `src/app/pictures.svelte.ts`, over `createImageBitmap` and an `OffscreenCanvas`; never enlarged. `scripts/ui-smoke.mjs` pastes 3000 px and draws 2048 |
+| P-4 | A picture's name is the first 32 hex digits of the SHA-256 of its bytes, so two devices that write one name write the same file | ✅ | `pictureName` in `src/core/pictures.ts`, over `crypto.subtle`. The half of S-3 that is not a device id. `pictures.test.ts`, `scripts/ui-smoke.mjs` |
+| P-5 | A picture whose file is missing, has not arrived, or does not hash to its name draws a symbol saying it cannot be found, and is looked for again on the next cycle | ✅ | `Pictures.url` and `namedBy`; `src/ui/Picture.svelte` draws the symbol and looks again whenever `generation` moves, which every cycle does. One symbol for all three: a reader cannot tell them apart and nothing different would be done about any of them. `pictures.test.ts`, `scripts/ui-smoke.mjs` |
+| P-6 | Committing a body that drops a mark its last body had renames that picture `del_<YYYY-MM-DD>_<name>`, unless another body in the tree points at it, archived rows included. A mark pointing at a renamed picture draws it from the new name | ✅ | `droppedPictures` in `src/core/pictures.ts`, run by `Pictures.commit` from `Session.commitBody`; `flaggedCopy` is the second name `Pictures.url` tries. Only the device that dropped the mark renames, so a picture another device pasted a moment ago is never at risk. `pictures.test.ts`, `src/app/pictures.test.ts` |
+| P-7 | On every cycle, a `del_` picture that a body points at again is renamed back, and one dated more than 30 days ago is removed | ✅ | `tidyPlan` in `src/core/pictures.ts`, run by `Pictures.tidy` at the end of `Session.cycle` over `FolderSync.listed`. Any device can do it: the date is in the name. A rename is a write of the new name, then a remove of the old one. `pictures.test.ts`, `src/app/pictures.test.ts` |
+| P-8 | The folder adapter gains `remove(name)`, and every adapter refuses it for a name outside `pictures/`. `local-folder` holds no pictures and refuses to write one | ✅ | `refuseUnlessPicture` in `src/core/folder.ts`, called by every adapter's `remove`; `serve.py` and `FolderBridge.java` refuse on their own side as well — [architecture.md §4 The folder adapter](architecture.md#4-the-folder-adapter). `conformance.ts`, and `serve.py` driven by hand over loopback |
+
+**The bytes are beside the body, never in it.** `body` stays a string, so the op, the merge, the conflict rows and
+compaction learn nothing — a picture is B-2's trade made again. A build that predates it shows the mark, which names the
+file a reader can open in the folder. The folder sync (S-19) never reads a picture: `deviceOfFileName` skips every name
+that is not a log, so a picture is read when it is drawn and not before.
+
 ## 5. Navigation and routing
 
 Hash routing, per X-7, so the fragment never reaches a server and the app deploys to a static host, to the loopback
@@ -831,7 +852,7 @@ requirement state.
 | --- | --- | --- | --- |
 | S-1 | Every mutation goes through one write path | ✅ | `src/app/device-log.ts` — the only writer of this device's file. |
 | S-2 | A mutation shape that merges at field granularity rather than whole-document | ✅ | The op of [§2.2 The op](#22-the-op): a `set` carries only the fields that changed, so disjoint fields never interact — `src/core/materialise.ts` |
-| S-3 | A device writes only paths carrying its own device id, so no two devices write one path | ✅ | `deviceFileName` in `src/core/op-log.ts` is the only name the write path can spell, and `src/app/folder-sync.ts` reads peers without ever writing one. |
+| S-3 | A device writes only paths carrying its own device id, or a picture named by its own content, so no two devices write one path with different contents | ✅ | `deviceFileName` in `src/core/op-log.ts` is the only name the write path can spell, and `src/app/folder-sync.ts` reads peers without ever writing one. The picture half is P-4's `pictureName` in `src/core/pictures.ts` — [past_decision.md §23.2 What the name has to be](past_decision.md#232-what-the-name-has-to-be) |
 | S-4 | Merge is commutative, associative and idempotent | ✅ | `src/core/merge.ts`; `merge.test.ts` asserts all three laws over op sets from a seeded generator — the shrinking S-12 still owes is what keeps that row open. |
 | S-5 | Concurrent edits are detected by version vector, never prevented | ✅ | `opVectors` in `src/core/merge.ts` replays each file's `seen` receipts into a vector per op; `src/core/conflicts.ts` classifies the pair. |
 | S-6 | Any device can settle any race, with no leader, quorum or membership | ✅ | Settling one is an ordinary op — `src/ui/ConflictsPage.svelte` writes a `set` like any other edit, and it dominates both sides because it has read both. |
@@ -859,11 +880,12 @@ requirement state.
 ### 7.3 Fixed constraints
 
 - No application server, ever. Sync goes through a cloud **file** provider.
-- A device writes **only** paths under its own id, so the provider's conflict-copy behaviour never triggers.
+- A device writes **only** paths under its own id, or a picture whose name is its content, so the provider's
+  conflict-copy behaviour never triggers — or triggers over two copies of the same bytes.
 - No authoritative clock, for the same reason. Timestamps recorded in a write still order writes identically on every
   device, but a skewed clock can order them against what the user meant — accepted, and costed in
   [sync-flow.md §6.5 Accepted limit](sync-flow.md#65-accepted-limit).
-- Provider choice stays behind the three adapter methods so it can be swapped. The default is **MEGA**, matching the
+- Provider choice stays behind the adapter's methods so it can be swapped. The default is **MEGA**, matching the
   milestone M2. Real provider behaviour is not observable until a Windows and an Android build exist, and is deferred
   until then — [sync-flow.md §7 What is still open](sync-flow.md#7-what-is-still-open).
 
@@ -1144,7 +1166,7 @@ X-12 gathered what is about *this device* rather than about the tree, and the fo
 it is chosen once, on the setup screen, and then never mentioned again except as a line in the footer. X-15 and X-16
 give it a section — what this device writes to, how to look inside it, and how to point the device somewhere else.
 
-**Opening a folder is not something the folder adapter does.** The adapter is three methods and stays three —
+**Opening a folder is not something the folder adapter does.** The adapter is four methods and gains none for this —
 [code-standard.md §3 Module boundaries](code-standard.md#3-module-boundaries) — so the two buttons are a separate,
 optional capability of the *shell*, and each shell answers for itself:
 
@@ -1445,7 +1467,7 @@ _Not written yet._
 
 ## 14. Engineering constraints
 
-_Not written yet._ Expected to cover: the no-server rule, the three-method adapter boundary, the logic layer rule from
+_Not written yet._ Expected to cover: the no-server rule, the four-method adapter boundary, the logic layer rule from
 [architecture.md §3 The layer model](architecture.md#3-the-layer-model), and the code standard in
 [code-standard.md](code-standard.md).
 
@@ -1472,8 +1494,8 @@ Windows bundle in Firefox, fixed rather than accepted, and the reason X-18 exist
 ## 16. Explicitly out of scope
 
 Backlogged deliberately, not overlooked: dynamic lists, Google Calendar sync, recurring tasks, reminders and
-notifications, attachments, dates and quick add, sharing or multi-user, and any form of application server or hosted
-database.
+notifications, attachments other than a picture in a body (P-1), dates and quick add, sharing or multi-user, and any
+form of application server or hosted database.
 
 Themes were on this list until M4 and are now X-13. What took them off it is that the shell had always spelled roles
 rather than colours, so the feature turned out to be a palette per theme and no component change at all —

@@ -23,6 +23,7 @@ History of project's decision. The situation, its options and resolution.
 | [What the note pane draws](#146-what-the-pane-draws--x-31) | The title, the tags and the body, with the body filling the pane | -  the note's page redrawn in a column<br>-  keeping the children under the body<br>-  dropping the tree's nesting under a note instead |
 | [Retiring the cloud-app launcher](#16-retiring-the-cloud-app-launcher) | Remove X-17 outright — no catalog, no stored provider, no launch capability | -  keeping the button and dropping only the picker<br>-  a free-text command instead of a catalog<br>-  detecting the provider from the folder's path |
 | [Development on its own port](#22-development-on-its-own-port) | Every server this repository runs on `38532`, the bundle's helper alone on `38531` | -  one shared port, with `make dev` closing the helper<br>-  `make dev` alone moved, preview left on `38531`<br>-  a dev-only prefix on every `localStorage` key |
+| [Pictures in a body](#23-pictures-in-a-body) | A shared `pictures/` folder named by content hash, a Markdown image mark in the body, renamed `del_<date>_` and removed after 30 days | -  keeping pictures out<br>-  a `data:` URI inside the body<br>-  one picture file per device<br>-  a read-only path to a file put there by hand<br>-  a sweep, an emptied file, or the intent in `localStorage` |
 
 ---
 
@@ -382,6 +383,9 @@ line this section draws. A bullet in a note body was refused once on the grounds
 anything that wants to be *ticked*, moved or found: a step that matters is a row, and B-10 is for the ones that do not.
 The measurement that would justify B remains the one this section always named: bodies long enough that the person is
 writing *in* the app rather than *about* the rows.
+
+An image came off this list without B: its bytes live in a file of their own and the body carries only a mark naming it,
+so the string still holds nothing it cannot spell — [§23 Pictures in a body](#23-pictures-in-a-body).
 
 ---
 
@@ -896,3 +900,91 @@ development no longer has a reason to stop it.
 
 A development workflow that needs the bundle's origin — the dev server driving `http-folder` against a running helper,
 say. The helper takes `--port`, so even that can run on a port of its own before it needs this one.
+
+## 23. Pictures in a body
+
+**Taken** — [requirements.md §4.6 Pictures in a body](requirements.md#46-pictures-in-a-body) is P-1 to P-8, built.
+[§12.3 What is still refused](#123-what-is-still-refused) refused an image as state a string cannot carry, and
+[requirements.md §16 Explicitly out of scope](requirements.md#16-explicitly-out-of-scope) carried attachments. A
+screenshot beside the line that explains it is what reopened both.
+
+### 23.1 The options
+
+| # | Option | What it costs |
+| --- | --- | --- |
+| A | Keep refusing: the picture stays in the provider's own app and the body says where | Nothing to build, and the picture is never beside the words it explains |
+| B | The picture inside `body` as a `data:` URI, shrunk on paste | Every `set body` op carries the whole picture, every flush rewrites it into the file, and every cycle re-reads it from every peer. A 270 KB picture in a note edited ten times is 2.7 MB of log before compaction, and `local-folder` has about 5 MB in all |
+| C | One file per picture per device, `checklist.<device>.pic.<hash>.webp` | S-3 kept to the letter for nothing: a write-once file named by its content needs no owner, and the same picture pasted on two devices is stored twice |
+| D | A path to a picture the person put in the folder themselves, read and never written | No paste and no camera. On a phone the picture goes through the provider's app first and its name is typed by hand |
+| E | **One shared `pictures/` folder, each file named by the hash of its bytes, pointed at by a Markdown image mark in the body** — chosen | S-3 restated rather than kept, a fourth adapter method to take a picture away, and binary files in the folder beside the logs |
+
+**E was taken.** It is C with the device id dropped and D folded in. The bytes never enter the op log, so the payload
+learns nothing: `body` stays a string, and the line `![](pictures/<hash>.webp)` in it is characters a person could have
+typed — [§12.1 The options](#121-the-options)'s option A again, with the bytes beside the string rather than in it. A
+build that predates it shows the mark, which names a file the reader can open in the folder. D comes free: the mark is a
+path, so a file dropped into `pictures/` by hand draws too, once its name is typed.
+
+A picture is shrunk on the way in, to 2048 px on its long edge as WebP. A phone photo is 3 to 5 MB, a note needs it
+legible rather than printable, and every byte saved is one the provider uploads once and every phone stores.
+
+### 23.2 What the name has to be
+
+S-3 was never about device ids. What it protects is that no path is written by two devices with different contents,
+since that is the one case where a provider's client makes a conflict copy and a file is lost. A device id in the name
+is one way to get that; a name that *is* the content is the other. Two devices writing `pictures/<hash>.webp` write the
+same bytes, so whatever the provider does with the race — keep either, or add a stray `(1)` copy — the right picture is
+at the right name. The rule becomes: **a file is written by one device, or its name is its content.**
+
+A pasted name gets none of that. Chrome names every pasted screenshot `image.png`, so the second paste would overwrite
+the first on one device before a second device is involved. The hash also catches a picture that half-arrived, because
+its bytes no longer hash to its name — S-7's skip, for a file no log describes.
+
+### 23.3 Taking a picture away
+
+The device that commits a body without a mark its last body had takes that picture away, unless another body in the tree
+still points at it — archived rows included, so a row restored by T-13 comes back with its pictures. Only the device
+that removed a reference acts on it, and it knows the reference existed, so a picture pasted on another device a moment
+ago is never at risk.
+
+| # | Option | What it costs |
+| --- | --- | --- |
+| A | Never delete | A folder holding every picture ever pasted |
+| B | A sweep: any device removes any picture no body points at | A paste writes the file at once and the body only on blur, navigation or after 60 s (S-20), so every new picture is unreferenced on every peer for a minute plus the provider's delay. A sweep in that window deletes it, on every paste rather than by rare chance |
+| C | Empty the file on removal, `write(name, '')` | No fourth method, but `Ctrl-Z` after the commit brings back a mark whose bytes are gone, and an empty file per removed picture stays forever |
+| D | The intent kept in this device's `localStorage`, the file emptied after 30 days | Undo survives and there is still no fourth method, but the empty files stay and the cleanup stops when that device is retired |
+| E | **Renamed `del_<YYYY-MM-DD>_<hash>.webp`, and removed after 30 days** — chosen | A fourth adapter method, `remove(name)` |
+
+**E was taken.** The flag is in the name, so any device can finish the job and nothing has to remember anything. On each
+cycle a `del_` file whose hash a body points at again is renamed back, and one older than 30 days is removed. The
+renderer reads either name, so a picture brought back by undo, by T-13 or by taking a conflict's losing value still
+draws for 30 days, and the provider's own trash usually keeps a removed file about as long again. A rename is a `write`
+of the new name and then a `remove` of the old one, in that order, so a device that dies between the two leaves a spare
+copy rather than none. The date is `dayKey` — local and a day wide, so a skewed clock moves the 30 days by hours.
+
+Missing and taken away read the same: a picture whose file is absent, or has not arrived yet, draws a symbol saying it
+cannot be found and is looked for again on the next cycle. The race this leaves open — a peer's unsynced edit pointing
+at a picture that was taken away and stays away for 30 days — was judged not worth more machinery.
+
+### 23.4 The fourth method
+
+`remove(name)` reaches `pictures/` and nothing else. The refusal sits inside each adapter, the way `serve.py` and the
+Android bridge already check a name, rather than only in its one caller: a remove that could reach a log would undo S-3
+outright. Each is one native call — `removeEntry` for `fsaa`, `DocumentFile.delete()` on Android, `unlink` in the
+helper, and a key or map delete in the two in-page adapters. The logs still have no delete; compaction rewrites them in
+place, as before ([§6 Compaction](#6-compaction)).
+
+`local-folder` holds no pictures: `localStorage` takes strings and about 5 MB, and a device that syncs with nothing has
+no peer to show one to.
+
+### 23.5 What reopens it
+
+- **The symbol on a picture nobody took away, more than once a month.** The race of
+  [§23.3 Taking a picture away](#233-taking-a-picture-away) is not rare, and the rename wants a grace period before it
+  as well as after.
+- **`pictures/` past 500 MB.** What E never collects — the pictures of deleted rows, a picture pasted and removed inside
+  one draft — has grown to matter, and option B returns with a grace period.
+- **A 300 KB picture taking more than a second to draw on the phone.** The bridge carries strings, so a picture crosses
+  it as base64. The Android shell would serve `pictures/` through a path handler instead, as `MimeCorrectAssetHandler`
+  already serves the assets.
+- **`(1)` copies appearing in `pictures/`.** A provider handling two creates of one name worse than
+  [§23.2 What the name has to be](#232-what-the-name-has-to-be) assumes.
